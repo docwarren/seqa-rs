@@ -1,190 +1,35 @@
-# seqa - Genomic File Query Tool
+# seqa — Genomic File Query Tool
 
-seqa is a fast, efficient command-line tool for querying genomic files across multiple storage backends. It supports local files, cloud storage (S3, Azure, GCS), and HTTP/HTTPS URLs.
-
-## Prerequisites
-
-- **Rust toolchain** (1.70 or later) - Install from https://rustup.rs/
-- **Git** - For cloning the repository
+Fast command-line tool for querying genomic files across local and cloud storage.
 
 ## Supported File Formats
 
-- **BAM** - Binary Alignment Map (requires .bai index)
-- **VCF** - Variant Call Format (requires .tbi index)
-- **GFF/GTF** - Gene Feature Format (requires .tbi index)
-- **BED/BedGraph** - Browser Extensible Data (requires .tbi index)
-- **BigWig** - Binary wiggle format (self-indexed)
-- **BigBed** - Binary BED format (self-indexed)
-- **FASTA** - Reference sequences (requires .fai index)
+- **BAM** — Binary Alignment Map (requires `.bai` index)
+- **VCF** — Variant Call Format (requires `.tbi` index)
+- **GFF/GTF** — Gene Feature Format (requires `.tbi` index)
+- **BED/BedGraph** — Browser Extensible Data (requires `.tbi` index)
+- **BigWig** — Binary wiggle format (self-indexed)
+- **BigBed** — Binary BED format (self-indexed)
+- **FASTA** — Reference sequences (requires `.fai` index)
 
 ## Installation
 
-### From Source
-
 ```bash
-# Clone the repository and navigate to the workspace root
-cd soma-rs
-
-# Build the CLI tool
 cargo build --release -p seqa
-
-# The binary will be available at target/release/seqa
 ```
 
-### Add to PATH (Optional)
-
-To use `seqa` from anywhere without specifying the full path, add it to your PATH:
-
-**Option 1: Add the binary directory to PATH**
-
-Add this line to your shell configuration file (`~/.bashrc`, `~/.zshrc`, or `~/.bash_profile`):
+The binary will be at `target/release/seqa`. To install it globally:
 
 ```bash
-export PATH="$PATH:/path/to/soma-rs/target/release"
-```
-
-Then reload your shell configuration:
-```bash
-source ~/.bashrc  # or ~/.zshrc
-```
-
-**Option 2: Create a symlink in a directory already in PATH**
-
-```bash
-# Create a symlink in /usr/local/bin (may require sudo)
-sudo ln -s /path/to/soma-rs/target/release/seqa /usr/local/bin/seqa
-
-# Or in your local bin directory (no sudo required)
-mkdir -p ~/.local/bin
-ln -s /path/to/soma-rs/target/release/seqa ~/.local/bin/seqa
-# Make sure ~/.local/bin is in your PATH
-export PATH="$PATH:$HOME/.local/bin"
-```
-
-**Option 3: Copy the binary**
-
-```bash
-# Copy to /usr/local/bin (may require sudo)
+# Copy to /usr/local/bin
 sudo cp target/release/seqa /usr/local/bin/
 
-# Or to your local bin directory
+# Or symlink to ~/.local/bin (no sudo)
 mkdir -p ~/.local/bin
-cp target/release/seqa ~/.local/bin/
+ln -s $(pwd)/target/release/seqa ~/.local/bin/seqa
 ```
-
-**Verify installation:**
-```bash
-which seqa
-seqa --version
-```
-
-## Storage Backends
-
-seqa automatically detects the storage backend from the file path:
-
-- **Local files**: `/path/to/file.bam` or `file:///path/to/file.bam`
-- **S3**: `s3://bucket/path/to/file.bam`
-- **Azure Blob Storage**: `az://container/path/to/file.bam`
-- **Google Cloud Storage**: `gs://bucket/path/to/file.bam`
-- **HTTP/HTTPS**: `https://example.com/path/to/file.bam`
-
-### Setting Up Cloud Storage Access
-
-To access files on cloud storage platforms, you need to configure authentication credentials.
-
-#### AWS S3
-
-**Required Environment Variables:**
-```bash
-export AWS_ACCESS_KEY_ID=<your-access-key-id>
-export AWS_SECRET_ACCESS_KEY=<your-secret-access-key>
-export AWS_REGION=<region>  # e.g., us-east-1
-```
-
-**How to Create AWS Credentials:**
-
-1. Go to the [AWS IAM Console](https://console.aws.amazon.com/iam/)
-2. Navigate to "Users" → "Add users"
-3. Enter username and select "Access key - Programmatic access"
-4. Attach policy: "AmazonS3ReadOnlyAccess" (or "AmazonS3FullAccess" if needed)
-5. Save the Access Key ID and Secret Access Key
-6. Set the environment variables above
-
-For detailed instructions, see [AWS IAM Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html).
-
-#### Azure Blob Storage
-
-**Option 1: Using Service Principal (Recommended)**
-```bash
-export AZURE_TENANT_ID=<your-tenant-id>
-export AZURE_CLIENT_ID=<your-client-id>
-export AZURE_CLIENT_SECRET=<your-client-secret>
-export AZURE_STORAGE_ACCOUNT=<storage-account-name>
-export AZURE_STORAGE_CONTAINER=<container-name>
-```
-
-**How to Create Azure Service Principal:**
-
-1. Go to the [Azure Portal](https://portal.azure.com/)
-2. Navigate to "Azure Active Directory" → "App registrations" → "New registration"
-3. Register your application
-4. Go to "Certificates & secrets" → "New client secret"
-5. Copy the client secret value immediately
-6. Assign the app "Storage Blob Data Contributor" role on your storage account:
-   - Storage account → "Access control (IAM)" → "Add role assignment"
-7. Set the environment variables with your Tenant ID, Client ID (Application ID), and Client Secret
-
-**Option 2: Using Access Keys**
-```bash
-export AZURE_STORAGE_ACCOUNT=<storage-account-name>
-export AZURE_STORAGE_ACCESS_KEY=<access-key>
-export AZURE_STORAGE_CONTAINER=<container-name>
-```
-
-For detailed instructions, see [Azure Storage Authentication Documentation](https://learn.microsoft.com/en-us/azure/storage/common/storage-auth).
-
-#### Google Cloud Storage
-
-**Required Environment Variables:**
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
-```
-
-**How to Create GCS Service Account:**
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Navigate to "IAM & Admin" → "Service Accounts"
-3. Click "Create Service Account"
-4. Enter name and grant role: "Storage Object Viewer" (read-only) or "Storage Object Admin" (read/write)
-5. Click "Done"
-6. Select your service account → "Keys" → "Add Key" → "Create new key"
-7. Choose JSON format and download the key file
-8. Set `GOOGLE_APPLICATION_CREDENTIALS` to the path of the downloaded JSON file
-
-For detailed instructions, see [GCS Authentication Documentation](https://cloud.google.com/storage/docs/authentication).
-
-#### Setting Environment Variables
-
-You can set environment variables temporarily in your terminal:
-```bash
-export AWS_ACCESS_KEY_ID=your_key_here
-export AWS_SECRET_ACCESS_KEY=your_secret_here
-export AWS_REGION=us-east-1
-```
-
-Or permanently by adding them to your shell configuration file (`~/.bashrc`, `~/.zshrc`, etc.):
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-export AWS_ACCESS_KEY_ID=your_key_here
-export AWS_SECRET_ACCESS_KEY=your_secret_here
-export AWS_REGION=us-east-1
-```
-
-**Security Note:** Never commit credentials to version control. Consider using a `.env` file (not committed) or a secrets manager.
 
 ## Usage
-
-### Basic Command Structure
 
 ```bash
 seqa search <file> <coordinates> [OPTIONS]
@@ -192,163 +37,97 @@ seqa search <file> <coordinates> [OPTIONS]
 
 ### Coordinate Formats
 
-seqa supports three coordinate formats:
+| Format | Example | Description |
+|--------|---------|-------------|
+| Range | `chr1:1000000-2000000` | Records overlapping the range |
+| Single position | `chr1:1000000` | Records overlapping that position |
+| Full chromosome | `chr1` | All records on the chromosome |
 
-1. **Full chromosome**: `chr12` or `12`
-   - Returns all records on the chromosome
-   - Uses genome-specific chromosome length if `-r` is specified
-   - Otherwise uses the longest known chromosome length
-
-2. **Single position**: `chr12:12000`
-   - Returns records overlapping position 12000
-   - Equivalent to `chr12:12000-12001`
-
-3. **Range**: `chr12:12000-15000`
-   - Returns records overlapping the range from 12000 to 15000
-
-**Note:** Commas in coordinates are automatically stripped: `chr1:1,234,567-2,345,678` works fine.
+Commas are stripped automatically: `chr1:1,000,000-2,000,000` works fine.
 
 ### Options
 
-- `-r, --reference <GENOME>` - Specify reference genome build (hg38 or hg19)
-  - Used to determine chromosome lengths for full-chromosome queries
-  - Example: `-r hg38` or `-r hg19`
-
-- `-w` - Include header in output
-  - Adds the file header (if available) to the output
-
-- `-o` - Output header only
-  - Returns only the file header without any records
+| Flag | Description |
+|------|-------------|
+| `-r, --reference <GENOME>` | Reference genome build: `hg38` or `hg19` (used for full-chromosome lengths) |
+| `-w` | Include file header in output |
+| `-o` | Output header only |
 
 ### Examples
 
-#### Local Files
-
 ```bash
-# Query a BAM file with range
-seqa search /path/to/file.bam chr4:12345-13456
+# Local file
+seqa search /path/to/sample.bam chr12:10000000-10010000
 
-# Query entire chromosome with reference genome
-seqa search /path/to/file.bam chr12 -r hg38
+# Full chromosome with reference
+seqa search /path/to/sample.vcf.gz chr1 -r hg38
 
-# Query single position
-seqa search /path/to/file.vcf.gz chr1:12000
+# With header
+seqa search /path/to/sample.gff.gz chr5:1000-2000 -w
 
-# Include header in output
-seqa search /path/to/file.gff.gz chr5:1000-2000 -w
-
-# Get header only
-seqa search /path/to/file.bam chr1 -o
-```
-
-#### Cloud Storage
-
-```bash
 # S3
-seqa search s3://my-bucket/samples/sample1.bam chr1:1000000-2000000 -r hg38
+seqa search s3://my-bucket/sample.bam chr1:1000000-2000000
 
 # Azure
-seqa search az://my-container/data/variants.vcf.gz chr12 -r hg19
+seqa search az://my-container/variants.vcf.gz chr12 -r hg19
 
 # Google Cloud Storage
 seqa search gs://my-bucket/annotations.gff.gz chr5:12345-67890
 
 # HTTPS
 seqa search https://example.com/public/file.bam chr1:1000000-1500000
+
+# Pipe output
+seqa search file.bam chr1:1000000-2000000 | wc -l
+seqa search file.vcf.gz chr12 -r hg38 > chr12_variants.vcf
 ```
 
-#### BigWig and BigBed (Self-Indexed)
+## Cloud Storage Credentials
+
+### AWS S3
 
 ```bash
-# BigWig files don't require separate index files
-seqa search /path/to/file.bw chr4:12345-13456
-
-# Same for BigBed
-seqa search /path/to/file.bb chr1:1000000-2000000
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_REGION=...
 ```
 
-#### FASTA Files
+### Azure Blob Storage
 
 ```bash
-# Query a reference sequence
-seqa search /path/to/genome.fa chr12:12000-15000
-
-# Get entire chromosome sequence
-seqa search /path/to/genome.fa chr22 -r hg38
+export AZURE_STORAGE_ACCOUNT=...
+export AZURE_STORAGE_CONTAINER=...
+export AZURE_STORAGE_ACCESS_KEY=...
 ```
 
-#### Using Numeric Chromosome Names
+### Google Cloud Storage
 
 ```bash
-# These are equivalent to chr1, chr12, chrX
-seqa search file.bam 1:1000-2000
-seqa search file.bam 12
-seqa search file.bam X:5000000-6000000
+# Option 1 (preferred): JSON key content directly as an env var
+export GOOGLE_SERVICE_ACCOUNT_KEY='{ "type": "service_account", ... }'
+export GOOGLE_BUCKET=...
+
+# Option 2 (fallback): path to a service account JSON file
+export GOOGLE_SERVICE_ACCOUNT=/path/to/credentials.json
+export GOOGLE_BUCKET=...
 ```
+
+> Never commit credentials to version control.
 
 ## Output
 
-seqa writes results to standard output in the native format of each file type:
-- BAM → SAM format
-- VCF → VCF format
-- GFF/GTF → GFF/GTF format
-- BED/BedGraph → BED/BedGraph format
-- FASTA → FASTA format
-- BigWig → Wiggle format
-- BigBed → BED format
+Results are written to stdout in each format's native representation:
 
-Output can be piped to other tools or redirected to files:
-
-```bash
-# Pipe to grep
-seqa search file.bam chr1:1000-2000 | grep "MAPQ"
-
-# Redirect to file
-seqa search file.vcf.gz chr12 -r hg38 > chr12_variants.vcf
-
-# Count records
-seqa search file.bam chr1:1000000-2000000 | wc -l
-```
-
-## Coordinate Systems
-
-seqa preserves native coordinate systems:
-- **0-based half-open [begin, end)**: BAM, BED, BigWig, BigBed
-- **1-based closed [begin, end]**: VCF, GFF, GTF
-
-When you specify `chr1:1000-2000`, the tool interprets this according to each format's convention.
+| Input | Output |
+|-------|--------|
+| BAM | SAM |
+| VCF | VCF |
+| GFF/GTF | GFF/GTF |
+| BED/BedGraph | BED/BedGraph |
+| FASTA | FASTA |
+| BigWig | Wiggle |
+| BigBed | BED |
 
 ## Index Files
 
-Most formats require index files for efficient random access:
-
-| Format | Index Extension | Auto-detected |
-|--------|----------------|---------------|
-| BAM | .bai | Yes |
-| VCF | .tbi or .csi | Yes |
-| GFF/GTF | .tbi | Yes |
-| BED | .tbi | Yes |
-| BigWig | (embedded) | N/A |
-| BigBed | (embedded) | N/A |
-| FASTA | .fai | Yes |
-
-Index files must be in the same location as the data file with the standard extension.
-
-## Error Handling
-
-Common errors and solutions:
-
-- **Index file not found**: Ensure the index file exists alongside the data file
-- **Invalid coordinates**: Check chromosome name and coordinate format
-- **Cloud access denied**: Verify environment variables are set correctly
-- **Invalid reference genome**: Only `hg38` and `hg19` are supported for the `-r` option
-
-## Performance Tips
-
-- Use specific coordinate ranges when possible (faster than full chromosomes)
-- For large queries, consider using cloud storage with high bandwidth
-- Index files must be accessible (same storage backend as data files)
-
-## License
-
-See workspace LICENSE file.
+Index files must be in the same location as the data file with the standard extension appended (e.g. `sample.bam` → `sample.bam.bai`). For remote files the index is downloaded and cached locally for the duration of the query, then deleted.

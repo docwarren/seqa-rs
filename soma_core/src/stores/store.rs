@@ -65,7 +65,9 @@ pub fn get_gc_store(bucket: Option<String>) -> Result<GoogleCloudStorage, StoreE
     let mut builder = GoogleCloudStorageBuilder::new()
         .with_bucket_name(bucket_name);
 
-    if let Ok(path) = std::env::var("GOOGLE_SERVICE_ACCOUNT") {
+    if let Ok(key) = std::env::var("GOOGLE_SERVICE_ACCOUNT_KEY") {
+        builder = builder.with_service_account_key(key);
+    } else if let Ok(path) = std::env::var("GOOGLE_SERVICE_ACCOUNT") {
         builder = builder.with_service_account_path(path);
     }
 

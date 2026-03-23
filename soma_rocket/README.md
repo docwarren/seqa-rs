@@ -29,7 +29,12 @@ export AZURE_STORAGE_ACCESS_KEY=...
 
 ### Google Cloud Storage
 ```bash
-export GOOGLE_SERVICE_ACCOUNT=...
+# Option 1 (preferred): JSON key content directly as an env var
+export GOOGLE_SERVICE_ACCOUNT_KEY='{ "type": "service_account", ... }'
+export GOOGLE_BUCKET=...
+
+# Option 2 (fallback): path to a service account JSON file
+export GOOGLE_SERVICE_ACCOUNT=/path/to/credentials.json
 export GOOGLE_BUCKET=...
 ```
 
