@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{indexes::{bai::BaiIndex, bigwig::BigwigIndex, fai::FaiIndex, tabix::Tabix}, models::{bam_header::header::BamHeader, tabix_header::TabixHeader}, traits::feature::Feature};
+use crate::{genome::{chr_index, chromosome_len, get_longest_possible_genome}, indexes::{bai::BaiIndex, bigwig::BigwigIndex, fai::FaiIndex, tabix::Tabix}, models::{bam_header::header::BamHeader, tabix_header::TabixHeader}, traits::feature::Feature};
 
 use super::output_format::OutputFormat;
 
@@ -23,6 +23,7 @@ pub struct SearchOptions {
     pub chromosome: String,
     pub begin: u32,
     pub end: u32,
+    pub genome: Option<String>,
     pub output_format: OutputFormat,
     pub include_header: bool,
     pub header_only: bool,
@@ -44,6 +45,7 @@ impl SearchOptions {
             chromosome: String::new(),
             begin: 0,
             end: 0,
+            genome: None,
             output_format: OutputFormat::STRING, // Default output format
             include_header: true,
             header_only: false,
@@ -76,12 +78,45 @@ impl SearchOptions {
     pub fn set_coordinates(&mut self, coords: &str) -> Self {
         let string:String = coords.replace(",", "");
         let parts: Vec<&str> = string.split(':').collect();
+
         if parts.len() == 2 {
+            // Format: chr:begin-end or chr:position
             let range: Vec<&str> = parts[1].split('-').collect();
+            self.chromosome = parts[0].to_string();
+
             if range.len() == 2 {
-                self.chromosome = parts[0].to_string();
+                // Format: chr:begin-end
                 self.begin = range[0].parse().unwrap_or(1);
                 self.end = range[1].parse().unwrap_or(1);
+            } else if range.len() == 1 {
+                // Format: chr:position (single position)
+                let position: u32 = range[0].parse().unwrap_or(1);
+                self.begin = position;
+                self.end = position + 1;
+            }
+        } else if parts.len() == 1 {
+            // Format: chr (no coordinates provided)
+            // Use full chromosome length
+            self.chromosome = parts[0].to_string();
+            self.begin = 1;
+
+            // If genome is known, use that genome's chromosome length
+            if let Some(ref genome_name) = self.genome {
+                if let Some(chr_len) = chromosome_len(&self.chromosome, genome_name) {
+                    self.end = chr_len;
+                } else {
+                    // Genome specified but chromosome not found - use longest
+                    if let Some(index) = chr_index(&self.chromosome) {
+                        let longest_genome = get_longest_possible_genome();
+                        self.end = longest_genome[index];
+                    }
+                }
+            } else {
+                // No genome specified - use longest possible
+                if let Some(index) = chr_index(&self.chromosome) {
+                    let longest_genome = get_longest_possible_genome();
+                    self.end = longest_genome[index];
+                }
             }
         }
         self.clone()
@@ -89,6 +124,11 @@ impl SearchOptions {
 
     pub fn set_chromosome(&mut self, chromosome: &str) -> Self {
         self.chromosome = chromosome.to_string();
+        self.clone()
+    }
+
+    pub fn set_genome(&mut self, genome: &str) -> Self {
+        self.genome = Some(genome.to_lowercase());
         self.clone()
     }
 
@@ -150,5 +190,114 @@ impl Feature for SearchOptions {
 impl Display for SearchOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}-{}", self.chromosome, self.begin, self.end)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_coordinates_full_chromosome_no_genome() {
+        // Test: chr12 with no genome specified -> use longest genome
+        let mut options = SearchOptions::new();
+        options.set_coordinates("chr12");
+
+        assert_eq!(options.chromosome, "chr12");
+        assert_eq!(options.begin, 1);
+        // chr12 longest length is from HG19/GRCH37: 133851895
+        assert_eq!(options.end, 133851895);
+    }
+
+    #[test]
+    fn test_set_coordinates_full_chromosome_with_genome() {
+        // Test: chr12 with hg38 specified
+        let mut options = SearchOptions::new();
+        options.set_genome("hg38");
+        options.set_coordinates("chr12");
+
+        assert_eq!(options.chromosome, "chr12");
+        assert_eq!(options.begin, 1);
+        // chr12 in HG38: 133275309
+        assert_eq!(options.end, 133275309);
+    }
+
+    #[test]
+    fn test_set_coordinates_full_chromosome_with_hg19() {
+        // Test: chr1 with hg19 specified
+        let mut options = SearchOptions::new();
+        options.set_genome("hg19");
+        options.set_coordinates("chr1");
+
+        assert_eq!(options.chromosome, "chr1");
+        assert_eq!(options.begin, 1);
+        // chr1 in HG19: 249250621
+        assert_eq!(options.end, 249250621);
+    }
+
+    #[test]
+    fn test_set_coordinates_single_position() {
+        // Test: chr1:12000 -> begin=12000, end=12001
+        let mut options = SearchOptions::new();
+        options.set_coordinates("chr1:12000");
+
+        assert_eq!(options.chromosome, "chr1");
+        assert_eq!(options.begin, 12000);
+        assert_eq!(options.end, 12001);
+    }
+
+    #[test]
+    fn test_set_coordinates_range() {
+        // Test: chr1:12000-15000
+        let mut options = SearchOptions::new();
+        options.set_coordinates("chr1:12000-15000");
+
+        assert_eq!(options.chromosome, "chr1");
+        assert_eq!(options.begin, 12000);
+        assert_eq!(options.end, 15000);
+    }
+
+    #[test]
+    fn test_set_coordinates_with_commas() {
+        // Test: chr1:12,000-15,000 (commas should be stripped)
+        let mut options = SearchOptions::new();
+        options.set_coordinates("chr1:12,000-15,000");
+
+        assert_eq!(options.chromosome, "chr1");
+        assert_eq!(options.begin, 12000);
+        assert_eq!(options.end, 15000);
+    }
+
+    #[test]
+    fn test_set_coordinates_numeric_chromosome() {
+        // Test: 12 (no chr prefix) with hg38
+        let mut options = SearchOptions::new();
+        options.set_genome("hg38");
+        options.set_coordinates("12");
+
+        assert_eq!(options.chromosome, "12");
+        assert_eq!(options.begin, 1);
+        // chr12 in HG38: 133275309
+        assert_eq!(options.end, 133275309);
+    }
+
+    #[test]
+    fn test_set_coordinates_chrx_with_position() {
+        // Test: chrX:1000000
+        let mut options = SearchOptions::new();
+        options.set_coordinates("chrX:1000000");
+
+        assert_eq!(options.chromosome, "chrX");
+        assert_eq!(options.begin, 1000000);
+        assert_eq!(options.end, 1000001);
+    }
+
+    #[test]
+    fn test_set_genome() {
+        // Test: genome setter converts to lowercase
+        let mut options = SearchOptions::new();
+        options.set_genome("HG38");
+
+        assert_eq!(options.genome, Some("hg38".to_string()));
     }
 }
