@@ -48,14 +48,6 @@ enum Commands {
         #[arg(short)]
         only_header: Option<bool>,
     },
-    Filter {
-        #[arg(short, long)]
-        file: String,
-    },
-    Jam {
-        #[arg(short, long)]
-        file: String,
-    },
 }
 
 #[derive(Error, Debug)]
@@ -160,16 +152,6 @@ async fn main() {
                     eprintln!("{:?}", e);
                 }
             }
-        }
-        Commands::Filter { file } => {
-            println!("Filtering file: {}", file);
-            // Implement filtering logic here
-        }
-        Commands::Jam {
-            file,
-        } => {
-            println!("Jamming file: {}", file);
-            // Implement jamming logic here
         }
     }
 }
