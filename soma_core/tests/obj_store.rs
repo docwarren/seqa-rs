@@ -1,14 +1,7 @@
-#[cfg(test)]
 use soma_core::stores::StoreService;
 
 #[tokio::test]
 async fn obj_store_s3() {
-    // Debug: Print what VS Code's test environment actually sees
-    println!("VS Code Test Environment:");
-    println!("AWS_ACCESS_KEY_ID: {:?}", std::env::var("AWS_ACCESS_KEY_ID"));
-    println!("AWS_SECRET_ACCESS_KEY: {:?}", std::env::var("AWS_SECRET_ACCESS_KEY"));
-    println!("AWS_REGION: {:?}", std::env::var("AWS_REGION"));
-    println!("S3_BUCKET: {:?}", std::env::var("S3_BUCKET"));
     
     let s3_path = "s3://com.gmail.docarw/test.txt";
     let store = StoreService::from_uri(s3_path).expect("Failed to create S3 store");
@@ -39,4 +32,14 @@ async fn obj_store_http() {
     let store = StoreService::from_uri(http_path).expect("Failed to create HTTP store");
     let data = store.get_object(http_path).await.expect("Failed to get data from HTTP store");
     assert_eq!("Hello world".to_string(), String::from_utf8_lossy(&data));
+}
+
+#[tokio::test]
+async fn obj_store_s3_put() {
+    let path = "s3://com.gmail.docarw/test_data/put_test.txt";
+    let store = StoreService::from_uri(path).expect("Failed to create S3 store");
+    let data = b"hello world";
+    store.put_object(path, data).await.expect("Failed to put object");
+    let object = store.get_object(path).await.expect("Failed to get object");
+    assert_eq!(object, data);
 }

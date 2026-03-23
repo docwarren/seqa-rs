@@ -174,18 +174,19 @@ fn test_parse_coordinates() {
 
 #[test]
 fn test_get_search_options_local() {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let request = FileSearchRequest::new("./mock_data/NA12878.gatk.cnv.vcf.gz".into(), "chr1:1000-2000".into());
     let options = get_search_options(request).unwrap();
     assert_eq!(
         options.file_path,
-        "file:///home/drew/dev/soma-rs/soma_core/mock_data/NA12878.gatk.cnv.vcf.gz"
+        format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", manifest_dir)
     );
     assert_eq!(options.chromosome, "chr1");
     assert_eq!(options.begin, 1000);
     assert_eq!(options.end, 2000);
     assert_eq!(
         options.index_path,
-        "file:///home/drew/dev/soma-rs/soma_core/mock_data/NA12878.gatk.cnv.vcf.gz.tbi"
+        format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz.tbi", manifest_dir)
     );
     assert_eq!(options.output_format, OutputFormat::VCF);
 
