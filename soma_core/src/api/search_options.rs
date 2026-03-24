@@ -32,7 +32,7 @@ pub enum CigarFormat {
 /// let mut opts = SearchOptions::new()
 ///     .set_file_path("s3://my-bucket/sample.bam".into())
 ///     .set_index_path("s3://my-bucket/sample.bam.bai".into())
-///     .set_output_format(OutputFormat::BAM)
+///     .set_output_format("bam")
 ///     .set_genome("hg38")
 ///     .set_coordinates("chr1:100000-200000");
 /// ```
