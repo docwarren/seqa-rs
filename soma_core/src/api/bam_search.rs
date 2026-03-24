@@ -32,7 +32,7 @@ pub enum BamError {
 /// * `options` - A `SearchOptions` struct containing the search parameters such as output format,
 ///  whether to include headers, and the range of positions to consider.
 /// # Returns:
-/// * A vector of strings containing the processed lines, which may include VCF lines or headers based on the options.
+/// * A vector of strings containing the processed lines, which may include headers based on the options.
 pub fn data_to_lines(
     data: &Vec<u8>,
     options: &SearchOptions,
@@ -66,7 +66,7 @@ pub fn data_to_lines(
     Ok((end, lines))
 }
 
-/// Searches for data in a bam index based on the provided search options.
+/// Searches for data in a bam based on the provided search options.
 /// # Arguments:
 /// * `options` - A `SearchOptions` struct containing the search parameters such as file paths, chromosome,
 ///  start and end positions, output format, and whether to include headers or only headers.

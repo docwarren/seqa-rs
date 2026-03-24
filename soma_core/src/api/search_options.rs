@@ -30,11 +30,11 @@ pub enum CigarFormat {
 /// use soma_core::api::output_format::OutputFormat;
 ///
 /// let mut opts = SearchOptions::new();
-/// opts.file_path = "s3://my-bucket/sample.bam".into();
-/// opts.index_path = "s3://my-bucket/sample.bam.bai".into();
-/// opts.output_format = OutputFormat::BAM;
-/// opts.set_genome("hg38");
-/// opts.set_coordinates("chr1:100000-200000");
+///     .set_file_path("s3://my-bucket/sample.bam".into())
+///     .set_index_path"s3://my-bucket/sample.bam.bai".into())
+///     .set_output_format(OutputFormat::BAM)
+///     .set_genome("hg38")
+///     .set_coordinates("chr1:100000-200000")
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchOptions {

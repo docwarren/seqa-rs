@@ -36,7 +36,7 @@ pub enum TabixSearchError {
 /// * `options` - A `SearchOptions` struct containing the search parameters such as output format,
 ///  whether to include headers, and the range of positions to consider.
 /// # Returns:
-/// * A Result containing a vector of strings with the processed lines, which may include VCF lines or headers.
+/// * A Result containing a vector of strings with the processed lines, which may include headers.
 pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Vec<String> {
     let raw_string = String::from_utf8_lossy(data).into_owned();
     let line_strings = raw_string
@@ -65,8 +65,8 @@ pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Vec<String> {
         .collect()
 }
 
-/// Searches for data in a tabix index based on the provided search options.
-/// Returns a vector of strings containing the results, which may include VCF lines or headers.
+/// Searches for data in a tabixed bgzipped file based on the provided search options.
+/// Returns a vector of strings containing the results, which may include  headers.
 /// # Arguments:
 /// * `options` - A `SearchOptions` struct containing the search parameters such as file paths, chromosome,
 ///  start and end positions, output format, and whether to include headers or only headers.
@@ -119,7 +119,7 @@ pub async fn tabix_search(options: &SearchOptions) -> Result<SearchResult, Tabix
 
 }
 
-/// Searches for VCF lines in a tabix index based on the provided search options.
+/// Searches for data in a vcf file using the provided search options.
 /// Returns a vector of `VcfLine` objects containing the results.
 /// # Arguments:
 /// * `options` - A `SearchOptions` struct containing the search parameters such as file

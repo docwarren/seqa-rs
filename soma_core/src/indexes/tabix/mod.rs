@@ -82,7 +82,7 @@ impl Tabix {
         Ok(Tabix::from_compressed_bytes(bytes)?)
     }
 
-    /// Creates a Tabix index from a compressed file with explicit data file path for better cache naming.
+    /// Creates a Tabix index from a compressed file with explicit data file path for cache naming.
     ///
     /// # Arguments
     /// * `idx_path` - Path to the index file (could be remote)

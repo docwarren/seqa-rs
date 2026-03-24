@@ -70,7 +70,7 @@ pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, options: &Search
 /// * `options` - A `SearchOptions` struct containing the search parameters such as output format,
 ///  whether to include headers, and the range of positions to consider.
 /// # Returns:
-/// * A vector of strings containing the processed lines, which may include VCF lines or headers.
+/// * A vector of strings containing the processed lines, which may include headers.
 pub fn data_to_lines(bytes: Vec<Vec<u8>>, is_zoom: bool, chr_tree: &BigwigChrTree, options: &SearchOptions) -> Result<Vec<String>, BigwigError> {
 
     let mut str_array: Vec<String> = if options.include_header {
@@ -94,8 +94,8 @@ pub fn data_to_lines(bytes: Vec<Vec<u8>>, is_zoom: bool, chr_tree: &BigwigChrTre
     Ok(str_array)
 }
 
-/// Searches for data in a bam index based on the provided search options.
-/// Returns a vector of strings containing the results, which may include VCF lines or headers.
+/// Searches for data in a bigwig file based on the provided search options.
+/// Returns a vector of strings containing the results, which may include headers.
 /// # Arguments:
 /// * `options` - A `SearchOptions` struct containing the search parameters such as file paths, chromosome,
 ///  start and end positions, output format, and whether to include headers or only headers.

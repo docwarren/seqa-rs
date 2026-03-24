@@ -8,20 +8,8 @@ pub mod zlib;
 use flate2::read::{GzDecoder, ZlibDecoder, DeflateDecoder};
 use std::io::Read;
 
-/// Decompresses `compressed_data` by inspecting the magic bytes to identify the format.
-///
-/// | Magic bytes | Format |
-/// |-------------|--------|
-/// | `0x1f 0x8b` | Gzip |
-/// | `0x78 {0x01,0x5e,0x9c,0xda}` | Zlib |
-/// | Everything else | Raw deflate (best-effort; falls back to returning the data unchanged) |
-///
-/// Bzip2 (`0x42 0x5a`), Zstd (`0x28 0xb5 0x2f 0xfd`), and XZ/LZMA formats are
-/// recognised but not supported — an error is returned for those.
-///
-/// If `compressed_data` is shorter than 2 bytes, or raw-deflate decoding fails,
-/// the input is returned unchanged (assumed to be uncompressed).
-///
+/// Decompresses `compressed_data`
+/// Checks the header for the compression type. If its not bgzip then an error is thrown
 /// # Errors
 ///
 /// Returns an error when an unsupported compression format is detected, or when

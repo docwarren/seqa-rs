@@ -46,7 +46,6 @@
 //! ## Feature flags
 //!
 //! - **`sqlite`** — Enables [`sqlite`] module for gene-symbol and cytoband queries via SQLite.
-//! - **`mongo`** — Enables the MongoDB module for patient/user data.
 
 pub mod genome;
 pub mod traits;

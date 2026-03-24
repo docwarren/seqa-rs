@@ -142,10 +142,6 @@ pub async fn init_fetch_handles(
     }
     Ok(chunk_handles)
 }
-
-/// Processes the fetched chunks by awaiting their completion,
-
-
 /// Processes the fetched chunks by awaiting their completion,
 /// decompressing the data, and extracting the relevant slice based on the chunk's decompressed offset.
 /// # Arguments:

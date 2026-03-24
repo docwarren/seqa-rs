@@ -23,7 +23,6 @@ Core Rust library for genomic file parsing, cloud storage, and database access.
 ### Feature-Gated Modules
 
 - `sqlite` — Enables `sqlite/` module (gene symbol lookup, cytoband queries via `rusqlite`).
-- `mongo` — Enables `mongo/` module (MongoDB collections for patients, users).
 
 ## Key Patterns
 
