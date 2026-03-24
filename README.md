@@ -1,5 +1,7 @@
 # soma-rs
 
+(Early release. Needs more thorough testing on a wide variety of files, as I have a limited test set.)
+
 A set of Rust tools for making genomic range requests against files stored locally, over HTTP, or in cloud storage (AWS S3, Azure Blob Storage, Google Cloud Storage).
 
 Supports BAM, VCF, GFF/GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats. Indexes (BAI, TBI) are fetched automatically from the same storage backend as the data file.
