@@ -36,7 +36,7 @@ jobs:
         run: cargo install cargo-llvm-cov --locked
 
       - name: Generate coverage report
-        run: cargo llvm-cov --lcov --output-path lcov.info --workspace
+        run: cargo llvm-cov --lcov --output-path lcov.info --workspace --all-features
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
