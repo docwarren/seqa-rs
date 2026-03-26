@@ -32,6 +32,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install system dependencies
+        run: sudo apt-get install -y libsqlite3-dev
+
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
 
@@ -39,7 +42,7 @@ jobs:
         run: cargo llvm-cov --lcov --output-path lcov.info --workspace --all-features
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: lcov.info
           fail_ci_if_error: true
