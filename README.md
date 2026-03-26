@@ -1,5 +1,8 @@
 # seqa-rs
 
+[![CI](https://github.com/docwarren/seqa-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/docwarren/seqa-rs/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/docwarren/seqa-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/docwarren/seqa-rs)
+
 (Early release. Needs more thorough testing on a wide variety of files, as I have a limited test set.)
 
 A set of Rust tools for making genomic range requests against files stored locally, over HTTP, or in cloud storage (AWS S3, Azure Blob Storage, Google Cloud Storage).
@@ -52,6 +55,19 @@ cargo test -p seqa_core --test bam
 cargo test -p seqa_core --test tabix
 cargo test -p seqa_core --test bigwig
 cargo test -p seqa_core --test bigbed
+```
+
+### Code coverage
+Requires `llvm-cov` and `cargo-llvm-cov` installed.
+
+```bash
+# Code coverage
+cargo install cargo-llvm-cov
+rustup component add llvm-tools-preview
+```
+then you can 
+```bash
+cargo llvm-cov --open
 ```
 
 See individual crate READMEs for credential setup.

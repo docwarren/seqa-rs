@@ -1,6 +1,7 @@
 #![cfg(feature = "sqlite")]
 
 #[test]
+#[ignore = "requires local database at /media/drew/ExtraSSD/genes/grch38-genes.db"]
 fn test_get_gene_coordinates() {
     use seqa_core::sqlite::establish_connection;
     use seqa_core::sqlite::genes::get_gene_coordinates;
@@ -15,6 +16,7 @@ fn test_get_gene_coordinates() {
 
 
 #[test]
+#[ignore = "requires local database at /media/drew/ExtraSSD/genes/grch38-genes.db"]
 fn test_get_gene() {
     use seqa_core::sqlite::establish_connection;
     use seqa_core::sqlite::genes::get_gene_symbols;
