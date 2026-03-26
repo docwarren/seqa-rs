@@ -2,6 +2,9 @@ name: Publish
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -10,6 +13,7 @@ jobs:
   publish-crate:
     name: Publish seqa_core to crates.io
     runs-on: ubuntu-latest
+    environment: TEST
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +46,7 @@ jobs:
             use_cross: true
             binary: seqa
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             use_cross: false
             binary: seqa
           - target: aarch64-apple-darwin
