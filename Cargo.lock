@@ -2662,7 +2662,7 @@ dependencies = [
 
 [[package]]
 name = "seqa"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap",
  "command",
@@ -2675,7 +2675,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_core"
-version = "1.0.1"
+version = "1.1.1"
 dependencies = [
  "flate2",
  "futures",
