@@ -57,6 +57,10 @@ Cloud storage and database access require environment variables:
 
 All crates use **Rust edition 2024**.
 
+## Debugging Output Policy
+
+**Never add `println!` or `eprintln!` statements** unless explicitly asked. These pollute stdout/stderr and break the user experience of CLI tools and the API server. Use the `log` crate (`log::debug!`, `log::info!`, etc.) if observability is needed.
+
 ## Test Deletion Policy
 
 **Never delete a failing test** to make CI green. Before removing any test, you must:

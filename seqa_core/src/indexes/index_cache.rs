@@ -61,7 +61,6 @@ pub async fn get_or_download_index(
         // Read from local cache
         match fs::read(&local_path).await {
             Ok(bytes) => {
-                eprintln!("Using cached index from: {}", local_path.display());
                 return Ok(bytes);
             }
             Err(e) => {
@@ -72,7 +71,6 @@ pub async fn get_or_download_index(
     }
 
     // Index doesn't exist locally or failed to read - download from remote
-    eprintln!("Downloading index from: {}", index_path);
     let store_service = StoreService::from_uri(index_path)?;
     let bytes = store_service.get_object(index_path).await?;
 
@@ -80,10 +78,7 @@ pub async fn get_or_download_index(
     if let Err(e) = cache_index_locally(&local_path, &bytes).await {
         eprintln!("Warning: Failed to cache index locally at {}: {}",
             local_path.display(), e);
-        // Continue anyway - we have the bytes
-    } else {
-        eprintln!("Cached index to: {}", local_path.display());
-    }
+    } else {}
 
     Ok(bytes)
 }
