@@ -48,6 +48,10 @@ enum Commands {
         // Only include the header in the output
         #[arg(short)]
         only_header: Option<bool>,
+
+        /// Skip reading from and writing to the local index cache
+        #[arg(long)]
+        no_cache: bool,
     },
 }
 
@@ -90,6 +94,7 @@ async fn main() {
             reference,
             with_header,
             only_header,
+            no_cache,
         } => {
 
             let file_path = format_file_path(&file).unwrap_or_else(|e| {
@@ -138,6 +143,8 @@ async fn main() {
                 Some(true) => options.set_header_only(true),
                 _ => options.set_header_only(false),
             };
+
+            options = options.set_no_cache(no_cache);
 
             match search(&options).await {
                 Ok(lines) => {

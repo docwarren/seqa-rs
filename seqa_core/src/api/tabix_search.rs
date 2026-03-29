@@ -77,7 +77,7 @@ pub async fn tabix_search(options: &SearchOptions) -> Result<SearchResult, Tabix
 
     let tabix = match &options.tabix_index {
         Some(index) => index,
-        None => &Tabix::from_compressed_file_with_data_path(&options.index_path, &options.file_path).await?
+        None => &Tabix::from_compressed_file(&options.index_path, options.no_cache).await?
     };
     let tabix_header = match &options.tabix_header {
         Some(header) => header,

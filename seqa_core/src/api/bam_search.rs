@@ -83,7 +83,7 @@ pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamErro
 
     let bai = match &options.bam_index {
         Some(index) => index,
-        None => &BaiIndex::from_file_with_data_path(&options.index_path, &options.file_path).await?
+        None => &BaiIndex::from_file(&options.index_path, options.no_cache).await?
     };
 
 

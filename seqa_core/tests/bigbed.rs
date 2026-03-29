@@ -8,7 +8,7 @@ const BED_PATH: &str = "s3://com.soma23.data/hg38/mane.bed.gz";
 const BED_INDEX_PATH: &str = "s3://com.soma23.data/hg38/mane.bed.gz.tbi";
 
 fn cleanup_bed_index() {
-    delete_local_index(BED_PATH, ".tbi");
+    delete_local_index(BED_INDEX_PATH);
 }
 
 #[tokio::test]

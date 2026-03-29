@@ -288,7 +288,7 @@ mod tests {
         let body = response.into_string().await.unwrap();
         assert!(body.contains("chr1\t116549"));
         seqa_core::indexes::index_cache::delete_local_index(
-            "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", ".tbi"
+            "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi"
         );
     }
 

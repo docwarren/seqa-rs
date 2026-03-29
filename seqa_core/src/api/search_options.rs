@@ -77,7 +77,11 @@ pub struct SearchOptions {
     /// Pre-parsed tabix header; supply to avoid re-downloading on repeated queries.
     pub tabix_header: Option<TabixHeader>,
     /// Pre-parsed FASTA index; supply to avoid re-downloading on repeated queries.
-    pub fasta_index: Option<FaiIndex>
+    pub fasta_index: Option<FaiIndex>,
+    /// When `true`, skip reading from and writing to the local index cache.
+    /// The index will always be fetched from the remote source.
+    /// Defaults to `false`.
+    pub no_cache: bool,
 }
 
 impl SearchOptions {
@@ -103,7 +107,8 @@ impl SearchOptions {
             bam_index: None,
             tabix_index: None,
             tabix_header: None,
-            fasta_index: None
+            fasta_index: None,
+            no_cache: false,
         }
     }
 
@@ -230,6 +235,12 @@ impl SearchOptions {
     /// When `true`, only header lines are returned and data records are skipped.
     pub fn set_header_only(&mut self, header_only: bool) -> Self {
         self.header_only = header_only;
+        self.clone()
+    }
+
+    /// When `true`, skip reading from and writing to the local index cache.
+    pub fn set_no_cache(&mut self, no_cache: bool) -> Self {
+        self.no_cache = no_cache;
         self.clone()
     }
 
@@ -374,5 +385,18 @@ mod tests {
         options.set_genome("HG38");
 
         assert_eq!(options.genome, Some("hg38".to_string()));
+    }
+
+    #[test]
+    fn test_no_cache_defaults_to_false() {
+        let options = SearchOptions::new();
+        assert_eq!(options.no_cache, false);
+    }
+
+    #[test]
+    fn test_set_no_cache() {
+        let mut options = SearchOptions::new();
+        options = options.set_no_cache(true);
+        assert_eq!(options.no_cache, true);
     }
 }

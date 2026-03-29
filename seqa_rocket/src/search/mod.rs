@@ -47,6 +47,7 @@ impl SearchService {
         let mut search_options = get_search_options(search_request)?;
 
         search_options.include_header = true;
+        search_options.no_cache = true;
 
         let results: Result<SearchResult, SearchError> = match search_options.output_format {
             OutputFormat::BAM => { 

@@ -2,7 +2,7 @@ const S3_BAM: &str = "s3://com.gmail.docarw/test_data/NA12877.bam";
 const S3_BAM_INDEX: &str = "s3://com.gmail.docarw/test_data/NA12877.bam.bai";
 
 fn cleanup_bam_index() {
-    seqa_core::indexes::index_cache::delete_local_index(S3_BAM, ".bai");
+    seqa_core::indexes::index_cache::delete_local_index(S3_BAM_INDEX);
 }
 
 #[tokio::test]

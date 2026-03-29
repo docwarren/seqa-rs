@@ -49,25 +49,15 @@ impl BaiIndex {
         }
     }
 
-    pub async fn from_file(idx_path: &str) -> Result<Self, BaiError> {
-        let bytes = crate::indexes::index_cache::get_or_download_index(
-            idx_path,
-            ".bai",
-            idx_path
-        ).await?;
-        BaiIndex::from_bytes(bytes)
-    }
-
-    /// Creates a BaiIndex from a file with explicit data file path for better cache naming.
+    /// Creates a BaiIndex from a file, optionally skipping the local cache.
     ///
     /// # Arguments
     /// * `idx_path` - Path to the index file (could be remote)
-    /// * `data_file_path` - Path to the data file (used for cache naming)
-    pub async fn from_file_with_data_path(idx_path: &str, data_file_path: &str) -> Result<Self, BaiError> {
+    /// * `no_cache` - When true, skip reading from and writing to the local index cache
+    pub async fn from_file(idx_path: &str, no_cache: bool) -> Result<Self, BaiError> {
         let bytes = crate::indexes::index_cache::get_or_download_index(
             idx_path,
-            ".bai",
-            data_file_path
+            no_cache
         ).await?;
         BaiIndex::from_bytes(bytes)
     }
