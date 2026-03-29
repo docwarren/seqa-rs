@@ -42,3 +42,20 @@ async fn obj_store_s3_put() {
     let object = store.get_object(path).await.expect("Failed to get object");
     assert_eq!(object, data);
 }
+
+#[tokio::test]
+async fn obj_store_get_file_size() {
+    let path = "s3://com.gmail.docarw/test_data/density.bw";
+    let store = StoreService::from_uri(path).expect("Failed to create S3 store");
+    let size = store.get_file_size(path).await.expect("Failed to get file size");
+    let expected = 2_600_000;
+    assert!(size > expected, "Expected file size > {}; got {}", expected, size);
+    assert!(size < 3_000_000, "Expected file size < 3MB; got {}", size);
+}
+
+#[test]
+fn get_canonical_path_s3() {
+    let path = "s3://com.gmail.docarw/test_data/density.bw";
+    let canonical = StoreService::get_canonical_path(path).expect("Failed to get canonical path");
+    assert_eq!(canonical.as_ref(), "test_data/density.bw");
+}

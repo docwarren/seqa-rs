@@ -179,3 +179,39 @@ impl Overlaps for DataPoint {
         ((chrom_id1 < self.chr_id) || (chrom_id1 == self.chr_id && start <= self.end))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_type_2_data() {
+        let begin: u32 = 5000;
+        let value: f32 = 3.14;
+        let span: u32 = 100;
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&begin.to_le_bytes());
+        bytes.extend_from_slice(&value.to_le_bytes());
+
+        let (dp, bytes_read) = read_type_2_data(&bytes, 1, span).unwrap();
+        assert_eq!(bytes_read, 8);
+        assert_eq!(dp.chr_id, 1);
+        assert_eq!(dp.begin, 5000);
+        assert_eq!(dp.end, 5100);
+        assert_eq!(dp.value, 3.14);
+    }
+
+    #[test]
+    fn test_read_type_3_data() {
+        let value: f32 = 2.718;
+        let bytes = value.to_le_bytes();
+
+        let (dp, bytes_read) = read_type_3_data(&bytes, 2, 8000, 50).unwrap();
+        assert_eq!(bytes_read, 4);
+        assert_eq!(dp.chr_id, 2);
+        assert_eq!(dp.begin, 8000);
+        assert_eq!(dp.end, 8050);
+        assert_eq!(dp.value, 2.718);
+    }
+}

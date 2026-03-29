@@ -122,6 +122,205 @@ pub fn map_tag_type_to_result(bytes: &[u8], i: usize, value_type: u8) -> Result<
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_sequence_code() {
+        assert_eq!(map_sequence_code(0), '=');
+        assert_eq!(map_sequence_code(1), 'A');
+        assert_eq!(map_sequence_code(2), 'C');
+        assert_eq!(map_sequence_code(4), 'G');
+        assert_eq!(map_sequence_code(8), 'T');
+        assert_eq!(map_sequence_code(15), 'N');
+        assert_eq!(map_sequence_code(255), 'N');
+    }
+
+    #[test]
+    fn test_get_tag_ua_value() {
+        let bytes = vec![b'U'];
+        let (val, next) = get_tag_ua_value(&bytes, 0).unwrap();
+        assert_eq!(val, "U");
+        assert_eq!(next, 1);
+    }
+
+    #[test]
+    fn test_get_tag_ua_value_out_of_bounds() {
+        let bytes: Vec<u8> = vec![];
+        assert!(get_tag_ua_value(&bytes, 0).is_err());
+    }
+
+    #[test]
+    fn test_get_tag_c_value() {
+        let bytes = vec![0xFE]; // -2 as i8
+        let (val, next) = get_tag_c_value(&bytes, 0).unwrap();
+        assert_eq!(val, "-2");
+        assert_eq!(next, 1);
+    }
+
+    #[test]
+    fn test_get_tag_uc_value() {
+        let bytes = vec![200u8];
+        let (val, next) = get_tag_uc_value(&bytes, 0).unwrap();
+        assert_eq!(val, "200");
+        assert_eq!(next, 1);
+    }
+
+    #[test]
+    fn test_get_tag_s_value() {
+        let val: i16 = -1234;
+        let bytes = val.to_le_bytes().to_vec();
+        let (result, next) = get_tag_s_value(&bytes, 0).unwrap();
+        assert_eq!(result, "-1234");
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn test_get_tag_s_value_out_of_bounds() {
+        let bytes = vec![0u8];
+        assert!(get_tag_s_value(&bytes, 0).is_err());
+    }
+
+    #[test]
+    fn test_get_tag_us_value() {
+        let val: u16 = 5000;
+        let bytes = val.to_le_bytes().to_vec();
+        let (result, next) = get_tag_us_value(&bytes, 0).unwrap();
+        assert_eq!(result, "5000");
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn test_get_tag_i_value() {
+        let val: i32 = -100000;
+        let bytes = val.to_le_bytes().to_vec();
+        let (result, next) = get_tag_i_value(&bytes, 0).unwrap();
+        assert_eq!(result, "-100000");
+        assert_eq!(next, 4);
+    }
+
+    #[test]
+    fn test_get_tag_ui_value() {
+        let val: u32 = 300000;
+        let bytes = val.to_le_bytes().to_vec();
+        let (result, next) = get_tag_ui_value(&bytes, 0).unwrap();
+        assert_eq!(result, "300000");
+        assert_eq!(next, 4);
+    }
+
+    #[test]
+    fn test_get_tag_f_value() {
+        let val: f32 = 1.5;
+        let bytes = val.to_le_bytes().to_vec();
+        let (result, next) = get_tag_f_value(&bytes, 0).unwrap();
+        assert_eq!(result, "1.5");
+        assert_eq!(next, 4);
+    }
+
+    #[test]
+    fn test_get_tag_f_value_out_of_bounds() {
+        let bytes = vec![0u8; 3];
+        assert!(get_tag_f_value(&bytes, 0).is_err());
+    }
+
+    #[test]
+    fn test_get_tag_z_value() {
+        let mut bytes = b"hello".to_vec();
+        bytes.push(0); // null terminator
+        let (val, next) = get_tag_z_value(&bytes, 0).unwrap();
+        assert_eq!(val, "hello");
+        assert_eq!(next, 6);
+    }
+
+    #[test]
+    fn test_get_tag_h_value() {
+        let mut bytes = b"DEADBEEF".to_vec();
+        bytes.push(0);
+        let (val, next) = get_tag_h_value(&bytes, 0).unwrap();
+        assert_eq!(val, "DEADBEEF");
+        assert_eq!(next, 9);
+    }
+
+    #[test]
+    fn test_get_tag_z_value_with_offset() {
+        let mut bytes = vec![0xFF, 0xFF]; // padding
+        bytes.extend_from_slice(b"world");
+        bytes.push(0);
+        let (val, next) = get_tag_z_value(&bytes, 2).unwrap();
+        assert_eq!(val, "world");
+        assert_eq!(next, 8);
+    }
+
+    #[test]
+    fn test_map_tag_type_to_result_unsupported() {
+        let bytes = vec![0u8; 4];
+        let (val, next) = map_tag_type_to_result(&bytes, 0, b'?').unwrap();
+        assert_eq!(val, "");
+        assert_eq!(next, 0);
+    }
+
+    #[test]
+    fn test_get_tag_value_z_type() {
+        // tag "RG", type 'Z', value "NA12877\0"
+        let mut bytes = vec![b'R', b'G', b'Z'];
+        bytes.extend_from_slice(b"NA12877");
+        bytes.push(0);
+        let (result, next) = get_tag_value(&bytes, 0).unwrap();
+        assert_eq!(result, "RG:Z:NA12877");
+        assert_eq!(next, bytes.len());
+    }
+
+    #[test]
+    fn test_get_tag_value_i_type() {
+        // tag "NM", type 'i' (i32), value 3
+        let mut bytes = vec![b'N', b'M', b'i'];
+        bytes.extend_from_slice(&3i32.to_le_bytes());
+        let (result, _) = get_tag_value(&bytes, 0).unwrap();
+        assert_eq!(result, "NM:i:3");
+    }
+
+    #[test]
+    fn test_get_tag_value_a_type() {
+        // tag "XT", type 'A', value 'U'
+        let bytes = vec![b'X', b'T', b'A', b'U'];
+        let (result, next) = get_tag_value(&bytes, 0).unwrap();
+        assert_eq!(result, "XT:A:U");
+        assert_eq!(next, 4);
+    }
+
+    #[test]
+    fn test_get_tag_value_b_array_type() {
+        // tag "BC", type 'B', sub-type 'C' (u8), count=3, values [10, 20, 30]
+        let mut bytes = vec![b'B', b'C', b'B', b'C'];
+        bytes.extend_from_slice(&3i32.to_le_bytes());
+        bytes.extend_from_slice(&[10, 20, 30]);
+        let (result, next) = get_tag_value(&bytes, 0).unwrap();
+        assert_eq!(result, "BC:B:10,20,30");
+        assert_eq!(next, bytes.len());
+    }
+
+    #[test]
+    fn test_get_tag_value_numeric_types_format_as_i() {
+        // 'C' (u8) should format type char as 'i'
+        let mut bytes = vec![b'X', b'0', b'C', 42u8];
+        let (result, _) = get_tag_value(&bytes, 0).unwrap();
+        assert_eq!(result, "X0:i:42");
+
+        // 'S' (u16) should format type char as 'i'
+        bytes = vec![b'X', b'1', b'S'];
+        bytes.extend_from_slice(&100u16.to_le_bytes());
+        let (result, _) = get_tag_value(&bytes, 0).unwrap();
+        assert_eq!(result, "X1:i:100");
+
+        // 'f' (f32) should format type char as 'i'
+        bytes = vec![b'X', b'2', b'f'];
+        bytes.extend_from_slice(&2.5f32.to_le_bytes());
+        let (result, _) = get_tag_value(&bytes, 0).unwrap();
+        assert_eq!(result, "X2:i:2.5");
+    }
+}
+
 pub fn get_tag_value(bytes: &[u8], mut i: usize) -> Result<(String, usize), String> {
     let tag: String = bytes[i..i + 2].iter().map(|&b| b as char).collect();
     i += 2;

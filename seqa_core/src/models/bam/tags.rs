@@ -84,3 +84,98 @@ impl Display for Tags {
         write!(f, "{}", self.to_string().unwrap_or_default())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build_z_tag(name: &str, value: &str) -> Vec<u8> {
+        let mut bytes = name.as_bytes().to_vec();
+        bytes.push(b'Z');
+        bytes.extend_from_slice(value.as_bytes());
+        bytes.push(0);
+        bytes
+    }
+
+    fn build_i32_tag(name: &str, value: i32) -> Vec<u8> {
+        let mut bytes = name.as_bytes().to_vec();
+        bytes.push(b'i');
+        bytes.extend_from_slice(&value.to_le_bytes());
+        bytes
+    }
+
+    fn build_a_tag(name: &str, value: u8) -> Vec<u8> {
+        let mut bytes = name.as_bytes().to_vec();
+        bytes.push(b'A');
+        bytes.push(value);
+        bytes
+    }
+
+    #[test]
+    fn test_empty_tags() {
+        let tags = Tags::from_bytes(vec![]);
+        assert_eq!(tags.to_string().unwrap(), "*");
+    }
+
+    #[test]
+    fn test_single_z_tag() {
+        let bytes = build_z_tag("RG", "NA12877");
+        let tags = Tags::from_bytes(bytes);
+        assert_eq!(tags.to_string().unwrap(), "RG:Z:NA12877");
+    }
+
+    #[test]
+    fn test_multiple_tags() {
+        let mut bytes = build_z_tag("RG", "NA12877");
+        bytes.extend(build_a_tag("XT", b'U'));
+        bytes.extend(build_i32_tag("NM", 0));
+        let tags = Tags::from_bytes(bytes);
+        assert_eq!(tags.to_string().unwrap(), "RG:Z:NA12877\tXT:A:U\tNM:i:0");
+    }
+
+    #[test]
+    fn test_get_value_found() {
+        let mut bytes = build_z_tag("RG", "sample1");
+        bytes.extend(build_i32_tag("NM", 5));
+        let tags = Tags::from_bytes(bytes);
+        assert_eq!(tags.get_value("NM"), Some("5".into()));
+        assert_eq!(tags.get_value("RG"), Some("sample1".into()));
+    }
+
+    #[test]
+    fn test_get_value_not_found() {
+        let bytes = build_z_tag("RG", "sample1");
+        let tags = Tags::from_bytes(bytes);
+        assert_eq!(tags.get_value("MD"), None);
+    }
+
+    #[test]
+    fn test_get_value_empty_tags() {
+        let tags = Tags::from_bytes(vec![]);
+        assert_eq!(tags.get_value("RG"), None);
+    }
+
+    #[test]
+    fn test_get_value_invalid_tag_name() {
+        let bytes = build_z_tag("RG", "sample1");
+        let tags = Tags::from_bytes(bytes);
+        assert_eq!(tags.get_value("R"), None);
+        assert_eq!(tags.get_value("RGX"), None);
+    }
+
+    #[test]
+    fn test_display() {
+        let bytes = build_z_tag("RG", "NA12877");
+        let tags = Tags::from_bytes(bytes);
+        assert_eq!(format!("{}", tags), "RG:Z:NA12877");
+    }
+
+    #[test]
+    fn test_get_value_b_array() {
+        let mut bytes = vec![b'B', b'C', b'B', b'C'];
+        bytes.extend_from_slice(&3i32.to_le_bytes());
+        bytes.extend_from_slice(&[10, 20, 30]);
+        let tags = Tags::from_bytes(bytes);
+        assert_eq!(tags.get_value("BC"), Some("10,20,30".into()));
+    }
+}
