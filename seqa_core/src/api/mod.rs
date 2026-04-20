@@ -8,4 +8,3 @@ pub mod constants;
 pub mod bigwig_search;
 pub mod bigbed_search;
 pub mod search_result;
-pub mod file_search_request;

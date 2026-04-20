@@ -16,18 +16,14 @@ async fn bigbed_search_matches_tabix() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
 
-    let bb_options = SearchOptions::new()
-        .set_file_path(BIGBED_PATH)
-        .set_coordinates("chr1:1000000-1300000")
+    let bb_options = SearchOptions::new(BIGBED_PATH, "chr1:1000000-1300000")
         .set_output_format("bigbed")
         .set_include_header(false);
 
     let bb_result = SearchService::search_features(&bb_options).await.expect("Failed to search BigBed");
 
-    let bed_options = SearchOptions::new()
-        .set_file_path(BED_PATH)
+    let bed_options = SearchOptions::new(BED_PATH, "chr1:1000000-1300000")
         .set_index_path(BED_INDEX_PATH)
-        .set_coordinates("chr1:1000000-1300000")
         .set_output_format("bed")
         .set_include_header(false);
 
@@ -57,17 +53,13 @@ async fn bigbed_search_chr1_small_region() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let bb_options = SearchOptions::new()
-        .set_file_path(BIGBED_PATH)
-        .set_coordinates("chr1:65000-72000")
+    let bb_options = SearchOptions::new(BIGBED_PATH, "chr1:65000-72000")
         .set_include_header(false);
 
     let bb_result = bigbed_search(&bb_options).await.expect("Failed to search BigBed");
 
-    let bed_options = SearchOptions::new()
-        .set_file_path(BED_PATH)
+    let bed_options = SearchOptions::new(BED_PATH, "chr1:65000-72000")
         .set_index_path(BED_INDEX_PATH)
-        .set_coordinates("chr1:65000-72000")
         .set_output_format("bed")
         .set_include_header(false);
 
@@ -87,17 +79,13 @@ async fn bigbed_search_different_chromosome() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let bb_options = SearchOptions::new()
-        .set_file_path(BIGBED_PATH)
-        .set_coordinates("chr2:1000000-2000000")
+    let bb_options = SearchOptions::new(BIGBED_PATH, "chr2:1000000-2000000")
         .set_include_header(false);
 
     let bb_result = bigbed_search(&bb_options).await.expect("Failed to search BigBed");
 
-    let bed_options = SearchOptions::new()
-        .set_file_path(BED_PATH)
+    let bed_options = SearchOptions::new(BED_PATH, "chr2:1000000-2000000")
         .set_index_path(BED_INDEX_PATH)
-        .set_coordinates("chr2:1000000-2000000")
         .set_output_format("bed")
         .set_include_header(false);
 
@@ -116,9 +104,7 @@ async fn bigbed_returns_correct_coordinates() {
     use seqa_core::api::bigbed_search::bigbed_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(BIGBED_PATH)
-        .set_coordinates("chr1:1000000-1100000")
+    let options = SearchOptions::new(BIGBED_PATH, "chr1:1000000-1100000")
         .set_include_header(false);
 
     let result = bigbed_search(&options).await.expect("Failed to search BigBed");

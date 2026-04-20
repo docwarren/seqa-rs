@@ -10,10 +10,8 @@ async fn bam_chr12() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_BAM)
+    let options = SearchOptions::new(S3_BAM, "chr12:10000000-10000000")
         .set_index_path(S3_BAM_INDEX)
-        .set_coordinates("chr12:10000000-10000000")
         .set_output_format("bam")
         .set_include_header(false);
 
@@ -29,12 +27,10 @@ async fn bam_chr12_more() {
     use seqa_core::api::bam_search::bam_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_BAM)
+    let options = SearchOptions::new(S3_BAM, "chr12:10000000-10010000")
         .set_index_path(S3_BAM_INDEX)
-        .set_coordinates("chr12:10000000-10010000")
-        .set_output_format("bam")
-        .set_include_header(false);
+        .set_include_header(false)
+        .set_output_format("bam");
 
     let result = bam_search(&options).await.expect(&format!("Failed to search BAM for chr12: {}", options.chromosome));
     assert_eq!(result.lines.len(), 5639);
@@ -46,12 +42,11 @@ async fn bam_chr1() {
     use seqa_core::api::bam_search::bam_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_BAM)
+    let options = SearchOptions::new(S3_BAM, "chr1:10000000-10200000")
         .set_index_path(S3_BAM_INDEX)
-        .set_coordinates("chr1:10000000-10200000")
-        .set_output_format("bam")
-        .set_include_header(false);
+        .set_include_header(false)
+        .set_output_format("bam");
+
 
     let result = bam_search(&options).await.expect(&format!("Failed to search BAM for chr1: {}", options.chromosome));
     assert_eq!(result.lines.len(), 108198);
@@ -63,12 +58,10 @@ async fn bam_chr_m() {
     use seqa_core::api::bam_search::bam_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_BAM)
+    let options = SearchOptions::new(S3_BAM, "chrM:1-1")
         .set_index_path(S3_BAM_INDEX)
-        .set_coordinates("chrM:1-1")
-        .set_output_format("bam")
-        .set_include_header(false);
+        .set_include_header(false)
+        .set_output_format("bam");
 
     let result = bam_search(&options).await.expect(&format!("Failed to search BAM for chrM: {}", options.chromosome));
     assert_eq!(result.lines.len(), 120);

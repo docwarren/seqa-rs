@@ -16,12 +16,8 @@ async fn vcf_chr1() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_VCF)
+    let options = SearchOptions::new(S3_VCF, "chr1:1-500000")
         .set_index_path(S3_VCF_INDEX)
-        .set_chromosome("chr1")
-        .set_begin(1)
-        .set_end(500000)
         .set_output_format("vcf")
         .set_include_header(false);
 
@@ -37,12 +33,8 @@ async fn vcf_chr12() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_VCF)
+    let options = SearchOptions::new(S3_VCF, "chr12:1-120000")
         .set_index_path(S3_VCF_INDEX)
-        .set_chromosome("chr12")
-        .set_begin(1)
-        .set_end(120000)
         .set_output_format("vcf")
         .set_include_header(false);
 
@@ -58,10 +50,8 @@ async fn vcf_chrx() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_VCF)
+    let options = SearchOptions::new(S3_VCF, "chrX:154927181-154929412")
         .set_index_path(S3_VCF_INDEX)
-        .set_coordinates("chrX:154927181-154929412")
         .set_output_format("vcf")
         .set_include_header(false);
 
@@ -77,10 +67,8 @@ async fn vcf_chr4() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_VCF)
+    let options = SearchOptions::new(S3_VCF, "chr4:4928400-4928402")
         .set_index_path(S3_VCF_INDEX)
-        .set_coordinates("chr4:4928400-4928402")
         .set_output_format("vcf")
         .set_include_header(false);
 
@@ -95,10 +83,8 @@ async fn vcf_many_lines() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_VCF)
+    let options = SearchOptions::new(S3_VCF, "chr1:100000000-200000000")
         .set_index_path(S3_VCF_INDEX)
-        .set_coordinates("chr1:100000000-200000000")
         .set_output_format("vcf")
         .set_include_header(false);
 
@@ -114,10 +100,8 @@ async fn cnv_vcf_chr_12() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_CNV_VCF)
+    let options = SearchOptions::new(S3_CNV_VCF, "chr12")
         .set_index_path(S3_CNV_VCF_INDEX)
-        .set_chromosome("chr12")
         .set_begin(1)
         .set_end(100000000)
         .set_output_format("vcf")
@@ -135,10 +119,8 @@ async fn gff_test() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_GTF)
+    let options = SearchOptions::new(S3_GTF, "chr1:1-100000000")
         .set_index_path(S3_GTF_INDEX)
-        .set_chromosome("chr1")
         .set_begin(1)
         .set_end(50000)
         .set_output_format("gff")
@@ -154,8 +136,7 @@ async fn gtf_test() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_GTF)
+    let options = SearchOptions::new(S3_GTF, "chr1:1-100000000")
         .set_index_path(S3_GTF_INDEX)
         .set_chromosome("chr1")
         .set_begin(1)
@@ -173,8 +154,7 @@ async fn azure_vcf() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(AZ_VCF)
+    let options = SearchOptions::new(AZ_VCF, "chr1:100000000-200000000")
         .set_index_path(AZ_VCF_INDEX)
         .set_coordinates("chr1:100000000-200000000")
         .set_output_format("vcf")
@@ -192,7 +172,7 @@ async fn gc_vcf() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
+    let options = SearchOptions::new(GCS_VCF, "chr1:100000000-200000000")
         .set_file_path(GCS_VCF)
         .set_index_path(GCS_VCF_INDEX)
         .set_coordinates("chr1:100000000-200000000")
@@ -207,12 +187,12 @@ async fn gc_vcf() {
 }
 
 #[tokio::test]
+#[serial_test::serial(bedgraph_cache)]
 async fn no_cache_does_not_write_index_file() {
     use seqa_core::api::tabix_search::tabix_search;
     use seqa_core::api::search_options::SearchOptions;
     use seqa_core::indexes::index_cache::get_local_index_path;
 
-    // Use the bedgraph index which no other test caches, avoiding parallel test races
     let no_cache_file = "s3://com.gmail.docarw/test_data/test.bedgraph.gz";
     let no_cache_index = "s3://com.gmail.docarw/test_data/test.bedgraph.gz.tbi";
 
@@ -222,8 +202,7 @@ async fn no_cache_does_not_write_index_file() {
     let cache_path = get_local_index_path(no_cache_index);
     assert!(!cache_path.exists(), "Cache file should not exist before search");
 
-    let options = SearchOptions::new()
-        .set_file_path(no_cache_file)
+    let options = SearchOptions::new(no_cache_file, "chr1:1-100000000")
         .set_index_path(no_cache_index)
         .set_coordinates("chr1:1-100000000")
         .set_output_format("bedgraph")
@@ -243,7 +222,7 @@ async fn http_vcf() {
     let http_vcf = "https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test_data/NA12877.EVA.vcf.gz";
     let http_vcf_index = "https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi";
 
-    let options = SearchOptions::new()
+    let options = SearchOptions::new(http_vcf, "chr1:100000000-200000000")
         .set_file_path(http_vcf)
         .set_index_path(http_vcf_index)
         .set_coordinates("chr1:100000000-200000000")
@@ -258,6 +237,7 @@ async fn http_vcf() {
 }
 
 #[tokio::test]
+#[serial_test::serial(bedgraph_cache)]
 async fn bedgraph_test() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
@@ -265,7 +245,7 @@ async fn bedgraph_test() {
     let bedgraph = "s3://com.gmail.docarw/test_data/test.bedgraph.gz";
     let bedgraph_index = "s3://com.gmail.docarw/test_data/test.bedgraph.gz.tbi";
 
-    let options = SearchOptions::new()
+    let options = SearchOptions::new(bedgraph, "chr1:1-100000000")
         .set_file_path(bedgraph)
         .set_index_path(bedgraph_index)
         .set_coordinates("chr1:1-100000000")

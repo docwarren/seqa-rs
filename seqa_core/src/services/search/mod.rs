@@ -54,15 +54,16 @@ pub enum SearchError {
 /// | `FASTA` | [`crate::api::fasta_search::fasta_search`] |
 pub struct SearchService;
 impl SearchService {
-    /// Searches for features in a file based on the provided search request.
+    /// Searches for features in a file based on the provided search options.
     ///
     /// # Arguments
     ///
-    /// * `search_request` - A `FileSearchRequest` containing the path and coordinates for the search.
+    /// * `search_options` - A `SearchOptions` containing the file path, coordinates, and other
+    ///   query parameters.
     ///
     /// # Returns
     ///
-    /// A `Result` containing a vector of strings representing the search results or an error message.
+    /// A `Result` containing a `SearchResult` with the matching lines or an error.
     pub async fn search_features(search_options: &SearchOptions) -> Result<SearchResult, SearchError> {
         let results: Result<SearchResult, SearchError> = match search_options.output_format {
             OutputFormat::BAM => Ok(bam_search::bam_search(&search_options).await?),

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::{genome::{chr_index, chromosome_len, get_longest_possible_genome}, indexes::{bai::BaiIndex, bigwig::BigwigIndex, fai::FaiIndex, tabix::Tabix}, models::{bam_header::header::BamHeader, tabix_header::TabixHeader}, traits::feature::Feature};
-
+use crate::utils::{get_output_format, parse_coordinates};
 use super::output_format::OutputFormat;
 
 /// Specifies the format of the CIGAR string in BAM output.
@@ -27,14 +27,11 @@ pub enum CigarFormat {
 ///
 /// ```rust
 /// use seqa_core::api::search_options::SearchOptions;
-/// use seqa_core::api::output_format::OutputFormat;
 ///
-/// let mut opts = SearchOptions::new()
-///     .set_file_path("s3://my-bucket/sample.bam".into())
-///     .set_index_path("s3://my-bucket/sample.bam.bai".into())
+/// let opts = SearchOptions::new("s3://my-bucket/sample.bam", "chr1")
+///     .set_index_path("s3://my-bucket/sample.bam.bai")
 ///     .set_output_format("bam")
-///     .set_genome("hg38")
-///     .set_coordinates("chr1:100000-200000");
+///     .set_genome("hg38");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchOptions {
@@ -89,18 +86,23 @@ impl SearchOptions {
     ///
     /// All path/chromosome fields are empty strings; `include_header` is `true`,
     /// `header_only` is `false`, and `output_format` is [`OutputFormat::STRING`].
-    pub fn new() -> Self {
+    pub fn new(path: &str, coordinates: &str) -> Self {
+        let (chromosome, begin, end) = parse_coordinates(coordinates).unwrap_or(("chr1".to_string(), 0, 0));
+        let file_path = crate::utils::format_file_path(path).unwrap_or_else(|_| path.to_string());
+        let index_path = crate::utils::get_index_path(&file_path).unwrap_or_else(|_| file_path.clone());
+        let output_format = get_output_format(&file_path).unwrap_or(OutputFormat::STRING);
         SearchOptions {
-            file_path: String::new(),
-            index_path: String::new(),
-            chromosome: String::new(),
-            begin: 0,
-            end: 0,
+            file_path,
+            index_path,
+            chromosome,
+            begin,
+            end,
             genome: None,
-            output_format: OutputFormat::STRING, // Default output format
+            output_format,
+            cigar_format: CigarFormat::Standard,
             include_header: true,
             header_only: false,
-            cigar_format: CigarFormat::Standard,
+            no_cache: false,
             bigwig_index: None,
             bigbed_index: None,
             bam_header: None,
@@ -108,7 +110,7 @@ impl SearchOptions {
             tabix_index: None,
             tabix_header: None,
             fasta_index: None,
-            no_cache: false,
+
         }
     }
 
@@ -285,7 +287,7 @@ mod tests {
     #[test]
     fn test_set_coordinates_full_chromosome_no_genome() {
         // Test: chr12 with no genome specified -> use longest genome
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
         options.set_coordinates("chr12");
 
         assert_eq!(options.chromosome, "chr12");
@@ -297,7 +299,7 @@ mod tests {
     #[test]
     fn test_set_coordinates_full_chromosome_with_genome() {
         // Test: chr12 with hg38 specified
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
         options.set_genome("hg38");
         options.set_coordinates("chr12");
 
@@ -310,7 +312,7 @@ mod tests {
     #[test]
     fn test_set_coordinates_full_chromosome_with_hg19() {
         // Test: chr1 with hg19 specified
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr3:1-10000000");
         options.set_genome("hg19");
         options.set_coordinates("chr1");
 
@@ -323,7 +325,7 @@ mod tests {
     #[test]
     fn test_set_coordinates_single_position() {
         // Test: chr1:12000 -> begin=12000, end=12001
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr8:1-10000000");
         options.set_coordinates("chr1:12000");
 
         assert_eq!(options.chromosome, "chr1");
@@ -334,10 +336,10 @@ mod tests {
     #[test]
     fn test_set_coordinates_range() {
         // Test: chr1:12000-15000
-        let mut options = SearchOptions::new();
-        options.set_coordinates("chr1:12000-15000");
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
+        options.set_coordinates("chr8:12000-15000");
 
-        assert_eq!(options.chromosome, "chr1");
+        assert_eq!(options.chromosome, "chr8");
         assert_eq!(options.begin, 12000);
         assert_eq!(options.end, 15000);
     }
@@ -345,10 +347,10 @@ mod tests {
     #[test]
     fn test_set_coordinates_with_commas() {
         // Test: chr1:12,000-15,000 (commas should be stripped)
-        let mut options = SearchOptions::new();
-        options.set_coordinates("chr1:12,000-15,000");
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
+        options.set_coordinates("chr6:12,000-15,000");
 
-        assert_eq!(options.chromosome, "chr1");
+        assert_eq!(options.chromosome, "chr6");
         assert_eq!(options.begin, 12000);
         assert_eq!(options.end, 15000);
     }
@@ -356,7 +358,7 @@ mod tests {
     #[test]
     fn test_set_coordinates_numeric_chromosome() {
         // Test: 12 (no chr prefix) with hg38
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
         options.set_genome("hg38");
         options.set_coordinates("12");
 
@@ -369,7 +371,7 @@ mod tests {
     #[test]
     fn test_set_coordinates_chrx_with_position() {
         // Test: chrX:1000000
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
         options.set_coordinates("chrX:1000000");
 
         assert_eq!(options.chromosome, "chrX");
@@ -380,7 +382,7 @@ mod tests {
     #[test]
     fn test_set_genome() {
         // Test: genome setter converts to lowercase
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
         options.set_genome("HG38");
 
         assert_eq!(options.genome, Some("hg38".to_string()));
@@ -388,13 +390,13 @@ mod tests {
 
     #[test]
     fn test_no_cache_defaults_to_false() {
-        let options = SearchOptions::new();
+        let options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
         assert_eq!(options.no_cache, false);
     }
 
     #[test]
     fn test_set_no_cache() {
-        let mut options = SearchOptions::new();
+        let mut options = SearchOptions::new("/media/drew/ExtraSSD/tracks/NA12877.bam", "chr1:1-10000000");
         options = options.set_no_cache(true);
         assert_eq!(options.no_cache, true);
     }

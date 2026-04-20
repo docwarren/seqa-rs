@@ -1,4 +1,4 @@
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use seqa_core::api::bam_search::{BamError, bam_search};
 use seqa_core::api::bigbed_search::{BigbedError, bigbed_search};
 use seqa_core::api::bigwig_search::{BigwigError, bigwig_search};
@@ -7,7 +7,7 @@ use seqa_core::api::output_format::OutputFormat;
 use seqa_core::api::search_options::SearchOptions;
 use seqa_core::api::search_result::SearchResult;
 use seqa_core::api::tabix_search::{TabixSearchError, tabix_search};
-use seqa_core::utils::{format_file_path, get_index_path, get_output_format, ExtensionError};
+use seqa_core::utils::ExtensionError;
 use std::io::{self, Write};
 use thiserror::Error;
 use log::{debug, error};
@@ -97,16 +97,6 @@ async fn main() {
             no_cache,
         } => {
 
-            let file_path = format_file_path(&file).unwrap_or_else(|e| {
-                print_error(&format!("Failed to format file path ({:?})", &file), &e);
-                std::process::exit(1);
-            });
-
-            let index_path = get_index_path(&file_path).unwrap_or_else(|e| {
-                print_error(&format!("Failed to get index path ({:?})", &file_path), &e);
-                std::process::exit(1);
-            });
-
             // Validate reference genome if provided
             if let Some(ref genome) = reference {
                 let genome_lower = genome.to_lowercase();
@@ -116,23 +106,12 @@ async fn main() {
                 }
             }
 
-            let mut options = SearchOptions::new()
-                .set_file_path(&file_path)
-                .set_index_path(&index_path);
+            let mut options = SearchOptions::new(&file, &coordinates);
 
             // Set genome before coordinates so set_coordinates can use it
             if let Some(ref genome) = reference {
                 options = options.set_genome(genome);
             }
-
-            options = options.set_coordinates(&coordinates);
-
-            let output_format = get_output_format(&file_path).unwrap_or_else(|e| {
-                print_error(&format!("Failed to get output format ({})", &file_path), &e);
-                std::process::exit(1);
-            });
-
-            options.set_output_format(&output_format.to_string());
 
             options = match with_header {
                 Some(true) => options.set_include_header(true),
@@ -164,12 +143,6 @@ async fn main() {
             }
         }
     }
-}
-
-fn print_error(message: &str, e: &dyn std::error::Error) {
-    error!("Error: {}: {}", message, e);
-    let mut cmd = Cli::command();
-    cmd.print_help().unwrap();
 }
 
 async fn search(options: &SearchOptions) -> Result<Vec<String>, ApiError> {

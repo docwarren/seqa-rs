@@ -7,9 +7,9 @@ use seqa_core::api::search_result::SearchResult;
 use seqa_core::api::tabix_search::TabixSearchError;
 use seqa_core::api::bigwig_search::BigwigError;
 use seqa_core::api::{bam_search, bigwig_search, fasta_search, tabix_search};
-use seqa_core::api::file_search_request::FileSearchRequest;
-use seqa_core::utils::{get_search_options, UtilError};
+use seqa_core::utils::UtilError;
 use thiserror::Error;
+use seqa_core::api::search_options::SearchOptions;
 
 #[derive(Debug, Error)]
 pub enum SearchError {
@@ -34,18 +34,18 @@ pub enum SearchError {
 
 pub struct SearchService;
 impl SearchService {
-    /// Searches for features in a file based on the provided search request.
+    /// Searches for features in a file based on the provided search options.
     ///
     /// # Arguments
     ///
-    /// * `search_request` - A `FileSearchRequest` containing the path and coordinates for the search.
+    /// * `search_options` - A `SearchOptions` containing the file path, coordinates, and other
+    ///   query parameters.
     ///
     /// # Returns
     ///
     /// A `Result` containing a vector of strings representing the search results or an error message.
-    pub async fn search_features(search_request: FileSearchRequest) -> Result<Vec<String>, SearchError> {
-        let mut search_options = get_search_options(search_request)?;
-
+    pub async fn search_features(search_options: &SearchOptions) -> Result<Vec<String>, SearchError> {
+        let mut search_options = search_options.clone();
         search_options.include_header = true;
         search_options.no_cache = true;
 

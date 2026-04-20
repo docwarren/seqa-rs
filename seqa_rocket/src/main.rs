@@ -11,13 +11,12 @@ use rocket::serde::json::serde_json;
 use rocket_cors::{ CorsOptions, AllowedHeaders, AllowedOrigins };
 use rocket_cors::Method;
 use serde::Serialize;
-use seqa_core::utils::{get_search_options, UtilError};
-
+use seqa_core::utils::UtilError;
 use std::collections::HashSet;
 use std::io::Cursor;
 use thiserror::Error;
 
-use seqa_core::api::file_search_request::FileSearchRequest;
+use seqa_core::api::search_options::SearchOptions;
 use seqa_core::models::gene_coordinate::GeneCoordinate;
 use seqa_core::services::search::{ SearchError, SearchService };
 use crate::search::models::SearchRequest;
@@ -135,8 +134,7 @@ async fn search_features(search_request: Json<SearchRequest>) -> Result<String, 
     if request.coordinates.is_empty() {
         return Err(ApiError::BadRequest("Missing coordinates".into()));
     }
-    let search_request = FileSearchRequest::new(request.path, request.coordinates);
-    let search_options = get_search_options(search_request)?;
+    let search_options = SearchOptions::new(&request.path, &request.coordinates);
     let result = SearchService::search_features(&search_options).await?;
 
     Ok(result.lines.into_iter().collect::<Vec<String>>().join("\n"))
