@@ -3,7 +3,7 @@ resolver = "3"
 members = [
     "seqa_core",
     "seqa_cli",
-    "seqa_rocket",
+    "seqa_axum",
 ]
 
 [profile.release]
