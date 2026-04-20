@@ -247,6 +247,9 @@ impl SearchOptions {
 }
 
 impl Feature for SearchOptions {
+    fn get_chromosome(&self) -> String {
+        self.chromosome.clone()
+    }
 
     fn get_begin(&self) -> u32 {
         self.begin
@@ -266,10 +269,6 @@ impl Feature for SearchOptions {
 
     fn coordinate_system(&self) -> crate::models::coordinates::CoordinateSystem {
         crate::models::coordinates::CoordinateSystem::OneBasedClosed
-    }
-
-    fn get_chromosome(&self) -> String {
-        self.chromosome.clone()
     }
 }
 

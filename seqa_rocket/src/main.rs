@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use std::io::Cursor;
 use thiserror::Error;
 
-use seqa_core::models::FileSearchRequest;
+use seqa_core::api::file_search_request::FileSearchRequest;
 use seqa_core::models::gene_coordinate::GeneCoordinate;
 use seqa_core::services::search::{ SearchError, SearchService };
 use crate::search::models::SearchRequest;

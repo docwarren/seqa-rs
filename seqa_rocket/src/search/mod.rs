@@ -7,7 +7,7 @@ use seqa_core::api::search_result::SearchResult;
 use seqa_core::api::tabix_search::TabixSearchError;
 use seqa_core::api::bigwig_search::BigwigError;
 use seqa_core::api::{bam_search, bigwig_search, fasta_search, tabix_search};
-use seqa_core::models::FileSearchRequest;
+use seqa_core::api::file_search_request::FileSearchRequest;
 use seqa_core::utils::{get_search_options, UtilError};
 use thiserror::Error;
 

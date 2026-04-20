@@ -1,7 +1,7 @@
 use crate::api::output_format::OutputFormat;
 use crate::api::search_options::SearchOptions;
 use crate::genome::get_longest_possible_genome;
-use crate::models::FileSearchRequest;
+use crate::api::file_search_request::FileSearchRequest;
 use std::num::ParseIntError;
 use std::path::absolute;
 use thiserror::Error;
