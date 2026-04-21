@@ -6,10 +6,8 @@ async fn fasta_chr1() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path(S3_FASTA)
+    let options = SearchOptions::new(S3_FASTA, "chr1:10000-10100")
         .set_index_path(S3_FASTA_INDEX)
-        .set_coordinates("chr1:10000-10100")
         .set_output_format("fasta")
         .set_include_header(false);
 

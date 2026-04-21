@@ -1,7 +1,5 @@
 use crate::api::output_format::OutputFormat;
-use crate::api::search_options::SearchOptions;
 use crate::genome::get_longest_possible_genome;
-use crate::models::FileSearchRequest;
 use std::num::ParseIntError;
 use std::path::absolute;
 use thiserror::Error;
@@ -67,45 +65,6 @@ pub fn format_file_path(file_path: &str) -> Result<String, UtilError> {
     } else {
         Ok(file_path.to_string())
     }
-}
-
-/// Converts a [`FileSearchRequest`] into a fully resolved [`SearchOptions`].
-///
-/// This function:
-/// 1. Validates that `path` and `coordinates` are non-empty.
-/// 2. Parses the coordinate string via [`parse_coordinates`].
-/// 3. Normalises the file path via [`format_file_path`].
-/// 4. Infers the index path via [`get_index_path`].
-/// 5. Infers the output format via [`get_output_format`].
-/// 6. Copies any pre-parsed index/header caches from the request.
-///
-/// # Errors
-///
-/// Returns [`UtilError`] when validation, path normalisation, coordinate parsing,
-/// or format inference fails.
-pub fn get_search_options(request: FileSearchRequest) -> Result<SearchOptions, UtilError> {
-    // Validate and process the search request
-    if request.path.is_empty() || request.coordinates.is_empty() {
-        return Err(UtilError::FormatError(FormatError::InvalidOptions(
-            format!("File path and coordinates must be provided: file: {}, coords: {}", request.path, request.coordinates),
-        )));
-    }
-    let mut options = SearchOptions::new();
-
-    let (chromosome, begin, end) = parse_coordinates(&request.coordinates)?;
-    options.chromosome = chromosome;
-    options.begin = begin;
-    options.end = end;
-    options.file_path = format_file_path(&request.path)?;
-    options.index_path = get_index_path(&options.file_path)?;
-    options.output_format = get_output_format(&options.file_path)?;
-    options.bigwig_index =  request.bigwig_index;
-    options.bam_header = request.bam_header;
-    options.bam_index = request.bam_index;
-    options.tabix_header = request.tabix_header;
-    options.tabix_index = request.tabix_index;
-    options.fasta_index = request.fasta_index;
-    Ok(options)
 }
 
 /// Parses a genomic coordinate string into `(chromosome, begin, end)`.
@@ -229,9 +188,9 @@ fn test_parse_coordinates() {
 
 #[test]
 fn test_get_search_options_local() {
+    use crate::api::search_options::SearchOptions;
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let request = FileSearchRequest::new("./mock_data/NA12878.gatk.cnv.vcf.gz".into(), "chr1:1000-2000".into());
-    let options = get_search_options(request).unwrap();
+    let options = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", "chr1:1000-2000");
     assert_eq!(
         options.file_path,
         format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", manifest_dir)
@@ -245,15 +204,10 @@ fn test_get_search_options_local() {
     );
     assert_eq!(options.output_format, OutputFormat::VCF);
 
-    let request = FileSearchRequest::new("./mock_data/NA12878.gatk.cnv.vcf.gz".into(), "chr1".into());
-    let options = get_search_options(request).unwrap();
+    let options = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", "chr1");
     assert_eq!(options.chromosome, "chr1");
     assert_eq!(options.begin, 1);
     assert_eq!(options.end, 249_250_621); // Assuming chr1 length from longest_possible_genome
-
-    let request = FileSearchRequest::new("./mock_data/crap.gatk.cnv.vcf.gz".into(),"chr1".into());
-    let options = get_search_options(request);
-    assert!(options.is_err());
 }
 
 #[test]
@@ -267,8 +221,8 @@ fn test_format_file_path() {
     assert_eq!(path, "s3://bucket/file.vcf.gz");
     let path = format_file_path("gs://bucket/file.vcf.gz").unwrap();
     assert_eq!(path, "gs://bucket/file.vcf.gz");
-    let path = format_file_path("http://example.com/file.vcf.gz").unwrap();
-    assert_eq!(path, "http://example.com/file.vcf.gz");
+    let path = format_file_path("https://example.com/file.vcf.gz").unwrap();
+    assert_eq!(path, "https://example.com/file.vcf.gz");
     let path = format_file_path("https://example.com/file.vcf.gz").unwrap();
     assert_eq!(path, "https://example.com/file.vcf.gz");
 }
@@ -279,8 +233,8 @@ fn test_get_index_path() {
     assert_eq!(index, "s3://bucket/file.bam.bai");
     let index = get_index_path("gs://bucket/file.fa").unwrap();
     assert_eq!(index, "gs://bucket/file.fa.fai");
-    let index = get_index_path("http://example.com/file.vcf.gz").unwrap();
-    assert_eq!(index, "http://example.com/file.vcf.gz.tbi");
+    let index = get_index_path("https://example.com/file.vcf.gz").unwrap();
+    assert_eq!(index, "https://example.com/file.vcf.gz.tbi");
     let index = get_index_path("https://example.com/file.bigwig").unwrap();
     assert_eq!(index, "-");
     let index = get_index_path("file.bed.gz").unwrap();

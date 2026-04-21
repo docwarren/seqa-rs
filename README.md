@@ -15,7 +15,7 @@ Supports BAM, VCF, GFF/GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats. In
 |-------|-------------|--------|
 | [`seqa_core`](seqa_core/) | Core library — genomic file parsing, binary index reading, cloud storage via `object_store` | [seqa_core/README.md](seqa_core/README.md) |
 | [`seqa`](seqa_cli/) | CLI tool — query any supported file from the command line | [seqa_cli/README.md](seqa_cli/README.md) |
-| [`seqa_rocket`](seqa_rocket/) | REST API server — HTTP endpoints for genomic search and file browsing | [seqa_rocket/README.md](seqa_rocket/README.md) |
+| [`seqa_axum`](seqa_axum/) | REST API server — HTTP endpoints for genomic search and file browsing |
 
 ## Storage Backends
 
@@ -39,8 +39,38 @@ seqa search /path/to/sample.vcf.gz chr1:1000000-2000000
 # Query a file on S3
 seqa search s3://my-bucket/sample.bam chr12:10000000-10010000
 
-# Run the API server
-cargo run -p seqa_rocket
+# Run the API server (listens on http://127.0.0.1:8000)
+cargo run -p seqa_axum
+```
+
+## API Server
+
+The `seqa_axum` crate provides a REST API backed by [axum](https://github.com/tokio-rs/axum). Run it with:
+
+```bash
+# Development (debug build)
+cargo run -p seqa_axum
+
+# Release build
+cargo run -p seqa_axum --release
+```
+
+The server binds to `127.0.0.1:8000` and exposes:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/` | Health check |
+| `POST` | `/search` | Genomic range query — JSON body `{"path": "...", "coordinates": "chr:start-end"}` |
+| `POST` | `/files` | List objects under a storage URI — JSON body is a bare string, e.g. `"s3://bucket/prefix/"` |
+| `GET`  | `/genes/symbols/{genome}` | List gene symbols for `hg19`/`hg38` |
+| `GET`  | `/genes/coordinates/{genome}/{gene}` | Look up coordinates for a gene symbol |
+
+CORS is preconfigured for `http://localhost:5173` (Vite dev server). Cloud-backed requests require the same credentials as the CLI — see `seqa_core/README.md`.
+
+Run the axum test suite:
+
+```bash
+cargo test -p seqa_axum
 ```
 
 ## Development

@@ -10,15 +10,13 @@
 //! ```rust,no_run
 //! use seqa_core::services::search::SearchService;
 //! use seqa_core::api::search_options::SearchOptions;
-//! use seqa_core::utils::{format_file_path, get_index_path, get_output_format};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mut opts = SearchOptions::new();
-//!     opts.file_path = format_file_path("s3://my-bucket/sample.bam")?;
-//!     opts.index_path = get_index_path(&opts.file_path)?;
-//!     opts.output_format = get_output_format(&opts.file_path)?;
-//!     opts.set_coordinates("chr1:100000-200000");
+//!     let opts = SearchOptions::new(
+//!         "s3://my-bucket/sample.bam",
+//!         "chr1:100000-200000",
+//!     );
 //!
 //!     let result = SearchService::search_features(&opts).await?;
 //!     for line in &result.lines {

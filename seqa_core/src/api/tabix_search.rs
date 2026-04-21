@@ -162,10 +162,9 @@ pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> 
 
 #[test]
 fn test_get_header_lines() {
-    let mut options = SearchOptions::new();
+    let mut options = SearchOptions::new("test.gff.gz", "chr1:1-10000000");
     options.include_header = true;
     options.output_format = OutputFormat::GFF;
-    options.file_path = "test.gff.gz".to_string();
     options.index_path = "test.gff.gz.tbi".to_string();
     options.begin = 0;
     options.end = 1000;

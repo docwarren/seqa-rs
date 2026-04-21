@@ -3,10 +3,8 @@ async fn s3_bigwig() {
     use seqa_core::services::search::SearchService;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path("s3://com.gmail.docarw/test_data/density.bw")
+    let options = SearchOptions::new("s3://com.gmail.docarw/test_data/density.bw", "chr4:120000000-140000000")
         .set_index_path("-")
-        .set_coordinates("chr4:120000000-140000000")
         .set_output_format("bigwig")
         .set_include_header(false);
 
@@ -27,10 +25,8 @@ async fn azure_bigwig() {
     use seqa_core::api::bigwig_search::bigwig_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path("az://genreblobs/genre-test-data/density.bw")
+    let options = SearchOptions::new("az://genreblobs/genre-test-data/density.bw", "chr4:120000000-140000000")
         .set_index_path("-")
-        .set_coordinates("chr4:120000000-140000000")
         .set_include_header(false);
     
     let result = bigwig_search(&options).await.expect("Failed to search BigWig for chr4");
@@ -50,10 +46,8 @@ async fn gc_bigwig() {
     use seqa_core::api::bigwig_search::bigwig_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path("gs://genre_test_bucket/density.bw")
+    let options = SearchOptions::new("gs://genre_test_bucket/density.bw", "chr4:120000000-140000000")
         .set_index_path("-")
-        .set_coordinates("chr4:120000000-140000000")
         .set_include_header(false);
     
     let result = bigwig_search(&options).await.expect("Failed to search BigWig for chr4");
@@ -73,10 +67,8 @@ async fn http_bigwig() {
     use seqa_core::api::bigwig_search::bigwig_search;
     use seqa_core::api::search_options::SearchOptions;
 
-    let options = SearchOptions::new()
-        .set_file_path("https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test_data/density.bw")
+    let options = SearchOptions::new("https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test_data/density.bw", "chr4:120000000-140000000")
         .set_index_path("-")
-        .set_coordinates("chr4:120000000-140000000")
         .set_include_header(false);
     
     let result = bigwig_search(&options).await.expect("Failed to search BigWig for chr4");
