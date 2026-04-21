@@ -87,8 +87,33 @@ jobs:
           path: target/${{ matrix.target }}/release/${{ matrix.binary }}
           if-no-files-found: error
 
-  upload-s3:
-    name: Upload to S3 (${{ matrix.target }})
+  build-axum:
+    name: Build seqa_axum (x86_64-unknown-linux-gnu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: seqa_axum-x86_64-unknown-linux-gnu
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y libsqlite3-dev
+
+      - name: Build
+        run: cargo build -p seqa_axum --release --target x86_64-unknown-linux-gnu
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: seqa_axum-x86_64-unknown-linux-gnu
+          path: target/x86_64-unknown-linux-gnu/release/seqa_axum
+          if-no-files-found: error
+
+  upload-s3-cli:
+    name: Upload seqa to S3 (${{ matrix.target }})
     needs: build-cli
     runs-on: ubuntu-latest
     environment: TEST
@@ -121,3 +146,22 @@ jobs:
 
       - name: Upload to S3
         run: aws s3 cp dist/${{ matrix.binary }} s3://com.soma23/${{ matrix.target }}/${{ matrix.binary }}
+
+  upload-s3-axum:
+    name: Upload seqa_axum to S3
+    needs: build-axum
+    runs-on: ubuntu-latest
+    environment: TEST
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: seqa_axum-x86_64-unknown-linux-gnu
+          path: dist/
+
+      - name: Upload to S3
+        run: aws s3 cp dist/seqa_axum s3://com.soma23/x86_64-unknown-linux-gnu/seqa_axum

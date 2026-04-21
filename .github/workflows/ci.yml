@@ -33,13 +33,13 @@ jobs:
       - name: Local store test
         run: cargo test -p seqa_core --test local
 
-      - name: Rocket tests
+      - name: Axum tests
         run: |
-          cargo test -p seqa_rocket test_index
-          cargo test -p seqa_rocket test_search_unsupported_file_type
-          cargo test -p seqa_rocket test_search_missing_coordinates
-          cargo test -p seqa_rocket test_search_invalid_json
-          cargo test -p seqa_rocket test_404
+          cargo test -p seqa_axum test_index
+          cargo test -p seqa_axum test_search_unsupported_file_type
+          cargo test -p seqa_axum test_search_missing_coordinates
+          cargo test -p seqa_axum test_search_invalid_json
+          cargo test -p seqa_axum test_404
 
   # Runs on pull requests and pushes ot main
   integration:
@@ -69,8 +69,9 @@ jobs:
           cargo test -p seqa_core --test bigwig
           cargo test -p seqa_core --test bigbed
           cargo test -p seqa_core --test obj_store
+          cargo test -p seqa_core --test fasta
 
-      - name: seqa_rocket cloud tests
+      - name: seqa_axum cloud tests
         run: |
-          cargo test -p seqa_rocket test_search_vcf
-          cargo test -p seqa_rocket test_list_files_s3
+          cargo test -p seqa_axum test_search_vcf
+          cargo test -p seqa_axum test_list_files_s3
