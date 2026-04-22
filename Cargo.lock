@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "seqa"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
  "command",
@@ -1557,7 +1557,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_axum"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "axum",
  "http-body-util",
@@ -1573,7 +1573,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_core"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "flate2",
  "futures",
