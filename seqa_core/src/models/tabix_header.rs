@@ -33,9 +33,11 @@ impl TabixHeader {
         TabixHeader { lines: Vec::new() }
     }
 
-    pub async fn from_file(file_path: &str, first_vp: VirtualOffset) -> Result<Self, TabixHeaderError> {
-        let store = StoreService::from_uri(file_path)?;
-
+    pub async fn from_file(
+        store: &StoreService,
+        file_path: &str,
+        first_vp: VirtualOffset,
+    ) -> Result<Self, TabixHeaderError> {
         let compressed_bytes = store
             .get_range(file_path, Range {
                 start: 0u64,

@@ -9,6 +9,7 @@ use crate::indexes::bigwig::{BigwigIndex, BigwigIndexError};
 use crate::indexes::bigwig::r_tree::r_tree_leaf::RTreeLeaf;
 use crate::indexes::bigwig::r_tree::{RTree, RTreeError};
 use crate::indexes::bigwig::zoom_header::ZoomHeader;
+use crate::stores::StoreService;
 use super::search_options::SearchOptions;
 use super::search_result::SearchResult;
 
@@ -101,13 +102,16 @@ pub fn data_to_lines(
 /// Searches for data in a BigBed file based on the provided search options.
 /// BigBed files share the same index structure as BigWig files (same header, chr tree, r-tree).
 /// The difference is in the data format: BigBed stores BED records instead of wig data.
-pub async fn bigbed_search(options: &SearchOptions) -> Result<SearchResult, BigbedError> {
+pub async fn bigbed_search(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<SearchResult, BigbedError> {
     let mut result = SearchResult::new();
 
     // Reuse BigwigIndex since the index structure is identical
     let index = match &options.bigbed_index {
         Some(index) => index,
-        _ => &BigwigIndex::new(&options.file_path).await?,
+        _ => &BigwigIndex::new(store_service, &options.file_path).await?,
     };
     result.bigbed_index = Some(index.clone());
 
@@ -125,9 +129,9 @@ pub async fn bigbed_search(options: &SearchOptions) -> Result<SearchResult, Bigb
     };
 
     let index_offset = get_index_begin(index, zoom_header).await?;
-    let index_end = get_index_end(index, zoom_header).await?;
+    let index_end = get_index_end(store_service, index, zoom_header).await?;
 
-    let r_tree = RTree::from_file(&options.file_path, index_offset..index_end).await?;
+    let r_tree = RTree::from_file(store_service, &options.file_path, index_offset..index_end).await?;
 
     let leaves = r_tree.get_overlapping_leaves(chr_id, options.begin, options.end);
 
@@ -137,7 +141,7 @@ pub async fn bigbed_search(options: &SearchOptions) -> Result<SearchResult, Bigb
 
     let range = get_range_from_leaves(&leaves);
 
-    let data = index.get_data(&range, &options.file_path).await?;
+    let data = index.get_data(store_service, &range, &options.file_path).await?;
 
     let mut decompressed_blocks: Vec<Vec<u8>> = Vec::new();
 
@@ -175,14 +179,15 @@ async fn get_index_begin(
 }
 
 async fn get_index_end(
+    store_service: &StoreService,
     index: &BigwigIndex,
     zoom_header: Option<&ZoomHeader>,
 ) -> Result<u64, BigbedError> {
     match zoom_header {
         Some(zoom_header) => Ok(index
-            .get_end_for_zoom_header(zoom_header, &index.file_path)
+            .get_end_for_zoom_header(store_service, zoom_header, &index.file_path)
             .await?),
-        None => Ok(index.get_full_index_end(&index.file_path).await?),
+        None => Ok(index.get_full_index_end(store_service, &index.file_path).await?),
     }
 }
 

@@ -29,7 +29,10 @@ pub enum FastaSearchError {
 ///   paths, chromosome, start and end positions, output format, and whether to include headers or only headers.
 /// # Returns:
 /// * A Result containing a vector of strings with the search results, or an error message if the search fails.
-pub async fn fasta_search(options: &SearchOptions) -> Result<SearchResult, FastaSearchError> {
+pub async fn fasta_search(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<SearchResult, FastaSearchError> {
     let mut result = SearchResult::new();
 
     if options.end - options.begin > 100_000 {
@@ -39,14 +42,13 @@ pub async fn fasta_search(options: &SearchOptions) -> Result<SearchResult, Fasta
     }
     let index = match &options.fasta_index {
         Some(index) => index,
-        None => &FaiIndex::from_file(&options.index_path).await?
+        None => &FaiIndex::from_file(store_service, &options.index_path).await?
     };
     result.fasta_index = Some(index.clone());
 
     let byte_range: Range<u64> = index.get_offsets(&options)?;
 
-    let store = StoreService::from_uri(&options.file_path)?;
-    let bytes = store.get_range(&options.file_path, byte_range).await?;
+    let bytes = store_service.get_range(&options.file_path, byte_range).await?;
     let line_string = String::from_utf8(bytes)?;
     result.lines = line_string.lines()
         .map(|line| line.to_string())

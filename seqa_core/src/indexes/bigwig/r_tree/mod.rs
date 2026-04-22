@@ -53,8 +53,11 @@ impl RTree {
         }
     }
 
-    pub async fn from_file(file_path: &str, range: Range<u64>) -> Result<RTree, RTreeError> {
-        let store = StoreService::from_uri(file_path)?;
+    pub async fn from_file(
+        store: &StoreService,
+        file_path: &str,
+        range: Range<u64>,
+    ) -> Result<RTree, RTreeError> {
         let tree_range = range.start..range.end;
         let tree_bytes = store.get_range(&file_path, tree_range).await?;
         let index_header = RTreeHeader::from_bytes(&tree_bytes)?;

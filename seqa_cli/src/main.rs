@@ -1,12 +1,7 @@
 use clap::{Parser, Subcommand};
-use seqa_core::api::bam_search::{BamError, bam_search};
-use seqa_core::api::bigbed_search::{BigbedError, bigbed_search};
-use seqa_core::api::bigwig_search::{BigwigError, bigwig_search};
-use seqa_core::api::fasta_search::{FastaSearchError, fasta_search};
-use seqa_core::api::output_format::OutputFormat;
+use seqa_core::api::search::SearchFeaturesError;
 use seqa_core::api::search_options::SearchOptions;
-use seqa_core::api::search_result::SearchResult;
-use seqa_core::api::tabix_search::{TabixSearchError, tabix_search};
+use seqa_core::stores::StoreService;
 use seqa_core::utils::ExtensionError;
 use std::io::{self, Write};
 use thiserror::Error;
@@ -57,20 +52,8 @@ enum Commands {
 
 #[derive(Error, Debug)]
 pub enum ApiError {
-    #[error("BAM Error: {0}")]
-    BamError(#[from] BamError),
-
-    #[error("Tabix Error: {0}")]
-    TabixError(#[from] TabixSearchError),
-
-    #[error("Fasta Error: {0}")]
-    FastaError(#[from] FastaSearchError),
-
-    #[error("Bigwig Error: {0}")]
-    BigwigError(#[from] BigwigError),
-
-    #[error("Bigbed Error: {0}")]
-    BigbedError(#[from] BigbedError),
+    #[error("Search Error: {0}")]
+    SearchError(#[from] SearchFeaturesError),
 
     #[error("Extension Error: {0}")]
     ExtensionError(#[from] ExtensionError),
@@ -125,7 +108,9 @@ async fn main() {
 
             options = options.set_no_cache(no_cache);
 
-            match search(&options).await {
+            let store_service = StoreService::new();
+
+            match search(&store_service, &options).await {
                 Ok(lines) => {
                     let result = print_output(&lines);
                     match result {
@@ -145,19 +130,11 @@ async fn main() {
     }
 }
 
-async fn search(options: &SearchOptions) -> Result<Vec<String>, ApiError> {
-    let search_result = match options.output_format {
-        OutputFormat::BAM => bam_search(options).await?,
-        OutputFormat::FASTA => fasta_search(options).await?,
-        OutputFormat::BIGWIG => bigwig_search(options).await?,
-        OutputFormat::BIGBED => bigbed_search(options).await?,
-        OutputFormat::BED |
-        OutputFormat::BEDGRAPH |
-        OutputFormat::GFF |
-        OutputFormat::GTF |
-        OutputFormat::VCF => tabix_search(options).await?,
-        _ => SearchResult::new()
-    };
+async fn search(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<Vec<String>, ApiError> {
+    let search_result = store_service.search_features(options).await?;
     Ok(search_result.lines)
 }
 

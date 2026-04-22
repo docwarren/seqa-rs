@@ -120,11 +120,12 @@ pub struct BigwigIndex {
 }
 
 impl BigwigIndex {
-    pub async fn new(file_path: &str) -> Result<BigwigIndex, BigwigIndexError> {
-        let store = StoreService::from_uri(file_path)?;
-
-        let bigwig_header =  get_bigwig_header(&store, file_path).await?;
-        let detail_bytes =  get_bigwig_detail_bytes(&store, &bigwig_header, file_path).await?;
+    pub async fn new(
+        store: &StoreService,
+        file_path: &str,
+    ) -> Result<BigwigIndex, BigwigIndexError> {
+        let bigwig_header =  get_bigwig_header(store, file_path).await?;
+        let detail_bytes =  get_bigwig_detail_bytes(store, &bigwig_header, file_path).await?;
         let zoom_headers =  get_zoom_headers(&bigwig_header, &detail_bytes)?;
         let total_summary =  get_total_summary(&bigwig_header, &detail_bytes)?;
         let chr_tree =  BigwigChrTree::from_bytes(&detail_bytes, &bigwig_header)?;
@@ -146,8 +147,12 @@ impl BigwigIndex {
         self.zoom_headers.iter().find(|zoom| zoom.matches(reduction_level))
     }
 
-    pub async fn get_end_for_zoom_header(&self, zoom_header: &ZoomHeader, path_str: &str) -> Result<u64, BigwigIndexError> {
-        let store = StoreService::from_uri(&self.file_path)?;
+    pub async fn get_end_for_zoom_header(
+        &self,
+        store: &StoreService,
+        zoom_header: &ZoomHeader,
+        path_str: &str,
+    ) -> Result<u64, BigwigIndexError> {
         match self.get_next_zoom_header(zoom_header) {
             Some(next) => Ok(next.index_offset as u64),
             None => Ok(store.get_file_size(path_str).await?),
@@ -164,16 +169,23 @@ impl BigwigIndex {
         }
     }
 
-    pub async fn get_full_index_end(&self, path_str: &str) -> Result<u64, BigwigIndexError> {
-        let store = StoreService::from_uri(&self.file_path)?;
+    pub async fn get_full_index_end(
+        &self,
+        store: &StoreService,
+        path_str: &str,
+    ) -> Result<u64, BigwigIndexError> {
         match self.zoom_headers.first() {
             Some(zoom) => Ok(zoom.index_offset as u64),
             None => Ok(store.get_file_size(path_str).await?),
         }
     }
 
-    pub async fn get_data(&self, range: &Range<u64>, path_str: &str) -> Result<Vec<u8>, BigwigIndexError> {
-        let store = StoreService::from_uri(&self.file_path)?;
+    pub async fn get_data(
+        &self,
+        store: &StoreService,
+        range: &Range<u64>,
+        path_str: &str,
+    ) -> Result<Vec<u8>, BigwigIndexError> {
         Ok(store.get_range(path_str, range.clone()).await?)
     }
 }

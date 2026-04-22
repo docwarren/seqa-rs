@@ -1,14 +1,16 @@
+use std::sync::Arc;
+
 use axum::{
     Json, Router,
-    extract::{Path, Request, rejection::JsonRejection},
+    extract::{Path, Request, State, rejection::JsonRejection},
     http::{HeaderValue, Method, StatusCode, header, Uri},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
 use serde::Serialize;
+use seqa_core::api::search::SearchFeaturesError;
 use seqa_core::api::search_options::SearchOptions;
 use seqa_core::models::gene_coordinate::GeneCoordinate;
-use seqa_core::services::search::{SearchError, SearchService};
 use seqa_core::sqlite::genes::{self, GeneError};
 use seqa_core::stores::StoreService;
 use seqa_core::utils::UtilError;
@@ -48,7 +50,7 @@ pub enum ApiError {
     DatabaseError(String),
 
     #[error("Search error: {0}")]
-    SearchError(#[from] SearchError),
+    SearchError(#[from] SearchFeaturesError),
 
     #[error("SQLite error: {0}")]
     SqliteError(#[from] rusqlite::Error),
@@ -103,6 +105,7 @@ async fn index() -> &'static str {
 }
 
 async fn search_features(
+    State(store_service): State<Arc<StoreService>>,
     payload: Result<Json<SearchRequest>, JsonRejection>,
 ) -> Result<String, ApiError> {
     let Json(request) = payload.map_err(|e| ApiError::BadRequest(e.body_text()))?;
@@ -126,20 +129,18 @@ async fn search_features(
     }
 
     let search_options = SearchOptions::new(&request.path, &request.coordinates);
-    let result = SearchService::search_features(&search_options).await?;
+    let result = store_service.search_features(&search_options).await?;
 
     Ok(result.lines.into_iter().collect::<Vec<String>>().join("\n"))
 }
 
 async fn list_dir(
+    State(store_service): State<Arc<StoreService>>,
     payload: Result<Json<String>, JsonRejection>,
 ) -> Result<Json<Vec<FileEntry>>, ApiError> {
     let Json(dir) = payload.map_err(|e| ApiError::BadRequest(e.body_text()))?;
 
-    let service = StoreService::from_uri(&dir)
-        .map_err(|e| ApiError::StoreError(format!("Invalid path {}: {}", dir, e)))?;
-
-    let objects = service
+    let objects = store_service
         .list_objects(&dir)
         .await
         .map_err(|e| ApiError::StoreError(format!("Failed to list {}: {}", dir, e)))?;
@@ -189,6 +190,8 @@ pub fn app() -> Router {
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         .allow_credentials(true);
 
+    let store_service = Arc::new(StoreService::new());
+
     Router::new()
         .route("/", get(index))
         .route("/search", post(search_features))
@@ -197,6 +200,7 @@ pub fn app() -> Router {
         .route("/genes/coordinates/{genome}/{gene}", get(get_coordinates))
         .fallback(not_found_fallback)
         .layer(cors)
+        .with_state(store_service)
 }
 
 #[tokio::main]

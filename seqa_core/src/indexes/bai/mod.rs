@@ -5,6 +5,7 @@ use thiserror::Error;
 
 use crate::indexes::bin::Bin;
 use crate::indexes::chunk::{Chunk, ChunkError};
+use crate::stores::StoreService;
 use super::traits::sam_index::SamIndex;
 use super::virtual_offset::VirtualOffset;
 
@@ -54,8 +55,13 @@ impl BaiIndex {
     /// # Arguments
     /// * `idx_path` - Path to the index file (could be remote)
     /// * `no_cache` - When true, skip reading from and writing to the local index cache
-    pub async fn from_file(idx_path: &str, no_cache: bool) -> Result<Self, BaiError> {
+    pub async fn from_file(
+        store_service: &StoreService,
+        idx_path: &str,
+        no_cache: bool,
+    ) -> Result<Self, BaiError> {
         let bytes = crate::indexes::index_cache::get_or_download_index(
+            store_service,
             idx_path,
             no_cache
         ).await?;

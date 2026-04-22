@@ -8,6 +8,7 @@ use crate::indexes::bin_util::get_bin_numbers;
 use crate::indexes::traits::sam_index::SamIndex;
 use crate::models::bam::read::Read;
 use crate::models::bam_header::header::{BamHeader, BamHeaderError};
+use crate::stores::StoreService;
 use crate::traits::feature::Feature;
 
 #[derive(Debug, Error)]
@@ -72,7 +73,10 @@ pub fn data_to_lines(
 ///  start and end positions, output format, and whether to include headers or only headers.
 /// # Returns:
 /// * A Result containing a vector of strings with the search results, or an error message if the search fails.
-pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamError> {
+pub async fn bam_search(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<SearchResult, BamError> {
     let mut result = SearchResult::new();
 
     if options.end - options.begin > 200_000 {
@@ -83,14 +87,14 @@ pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamErro
 
     let bai = match &options.bam_index {
         Some(index) => index,
-        None => &BaiIndex::from_file(&options.index_path, options.no_cache).await?
+        None => &BaiIndex::from_file(store_service, &options.index_path, options.no_cache).await?
     };
 
 
     let first_feature_offset = bai.get_first_feature_offset().await;
     let bam_header = match &options.bam_header {
         Some(header) => header,
-        None => &BamHeader::from_file(&options.file_path, first_feature_offset).await?
+        None => &BamHeader::from_file(store_service, &options.file_path, first_feature_offset).await?
     };
 
     result.bam_index = Some(bai.clone());
@@ -116,7 +120,7 @@ pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamErro
     let chr_idx = &bai.references[chr_i as usize];
     let chunks = bai.get_optimized_chunks(&chr_idx, bin_numbers, &options);
 
-    let lines = stream_data_to_strings(&options, start_lines, &chunks, |data| {
+    let lines = stream_data_to_strings(store_service, &options, start_lines, &chunks, |data| {
         match data_to_lines(data, options, &bam_header) {
             Ok((end, lines)) => Ok((end, lines)),
             Err(e) => Err(e.to_string())
