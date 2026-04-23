@@ -17,7 +17,7 @@ pub enum BgZipError {
 /// Returns a vector of block sizes.
 pub fn from_bytes(bytes: &Vec<u8>) -> Result<Vec<usize>, BgZipError> {
     let mut i = 0;
-    let mut blocks = Vec::new();
+    let mut blocks = Vec::with_capacity(bytes.len() / (16 * 1024) + 1);
     while i < bytes.len() {
         let block = BgZipBlock::from_bytes(&bytes, i);
         match block {
@@ -36,8 +36,8 @@ pub fn from_bytes(bytes: &Vec<u8>) -> Result<Vec<usize>, BgZipError> {
 /// Takes a vector of block sizes and a byte slice containing the compressed data.
 pub fn decompress(block_sizes: &[usize], bytes: &[u8]) -> Result<Vec<u8>, BgZipError> {
     let mut i = 0;
-    let mut result = Vec::new();
-    let mut zip_handles = Vec::new();
+    let mut result = Vec::with_capacity(block_sizes.len());
+    let mut zip_handles = Vec::with_capacity(block_sizes.len());
 
     for &size in block_sizes {
         let compressed: Vec<u8> = bytes[i..i + size].to_vec();
@@ -49,7 +49,7 @@ pub fn decompress(block_sizes: &[usize], bytes: &[u8]) -> Result<Vec<u8>, BgZipE
 
     for handle in zip_handles {
         match handle.join() {
-            Ok(Ok(decompressed)) => result.extend(decompressed),
+            Ok(Ok(decompressed)) => result.push(decompressed),
             Ok(Err(e)) => return Err(BgZipError::DecompressBlockError(e)),
             Err(_) => {
                 return Err(BgZipError::DecompressBlockError(std::io::Error::new(
@@ -59,5 +59,5 @@ pub fn decompress(block_sizes: &[usize], bytes: &[u8]) -> Result<Vec<u8>, BgZipE
             }
         }
     }
-    Ok(result)
+    Ok(result.iter().flatten().copied().collect())
 }

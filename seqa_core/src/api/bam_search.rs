@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use super::search_options::{CigarFormat, SearchOptions};
-use crate::api::search::stream_data_to_strings;
+use crate::api::search::{init_fetch_handles, join_fetch_handles};
 use crate::api::search_result::SearchResult;
 use crate::indexes::bai::{BaiError, BaiIndex};
 use crate::indexes::bin_util::get_bin_numbers;
@@ -25,6 +25,9 @@ pub enum BamError {
 
     #[error("Failed to read Bai index: {0}")]
     BaiError(#[from] BaiError),
+
+    #[error("Failed to initialise search: {0}")]
+    SearchError(#[from] crate::api::search::SearchError),
 }
 
 /// Converts raw data bytes into a vector of strings, processing each line according to the search options.
@@ -105,7 +108,7 @@ pub async fn bam_search(
         return Ok(result);
     }
 
-    let start_lines = if options.include_header {
+    let mut start_lines = if options.include_header {
         bam_header.to_lines()
     } else {
         Vec::new()
@@ -119,21 +122,17 @@ pub async fn bam_search(
 
     let chr_idx = &bai.references[chr_i as usize];
     let chunks = bai.get_optimized_chunks(&chr_idx, bin_numbers, &options);
-
-    let lines = stream_data_to_strings(store_service, &options, start_lines, &chunks, |data| {
-        match data_to_lines(data, options, &bam_header) {
-            Ok((end, lines)) => Ok((end, lines)),
-            Err(e) => Err(e.to_string())
+    let chunk_handles = init_fetch_handles(store_service, &options, &chunks).await?;
+    let raw_data = join_fetch_handles(chunk_handles).await?;
+    result.lines = {
+        match data_to_lines(&raw_data.concat(), options, bam_header) {
+            Ok((_, lines)) => {
+                start_lines.extend(lines);
+                start_lines
+            },
+            Err(e) => return Err(e)
         }
-    })
-    .await
-    .map_err(|e| BamError::DataProcessingError(format!("Failed to process data: {}", e)));
+    };
 
-    match lines {
-        Ok(lines) => {
-            result.lines = lines;
-            Ok(result)
-        }
-        Err(e) => Err(e)
-    }
+    Ok(result)
 }

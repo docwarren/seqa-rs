@@ -81,6 +81,7 @@ pub async fn chunk_to_stream(
 }
 
 /// Streams data from the store service and processes it into strings based on the provided closure.
+/// #[inline(always)]
 pub async fn stream_data_to_strings(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -93,6 +94,9 @@ pub async fn stream_data_to_strings(
 
     let mut overlapping_lines = Vec::new();
     overlapping_lines.extend(start_lines);
+
+    log::info!("Number of chunks {}", chunks.len() );
+
 
     for chunk in chunks.iter() {
         let mut bytes = Vec::new();
