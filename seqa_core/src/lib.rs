@@ -8,8 +8,8 @@
 //! ## Quick start
 //!
 //! ```rust,no_run
-//! use seqa_core::services::search::SearchService;
 //! use seqa_core::api::search_options::SearchOptions;
+//! use seqa_core::stores::StoreService;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +18,8 @@
 //!         "chr1:100000-200000",
 //!     );
 //!
-//!     let result = SearchService::search_features(&opts).await?;
+//!     let store_service = StoreService::new();
+//!     let result = store_service.search_features(&opts).await?;
 //!     for line in &result.lines {
 //!         println!("{}", line);
 //!     }

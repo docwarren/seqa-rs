@@ -13,6 +13,7 @@ use crate::models::bedgraph::BedGraphLine;
 use crate::models::gff::GffLine;
 use crate::models::gtf::GtfLine;
 use crate::models::tabix_header::{TabixHeader, TabixHeaderError};
+use crate::stores::StoreService;
 use crate::{indexes::tabix::Tabix, models::vcf::VcfLine};
 
 #[derive(Debug, Error)]
@@ -72,18 +73,21 @@ pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Vec<String> {
 ///  start and end positions, output format, and whether to include headers or only headers.
 /// # Returns:
 /// * a Result containing a vector of strings with the search results, or an error message if the search fails.
-pub async fn tabix_search(options: &SearchOptions) -> Result<SearchResult, TabixSearchError> {
+pub async fn tabix_search(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<SearchResult, TabixSearchError> {
     let mut result = SearchResult::new();
 
     let tabix = match &options.tabix_index {
         Some(index) => index,
-        None => &Tabix::from_compressed_file(&options.index_path, options.no_cache).await?
+        None => &Tabix::from_compressed_file(store_service, &options.index_path, options.no_cache).await?
     };
     let tabix_header = match &options.tabix_header {
         Some(header) => header,
         None => {
             let first_feature_offset = tabix.first_feature_offset.clone();
-            &TabixHeader::from_file(&options.file_path, first_feature_offset).await?
+            &TabixHeader::from_file(store_service, &options.file_path, first_feature_offset).await?
         }
     };
 
@@ -108,7 +112,7 @@ pub async fn tabix_search(options: &SearchOptions) -> Result<SearchResult, Tabix
     };
     let chr_idx = &tabix.references[chr_i as usize];
     let chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &options);
-    let chunk_handles = init_fetch_handles(&options, &chunks).await?;
+    let chunk_handles = init_fetch_handles(store_service, &options, &chunks).await?;
     let raw_data = join_fetch_handles(chunk_handles).await?;
     let lines = data_to_lines(&raw_data.concat(), &options);
 
@@ -126,8 +130,11 @@ pub async fn tabix_search(options: &SearchOptions) -> Result<SearchResult, Tabix
 ///     paths, chromosome, start and end positions, output format, and whether to include headers or only headers.
 /// # Returns:
 /// * A  Result containing a vector of `VcfLine` objects with the search results, or an error message if the search fails.
-pub async fn tabix_search_vcf(options: &SearchOptions) -> Result<Vec<VcfLine>, TabixSearchError> {
-    let tabix_result = tabix_search(options).await?;
+pub async fn tabix_search_vcf(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<Vec<VcfLine>, TabixSearchError> {
+    let tabix_result = tabix_search(store_service, options).await?;
     let mut vcf_lines = Vec::new();
 
     for line in tabix_result.lines {

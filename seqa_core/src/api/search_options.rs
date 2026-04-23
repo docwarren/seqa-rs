@@ -20,7 +20,7 @@ pub enum CigarFormat {
 ///
 /// Build a `SearchOptions` with [`SearchOptions::new`] and the setter methods, or set
 /// fields directly.  Pass the finished value to
-/// [`crate::services::search::SearchService::search_features`] or to one of the
+/// [`crate::stores::StoreService::search_features`] or to one of the
 /// format-specific search functions in [`crate::api`].
 ///
 /// # Example

@@ -46,10 +46,11 @@ impl FaiIndex {
         }
     }
 
-    pub async fn from_file(idx_path: &str) -> Result<Self, FaiIndexError> {
-        let bytes = StoreService::from_uri(idx_path)?
-            .get_object(idx_path)
-            .await?;
+    pub async fn from_file(
+        store_service: &StoreService,
+        idx_path: &str,
+    ) -> Result<Self, FaiIndexError> {
+        let bytes = store_service.get_object(idx_path).await?;
 
         Ok(FaiIndex::from_bytes(bytes)?)
     }

@@ -44,6 +44,7 @@ pub fn get_local_index_path(index_path: &str) -> PathBuf {
 /// # Returns
 /// * Result containing the bytes of the index file
 pub async fn get_or_download_index(
+    store_service: &StoreService,
     index_path: &str,
     no_cache: bool,
 ) -> Result<Vec<u8>, StoreError> {
@@ -64,7 +65,6 @@ pub async fn get_or_download_index(
     }
 
     // Index doesn't exist locally or failed to read - download from remote
-    let store_service = StoreService::from_uri(index_path)?;
     let bytes = store_service.get_object(index_path).await?;
 
     // Try to cache the downloaded index locally (skip when no_cache is set)

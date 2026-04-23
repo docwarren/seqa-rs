@@ -8,6 +8,7 @@ use crate::indexes::chunk::{Chunk, ChunkError};
 use crate::indexes::bin;
 use crate::indexes::virtual_offset::VirtualOffset;
 use crate::stores::error::StoreError;
+use crate::stores::StoreService;
 
 use super::bai::chr_idx::ChrIdx;
 use super::traits::sam_index::SamIndex;
@@ -78,8 +79,13 @@ impl Tabix {
     /// # Arguments
     /// * `idx_path` - Path to the index file (could be remote)
     /// * `no_cache` - When true, skip reading from and writing to the local index cache
-    pub async fn from_compressed_file(idx_path: &str, no_cache: bool) -> Result<Self, TabixError> {
+    pub async fn from_compressed_file(
+        store_service: &StoreService,
+        idx_path: &str,
+        no_cache: bool,
+    ) -> Result<Self, TabixError> {
         let bytes = crate::indexes::index_cache::get_or_download_index(
+            store_service,
             idx_path,
             no_cache
         ).await?;

@@ -1,13 +1,14 @@
 use thiserror::Error;
 
 use super::search_options::{CigarFormat, SearchOptions};
-use crate::api::search::stream_data_to_strings;
+use crate::api::search::{init_fetch_handles, join_fetch_handles};
 use crate::api::search_result::SearchResult;
 use crate::indexes::bai::{BaiError, BaiIndex};
 use crate::indexes::bin_util::get_bin_numbers;
 use crate::indexes::traits::sam_index::SamIndex;
 use crate::models::bam::read::Read;
 use crate::models::bam_header::header::{BamHeader, BamHeaderError};
+use crate::stores::StoreService;
 use crate::traits::feature::Feature;
 
 #[derive(Debug, Error)]
@@ -24,6 +25,9 @@ pub enum BamError {
 
     #[error("Failed to read Bai index: {0}")]
     BaiError(#[from] BaiError),
+
+    #[error("Failed to initialise search: {0}")]
+    SearchError(#[from] crate::api::search::SearchError),
 }
 
 /// Converts raw data bytes into a vector of strings, processing each line according to the search options.
@@ -72,7 +76,10 @@ pub fn data_to_lines(
 ///  start and end positions, output format, and whether to include headers or only headers.
 /// # Returns:
 /// * A Result containing a vector of strings with the search results, or an error message if the search fails.
-pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamError> {
+pub async fn bam_search(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<SearchResult, BamError> {
     let mut result = SearchResult::new();
 
     if options.end - options.begin > 200_000 {
@@ -83,14 +90,14 @@ pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamErro
 
     let bai = match &options.bam_index {
         Some(index) => index,
-        None => &BaiIndex::from_file(&options.index_path, options.no_cache).await?
+        None => &BaiIndex::from_file(store_service, &options.index_path, options.no_cache).await?
     };
 
 
     let first_feature_offset = bai.get_first_feature_offset().await;
     let bam_header = match &options.bam_header {
         Some(header) => header,
-        None => &BamHeader::from_file(&options.file_path, first_feature_offset).await?
+        None => &BamHeader::from_file(store_service, &options.file_path, first_feature_offset).await?
     };
 
     result.bam_index = Some(bai.clone());
@@ -101,7 +108,7 @@ pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamErro
         return Ok(result);
     }
 
-    let start_lines = if options.include_header {
+    let mut start_lines = if options.include_header {
         bam_header.to_lines()
     } else {
         Vec::new()
@@ -115,21 +122,17 @@ pub async fn bam_search(options: &SearchOptions) -> Result<SearchResult, BamErro
 
     let chr_idx = &bai.references[chr_i as usize];
     let chunks = bai.get_optimized_chunks(&chr_idx, bin_numbers, &options);
-
-    let lines = stream_data_to_strings(&options, start_lines, &chunks, |data| {
-        match data_to_lines(data, options, &bam_header) {
-            Ok((end, lines)) => Ok((end, lines)),
-            Err(e) => Err(e.to_string())
+    let chunk_handles = init_fetch_handles(store_service, &options, &chunks).await?;
+    let raw_data = join_fetch_handles(chunk_handles).await?;
+    result.lines = {
+        match data_to_lines(&raw_data.concat(), options, bam_header) {
+            Ok((_, lines)) => {
+                start_lines.extend(lines);
+                start_lines
+            },
+            Err(e) => return Err(e)
         }
-    })
-    .await
-    .map_err(|e| BamError::DataProcessingError(format!("Failed to process data: {}", e)));
+    };
 
-    match lines {
-        Ok(lines) => {
-            result.lines = lines;
-            Ok(result)
-        }
-        Err(e) => Err(e)
-    }
+    Ok(result)
 }

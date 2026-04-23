@@ -30,32 +30,6 @@ pub fn get_s3_store(url: Option<&str>) -> Result<AmazonS3, StoreError> {
     Ok(builder.build()?)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_s3_bucket_from_s3_url() {
-        assert_eq!(
-            get_s3_bucket_from_url("s3://com.gmail.docarw/test.txt"),
-            Some("com.gmail.docarw".to_string())
-        );
-    }
-
-    #[test]
-    fn test_get_s3_bucket_from_https_url() {
-        assert_eq!(
-            get_s3_bucket_from_url("https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test.txt"),
-            Some("com.gmail.docarw".to_string())
-        );
-    }
-
-    #[test]
-    fn test_get_s3_bucket_from_invalid_url() {
-        assert_eq!(get_s3_bucket_from_url("not a url"), None);
-    }
-}
-
 pub fn get_gc_store(bucket: Option<String>) -> Result<GoogleCloudStorage, StoreError> {
     let bucket_name = match bucket {
         Some(bucket_name) => bucket_name,
@@ -96,4 +70,30 @@ pub fn get_http_store(path: &str) -> Result<HttpStore, StoreError> {
 
 pub fn get_local_store() -> Result<LocalFileSystem, StoreError> {
     Ok(LocalFileSystem::new())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_s3_bucket_from_s3_url() {
+        assert_eq!(
+            get_s3_bucket_from_url("s3://com.gmail.docarw/test.txt"),
+            Some("com.gmail.docarw".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_s3_bucket_from_https_url() {
+        assert_eq!(
+            get_s3_bucket_from_url("https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test.txt"),
+            Some("com.gmail.docarw".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_s3_bucket_from_invalid_url() {
+        assert_eq!(get_s3_bucket_from_url("not a url"), None);
+    }
 }

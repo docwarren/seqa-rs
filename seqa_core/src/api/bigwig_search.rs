@@ -9,6 +9,7 @@ use crate::indexes::bigwig::{BigwigIndex, BigwigIndexError};
 use crate::indexes::bigwig::r_tree::r_tree_leaf::RTreeLeaf;
 use crate::indexes::bigwig::r_tree::{RTree, RTreeError};
 use crate::indexes::bigwig::zoom_header::ZoomHeader;
+use crate::stores::StoreService;
 use super::search_options::SearchOptions;
 use super::search_result::SearchResult;
 
@@ -101,14 +102,17 @@ pub fn data_to_lines(bytes: Vec<Vec<u8>>, is_zoom: bool, chr_tree: &BigwigChrTre
 ///  start and end positions, output format, and whether to include headers or only headers.
 /// # Returns:
 /// * A Result containing a vector of strings with the search results, or an error message if the search fails.
-pub async fn bigwig_search(options: &SearchOptions) -> Result<SearchResult, BigwigError> {
+pub async fn bigwig_search(
+    store_service: &StoreService,
+    options: &SearchOptions,
+) -> Result<SearchResult, BigwigError> {
     let mut result = SearchResult::new();
 
     let index = match &options.bigwig_index {
         Some(index) => {
             index
         },
-        _ => &BigwigIndex::new(&options.file_path).await?
+        _ => &BigwigIndex::new(store_service, &options.file_path).await?
     };
     result.bigwig_index = Some(index.clone());
 
@@ -123,9 +127,9 @@ pub async fn bigwig_search(options: &SearchOptions) -> Result<SearchResult, Bigw
     };
 
     let index_offset = get_index_begin(&index, zoom_header).await?;
-    let index_end = get_index_end(&index, zoom_header).await?;
+    let index_end = get_index_end(store_service, &index, zoom_header).await?;
 
-    let r_tree = RTree::from_file(&options.file_path, index_offset..index_end)
+    let r_tree = RTree::from_file(store_service, &options.file_path, index_offset..index_end)
         .await?;
 
     let leaves = r_tree.get_overlapping_leaves(chr_id, options.begin, options.end);
@@ -136,7 +140,7 @@ pub async fn bigwig_search(options: &SearchOptions) -> Result<SearchResult, Bigw
 
     let range = get_range_from_leaves(&leaves);
 
-    let data = index.get_data(&range, &options.file_path).await?;
+    let data = index.get_data(store_service, &range, &options.file_path).await?;
 
     let mut decompressed_blocks: Vec<Vec<u8>> = Vec::new();
 
@@ -175,10 +179,14 @@ async fn get_index_begin(index: &BigwigIndex, zoom_header: Option<&ZoomHeader>) 
     }
 }
 
-async fn get_index_end(index: &BigwigIndex, zoom_header: Option<&ZoomHeader>) -> Result<u64, BigwigError> {
+async fn get_index_end(
+    store_service: &StoreService,
+    index: &BigwigIndex,
+    zoom_header: Option<&ZoomHeader>,
+) -> Result<u64, BigwigError> {
     match zoom_header {
-        Some(zoom_header) => Ok(index.get_end_for_zoom_header(zoom_header, &index.file_path).await?),
-        None => Ok(index.get_full_index_end(&index.file_path).await?),
+        Some(zoom_header) => Ok(index.get_end_for_zoom_header(store_service, zoom_header, &index.file_path).await?),
+        None => Ok(index.get_full_index_end(store_service, &index.file_path).await?),
     }
 }
 
