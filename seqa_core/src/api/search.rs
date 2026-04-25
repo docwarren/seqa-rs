@@ -80,59 +80,6 @@ pub async fn chunk_to_stream(
     Ok(stream.map_ok(|get_result| get_result.to_vec()))
 }
 
-/// Streams data from the store service and processes it into strings based on the provided closure.
-/// #[inline(always)]
-pub async fn stream_data_to_strings(
-    store_service: &StoreService,
-    options: &SearchOptions,
-    start_lines: Vec<String>,
-    chunks: &[Chunk],
-    data_to_string_closure: impl Fn(&Vec<u8>) -> Result<(bool, Vec<String>), String>,
-) -> Result<Vec<String>, SearchError> {
-    let path = StoreService::get_canonical_path(&options.file_path)?;
-    let store = store_service.get_or_create_store(&options.file_path)?;
-
-    let mut overlapping_lines = Vec::new();
-    overlapping_lines.extend(start_lines);
-
-    log::info!("Number of chunks {}", chunks.len() );
-
-
-    for chunk in chunks.iter() {
-        let mut bytes = Vec::new();
-        let mut decompressed_slices: Vec<u8> = Vec::new();
-
-        let mut stream = chunk_to_stream(chunk, store.as_ref(), &path).await?;
-        let mut decompressed_start_byte = chunk.begin_vp.decompressed_offset as usize;
-
-        while let Ok(Some(byte_chunk)) = stream.try_next().await {
-            bytes.extend(byte_chunk.into_iter());
-
-            let block_sizes = bgzip::from_bytes(&bytes)?;
-
-            if !block_sizes.is_empty() {
-                let tail_start = block_sizes.iter().map(|b| b).sum::<usize>();
-                let remaining_bytes = bytes.split_off(tail_start);
-                let decompressed_bytes = bgzip::decompress(&block_sizes, &bytes)?;
-                bytes = remaining_bytes;
-
-                let decompressed_slice = &decompressed_bytes[decompressed_start_byte..];
-                decompressed_slices.extend_from_slice(decompressed_slice);
-
-                if let Ok((end, lines)) = data_to_string_closure(&decompressed_slices) {
-                    decompressed_start_byte = 0;
-                    decompressed_slices.clear();
-                    overlapping_lines.extend(lines);
-                    if end {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    Ok(overlapping_lines)
-}
-
 /// Fetches chunks concurrently from the store service.
 ///
 /// Returns a vector of `(Chunk, bytes)` pairs preserving input order.
