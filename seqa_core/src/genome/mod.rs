@@ -97,8 +97,39 @@ pub fn chr_index(chr: &str) -> Option<usize> {
         "X" => Some(22),
         "Y" => Some(23),
         "M" => Some(24),
+        "MT" => Some(24),
+        "chrMT" => Some(24),
         _ => None
     }
+}
+
+/// Returns the candidate names to try when looking up a contig in a file's
+/// index/header.  The user's supplied name is tried first, followed by its
+/// `chr`-prefix-flipped form, plus `M`/`MT` aliases for mitochondrial.
+///
+/// Examples: `"chr1"` → `["chr1", "1"]`; `"1"` → `["1", "chr1"]`;
+/// `"chrM"` → `["chrM", "M", "MT", "chrMT"]`; `"MT"` → `["MT", "chrMT", "M", "chrM"]`.
+pub fn chromosome_aliases(name: &str) -> Vec<String> {
+    let stripped = name.strip_prefix("chr").unwrap_or(name);
+    let mut out = Vec::with_capacity(4);
+    out.push(name.to_string());
+    if name == stripped {
+        out.push(format!("chr{}", stripped));
+    } else {
+        out.push(stripped.to_string());
+    }
+    match stripped {
+        "M" => {
+            out.push("MT".to_string());
+            out.push("chrMT".to_string());
+        }
+        "MT" => {
+            out.push("M".to_string());
+            out.push("chrM".to_string());
+        }
+        _ => {}
+    }
+    out
 }
 
 /// Returns an array of the maximum chromosome length for each index position across
@@ -161,6 +192,18 @@ fn test_get_longest_possible_genome() {
     assert_eq!(longest[22], 156040895); // chrX
     assert_eq!(longest[24], 16571); // chrM
     assert_eq!(longest.len(), 25);
+}
+
+#[test]
+fn test_chromosome_aliases() {
+    assert_eq!(chromosome_aliases("chr1"), vec!["chr1", "1"]);
+    assert_eq!(chromosome_aliases("1"), vec!["1", "chr1"]);
+    assert_eq!(chromosome_aliases("chrX"), vec!["chrX", "X"]);
+    assert_eq!(chromosome_aliases("X"), vec!["X", "chrX"]);
+    assert_eq!(chromosome_aliases("chrM"), vec!["chrM", "M", "MT", "chrMT"]);
+    assert_eq!(chromosome_aliases("M"), vec!["M", "chrM", "MT", "chrMT"]);
+    assert_eq!(chromosome_aliases("MT"), vec!["MT", "chrMT", "M", "chrM"]);
+    assert_eq!(chromosome_aliases("chrMT"), vec!["chrMT", "MT", "M", "chrM"]);
 }
 
 #[test]

@@ -70,7 +70,9 @@ impl BigwigChrTree {
     }
 
     pub fn get_chromosome_id(&self, key: &str) -> Option<u32> {
-        self.key_map.get(key).cloned()
+        crate::genome::chromosome_aliases(key)
+            .iter()
+            .find_map(|alias| self.key_map.get(alias).cloned())
     }
 
     pub fn get_chromosome_name(&self, chr_id: u32) -> Option<String> {

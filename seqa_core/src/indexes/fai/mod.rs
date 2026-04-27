@@ -85,7 +85,10 @@ impl FaiIndex {
     }
 
     pub fn get_offsets(&self, options: &SearchOptions) -> Result<Range<u64>, FaiIndexError> {
-        let contig = self.contigs.get(&options.chromosome).ok_or(FaiIndexError::ReadError(format!("Contig not found: {}", options.chromosome)))?;
+        let contig = crate::genome::chromosome_aliases(&options.chromosome)
+            .iter()
+            .find_map(|alias| self.contigs.get(alias))
+            .ok_or(FaiIndexError::ReadError(format!("Contig not found: {}", options.chromosome)))?;
         if options.begin < 1 || options.end > contig.length as u32 {
             return Err(FaiIndexError::ReadError(format!("Invalid coordinates: {}-{}", options.begin, options.end)));
         }
