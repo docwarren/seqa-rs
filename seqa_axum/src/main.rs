@@ -8,8 +8,10 @@ use axum::{
     routing::{get, post},
 };
 use serde::Serialize;
+use seqa_core::api::output_format::OutputFormat;
 use seqa_core::api::search::SearchFeaturesError;
 use seqa_core::api::search_options::SearchOptions;
+use seqa_core::models::cytoband::Cytoband;
 use seqa_core::models::gene_coordinate::GeneCoordinate;
 use seqa_core::sqlite::genes::{self, GeneError};
 use seqa_core::stores::StoreService;
@@ -17,9 +19,17 @@ use seqa_core::utils::UtilError;
 use thiserror::Error;
 use tower_http::cors::CorsLayer;
 
+use crate::cache::AppCache;
 use crate::search::models::SearchRequest;
 
+pub mod cache;
 pub mod search;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub store: Arc<StoreService>,
+    pub cache: AppCache,
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,7 +115,7 @@ async fn index() -> &'static str {
 }
 
 async fn search_features(
-    State(store_service): State<Arc<StoreService>>,
+    State(state): State<AppState>,
     payload: Result<Json<SearchRequest>, JsonRejection>,
 ) -> Result<String, ApiError> {
     let Json(request) = payload.map_err(|e| ApiError::BadRequest(e.body_text()))?;
@@ -128,19 +138,65 @@ async fn search_features(
         return Err(ApiError::BadRequest("Missing coordinates".into()));
     }
 
-    let search_options = SearchOptions::new(&request.path, &request.coordinates);
-    let result = store_service.search_features(&search_options).await?;
+    let mut search_options = SearchOptions::new(&request.path, &request.coordinates);
+    populate_from_cache(&state.cache, &mut search_options).await;
+    let result = state.store.search_features(&search_options).await?;
+    write_back_to_cache(&state.cache, &search_options, &result).await;
 
     Ok(result.lines.into_iter().collect::<Vec<String>>().join("\n"))
 }
 
+async fn populate_from_cache(cache: &AppCache, options: &mut SearchOptions) {
+    match options.output_format {
+        OutputFormat::BAM => {
+            options.bam_index = cache.bai.get(&options.index_path).await;
+            options.bam_header = cache.bam_header.get(&options.file_path).await;
+        }
+        OutputFormat::VCF
+        | OutputFormat::BED
+        | OutputFormat::BEDGRAPH
+        | OutputFormat::GFF
+        | OutputFormat::GTF => {
+            options.tabix_index = cache.tabix.get(&options.index_path).await;
+            options.tabix_header = cache.tabix_header.get(&options.file_path).await;
+        }
+        OutputFormat::FASTA => {
+            options.fasta_index = cache.fai.get(&options.index_path).await;
+        }
+        _ => {}
+    }
+}
+
+async fn write_back_to_cache(
+    cache: &AppCache,
+    options: &SearchOptions,
+    result: &seqa_core::api::search_result::SearchResult,
+) {
+    if let Some(bai) = &result.bam_index {
+        cache.bai.insert(options.index_path.clone(), bai.clone()).await;
+    }
+    if let Some(header) = &result.bam_header {
+        cache.bam_header.insert(options.file_path.clone(), header.clone()).await;
+    }
+    if let Some(tabix) = &result.tabix_index {
+        cache.tabix.insert(options.index_path.clone(), tabix.clone()).await;
+    }
+    if let Some(header) = &result.tabix_header {
+        cache.tabix_header.insert(options.file_path.clone(), header.clone()).await;
+    }
+    if let Some(fai) = &result.fasta_index {
+        cache.fai.insert(options.index_path.clone(), fai.clone()).await;
+    }
+}
+
 async fn list_dir(
-    State(store_service): State<Arc<StoreService>>,
+    State(state): State<AppState>,
     payload: Result<Json<String>, JsonRejection>,
 ) -> Result<Json<Vec<FileEntry>>, ApiError> {
     let Json(dir) = payload.map_err(|e| ApiError::BadRequest(e.body_text()))?;
 
-    let objects = store_service
+    let objects = state
+        .store
         .list_objects(&dir)
         .await
         .map_err(|e| ApiError::StoreError(format!("Failed to list {}: {}", dir, e)))?;
@@ -157,8 +213,15 @@ async fn list_dir(
     Ok(Json(entries))
 }
 
+fn normalize_genome(genome: &str) -> &'static str {
+    match genome.to_ascii_lowercase().as_str() {
+        "grch37" | "hg19" => "grch37",
+        _ => "grch38",
+    }
+}
+
 async fn get_gene_symbols(Path(genome): Path<String>) -> Result<Json<Vec<String>>, ApiError> {
-    let url = format!("./data/{}-genes.db", genome.to_lowercase());
+    let url = format!("./data/{}-genes.db", normalize_genome(&genome));
     let connection = genes::establish_connection(url.clone())
         .map_err(|e| ApiError::DatabaseError(format!("Failed to open {}: {}", url, e)))?;
     let symbols = genes::get_gene_symbols(&connection)?;
@@ -168,11 +231,21 @@ async fn get_gene_symbols(Path(genome): Path<String>) -> Result<Json<Vec<String>
 async fn get_coordinates(
     Path((genome, gene)): Path<(String, String)>,
 ) -> Result<Json<GeneCoordinate>, ApiError> {
-    let url = format!("./data/{}-genes.db", genome.to_lowercase());
+    let url = format!("./data/{}-genes.db", normalize_genome(&genome));
     let connection = genes::establish_connection(url.clone())
         .map_err(|e| ApiError::DatabaseError(format!("Failed to open {}: {}", url, e)))?;
     let coord = genes::get_gene_coordinates(&connection, &gene)?;
     Ok(Json(coord))
+}
+
+async fn get_cytobands(
+    Path((genome, chromosome)): Path<(String, String)>,
+) -> Result<Json<Vec<Cytoband>>, ApiError> {
+    let url = format!("./data/{}-cytobands.db", normalize_genome(&genome));
+    let connection = genes::establish_connection(url.clone())
+        .map_err(|e| ApiError::DatabaseError(format!("Failed to open {}: {}", url, e)))?;
+    let cytobands = genes::get_cytobands(&connection, &chromosome)?;
+    Ok(Json(cytobands))
 }
 
 async fn not_found_fallback(req: Request) -> (StatusCode, Html<String>) {
@@ -190,7 +263,10 @@ pub fn app() -> Router {
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         .allow_credentials(true);
 
-    let store_service = Arc::new(StoreService::new());
+    let state = AppState {
+        store: Arc::new(StoreService::new()),
+        cache: AppCache::new(),
+    };
 
     Router::new()
         .route("/", get(index))
@@ -198,9 +274,10 @@ pub fn app() -> Router {
         .route("/files", post(list_dir))
         .route("/genes/symbols/{genome}", get(get_gene_symbols))
         .route("/genes/coordinates/{genome}/{gene}", get(get_coordinates))
+        .route("/genes/cytobands/{genome}/{chromosome}", get(get_cytobands))
         .fallback(not_found_fallback)
         .layer(cors)
-        .with_state(store_service)
+        .with_state(state)
 }
 
 #[tokio::main]
