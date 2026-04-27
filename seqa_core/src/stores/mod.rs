@@ -63,50 +63,48 @@ impl StoreService {
         Ok(svc)
     }
 
-    /// Returns a cached backend client for `uri`, building one if absent.
+    /// Returns a cached backend client for `path`, building one if absent.
     ///
     /// Cache key is derived from the URI's scheme and host, so two calls with
     /// different object paths under the same bucket/host share a client.
-    pub fn get_or_create_store(&self, uri: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
-        let (key, build_uri) = Self::store_key_and_build_uri(uri)?;
+    pub fn get_or_create_store(&self, path: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
+        let key = Self::cache_key(path)?;
         let mut stores = self
             .stores
             .lock()
             .expect("StoreService mutex poisoned");
+
         if let Some(existing) = stores.get(&key) {
             return Ok(Arc::clone(existing));
         }
-        let store = Self::build_store(&build_uri)?;
+        let store = Self::build_store(path)?;
         stores.insert(key, Arc::clone(&store));
         Ok(store)
     }
 
-    /// Derives the cache key and the URI to pass to [`Self::build_store`].
-    ///
-    /// Bare filesystem paths (no `://`) are treated as the local filesystem.
-    fn store_key_and_build_uri(uri: &str) -> Result<(String, String), StoreError> {
-        if !uri.contains("://") {
-            return Ok(("file://".to_string(), "file:///".to_string()));
+    /// Cache key is `scheme://host[:port]` so distinct buckets/hosts each get
+    /// their own client. Bare filesystem paths collapse to `file://`.
+    fn cache_key(path: &str) -> Result<String, StoreError> {
+        if !path.contains("://") {
+            return Ok("file://".to_string());
         }
-        let url: url::Url = uri.parse()?;
+        let url: url::Url = path.parse()?;
         let scheme = url.scheme();
         let host = url.host_str().unwrap_or("");
         let key = match url.port() {
             Some(port) => format!("{}://{}:{}", scheme, host, port),
             None => format!("{}://{}", scheme, host),
         };
-        Ok((key, uri.to_string()))
+        Ok(key)
     }
 
-    fn build_store(uri: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
-        let url: url::Url = uri.parse()?;
-        let (scheme, _) = ObjectStoreScheme::parse(&url)
-            .map_err(|e| StoreError::ObjectStoreUriParseError(e.to_string()))?;
+    fn build_store(path: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
+        let (scheme, _) = Self::get_canonical_path(path)?;
         let store: Arc<dyn ObjectStore> = match scheme {
-            ObjectStoreScheme::AmazonS3 => Arc::new(store::get_s3_store(Some(uri))?),
+            ObjectStoreScheme::AmazonS3 => Arc::new(store::get_s3_store(Some(path))?),
             ObjectStoreScheme::GoogleCloudStorage => Arc::new(store::get_gc_store(None)?),
             ObjectStoreScheme::MicrosoftAzure => Arc::new(store::get_azure_store(None)?),
-            ObjectStoreScheme::Http => Arc::new(store::get_http_store(uri)?),
+            ObjectStoreScheme::Http => Arc::new(store::get_http_store(Some(path))?),
             ObjectStoreScheme::Local => Arc::new(store::get_local_store()?),
             _ => {
                 return Err(StoreError::ValidationError(
@@ -125,14 +123,14 @@ impl StoreService {
     ///
     /// Returns [`StoreError`] on path normalisation failure or storage I/O errors.
     pub async fn get_range(&self, path: &str, range: Range<u64>) -> Result<Vec<u8>, StoreError> {
-        let canonical = Self::get_canonical_path(path)?;
+        let (_, url) = Self::get_canonical_path(path)?;
         let store = self.get_or_create_store(path)?;
-        Ok(store.get_range(&canonical, range).await?.to_vec())
+        Ok(store.get_range(&url, range).await?.to_vec())
     }
 
     /// Get file path
     /// Gets a Path object from the string supplied.
-    pub fn get_canonical_path(path: &str) -> Result<ObjectStorePath, StoreError> {
+    pub fn get_canonical_path(path: &str) -> Result<(ObjectStoreScheme, ObjectStorePath), StoreError> {
         let mut abs_path = path.to_owned();
 
         if !path.contains("://") {
@@ -155,11 +153,11 @@ impl StoreService {
         match ObjectStoreScheme::parse(url) {
             Ok((scheme, path)) => {
                 match scheme {
-                    ObjectStoreScheme::MicrosoftAzure => { Ok(path) }
-                    ObjectStoreScheme::AmazonS3 => { Ok(path) }
-                    ObjectStoreScheme::GoogleCloudStorage => { Ok(path) }
-                    ObjectStoreScheme::Http => { Ok(path) }
-                    ObjectStoreScheme::Local => { Ok(path) }
+                    ObjectStoreScheme::MicrosoftAzure => { Ok((scheme, path)) }
+                    ObjectStoreScheme::AmazonS3 => { Ok((scheme, path)) }
+                    ObjectStoreScheme::GoogleCloudStorage => { Ok((scheme, path)) }
+                    ObjectStoreScheme::Http => { Ok((scheme, path)) }
+                    ObjectStoreScheme::Local => { Ok((scheme, path)) }
                     _ => {
                         Err(StoreError::ValidationError(
                             "Unsupported store type".into(),
@@ -175,7 +173,7 @@ impl StoreService {
 
     /// Returns the total size of the object at `path` in bytes.
     pub async fn get_file_size(&self, path: &str) -> Result<u64, StoreError> {
-        let canonical = Self::get_canonical_path(path)?;
+        let (_, canonical) = Self::get_canonical_path(path)?;
         let store = self.get_or_create_store(path)?;
         let meta = store.head(&canonical).await?;
         Ok(meta.size)
@@ -183,7 +181,7 @@ impl StoreService {
 
     /// Downloads the entire object at `path` and returns its bytes.
     pub async fn get_object(&self, path: &str) -> Result<Vec<u8>, StoreError> {
-        let canonical = Self::get_canonical_path(path)?;
+        let (_, canonical) = Self::get_canonical_path(path)?;
         let store = self.get_or_create_store(path)?;
         let result = store.get(&canonical).await?;
         let bytes = result.bytes().await?;
@@ -192,7 +190,7 @@ impl StoreService {
 
     /// Uploads `contents` to the object at `path`, creating or overwriting it.
     pub async fn put_object(&self, path: &str, contents: &[u8]) -> Result<(), StoreError> {
-        let canonical = Self::get_canonical_path(path)?;
+        let (_, canonical) = Self::get_canonical_path(path)?;
         let store = self.get_or_create_store(path)?;
 
         let payload = PutPayload::from(contents.to_vec());
@@ -207,7 +205,7 @@ impl StoreService {
 
     /// Lists all objects whose path begins with `prefix`, returning their metadata.
     pub async fn list_objects(&self, prefix: &str) -> Result<Vec<ObjectMeta>, StoreError> {
-        let canonical = Self::get_canonical_path(prefix)?;
+        let (_, canonical) = Self::get_canonical_path(prefix)?;
         let store = self.get_or_create_store(prefix)?;
         let mut results = Vec::new();
         let mut stream = store.list(Some(&canonical));

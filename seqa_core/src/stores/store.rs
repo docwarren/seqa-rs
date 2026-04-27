@@ -64,8 +64,13 @@ pub fn get_azure_store(bucket: Option<String>) -> Result<MicrosoftAzure, StoreEr
         .build()?)
 }
 
-pub fn get_http_store(path: &str) -> Result<HttpStore, StoreError> {
-    Ok(HttpBuilder::new().with_url(path).build()?)
+pub fn get_http_store(path: Option<&str>) -> Result<HttpStore, StoreError> {
+    return if let Some(path) = path {
+        Ok(HttpBuilder::new().with_url(path).build()?)
+    } else {
+        Ok(HttpBuilder::new().build()?)
+    }
+
 }
 
 pub fn get_local_store() -> Result<LocalFileSystem, StoreError> {

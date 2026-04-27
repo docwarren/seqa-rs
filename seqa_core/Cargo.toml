@@ -1,6 +1,6 @@
 [package]
 name = "seqa_core"
-version = "3.0.0"
+version = "3.0.2"
 edition = "2024"
 authors = ["Andrew Warren"]
 rust-version = "1.94.0"
@@ -21,7 +21,7 @@ futures = "0.3.31"
 flate2 = "1.1.1"
 object_store = { version = "0.12.4", features = ["aws", "azure", "reqwest", "http", "gcp"] }
 thiserror = "2.0.16"
-rusqlite = { version = "0.37.0", optional = true }
+rusqlite = { version = "0.37.0", features = ["bundled"], optional = true }
 log = "0.4.29"
 
 [dev-dependencies]
