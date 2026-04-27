@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5.41", features = ["derive"] }
 command = "0.0.0"
-seqa_core = { path = "../seqa_core" }
+seqa_core = { path = "../seqa_core", features = ["sqlite"] }
 thiserror = "2.0.16"
 tokio = "1.47.0"
 log = "0.4.29"

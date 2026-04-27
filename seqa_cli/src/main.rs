@@ -1,9 +1,11 @@
 use clap::{Parser, Subcommand};
 use seqa_core::api::search::SearchFeaturesError;
 use seqa_core::api::search_options::SearchOptions;
+use seqa_core::sqlite::genes::{self, GeneError};
 use seqa_core::stores::StoreService;
 use seqa_core::utils::ExtensionError;
 use std::io::{self, Write};
+use std::path::PathBuf;
 use thiserror::Error;
 use log::{debug, error};
 
@@ -48,6 +50,61 @@ enum Commands {
         #[arg(long)]
         no_cache: bool,
     },
+
+    /// Look up gene metadata from the local SQLite databases.
+    Genes {
+        #[command(subcommand)]
+        command: GeneCommands,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum GeneCommands {
+    /// Print the coordinates (chromosome, begin, end) for a gene symbol.
+    Coordinates {
+        /// Gene symbol (e.g. BRCA2)
+        gene: String,
+
+        /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
+        #[arg(short = 'r', long, default_value = "grch38")]
+        reference: String,
+
+        /// Directory containing `{genome}-genes.db` files.
+        #[arg(short = 'd', long, default_value = "./data")]
+        data_dir: PathBuf,
+    },
+
+    /// Print every gene symbol in the database, one per line.
+    Symbols {
+        /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
+        #[arg(short = 'r', long, default_value = "grch38")]
+        reference: String,
+
+        /// Directory containing `{genome}-genes.db` files.
+        #[arg(short = 'd', long, default_value = "./data")]
+        data_dir: PathBuf,
+    },
+
+    /// Print cytobands for a chromosome.
+    Cytobands {
+        /// Chromosome name (e.g. chr1)
+        chromosome: String,
+
+        /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
+        #[arg(short = 'r', long, default_value = "grch38")]
+        reference: String,
+
+        /// Directory containing `{genome}-cytobands.db` files.
+        #[arg(short = 'd', long, default_value = "./data")]
+        data_dir: PathBuf,
+    },
+}
+
+fn normalize_genome(genome: &str) -> &'static str {
+    match genome.to_ascii_lowercase().as_str() {
+        "grch37" | "hg19" => "grch37",
+        _ => "grch38",
+    }
 }
 
 #[derive(Error, Debug)]
@@ -57,6 +114,9 @@ pub enum ApiError {
 
     #[error("Extension Error: {0}")]
     ExtensionError(#[from] ExtensionError),
+
+    #[error("Gene Error: {0}")]
+    GeneError(#[from] GeneError),
 }
 
 #[tokio::main]
@@ -127,7 +187,47 @@ async fn main() {
                 }
             }
         }
+        Commands::Genes { command } => {
+            if let Err(e) = run_gene_command(command) {
+                error!("{}", e);
+                std::process::exit(1);
+            }
+        }
     }
+}
+
+fn run_gene_command(command: GeneCommands) -> Result<(), ApiError> {
+    match command {
+        GeneCommands::Coordinates { gene, reference, data_dir } => {
+            let db = data_dir.join(format!("{}-genes.db", normalize_genome(&reference)));
+            let conn = genes::establish_connection(db.to_string_lossy().into_owned())?;
+            let coord = genes::get_gene_coordinates(&conn, &gene)?;
+            println!("{}\t{}\t{}\t{}", coord.gene, coord.chr, coord.begin, coord.end);
+        }
+        GeneCommands::Symbols { reference, data_dir } => {
+            let db = data_dir.join(format!("{}-genes.db", normalize_genome(&reference)));
+            let conn = genes::establish_connection(db.to_string_lossy().into_owned())?;
+            let stdout = io::stdout();
+            let mut handle = stdout.lock();
+            for symbol in genes::get_gene_symbols(&conn)? {
+                if writeln!(handle, "{}", symbol).is_err() {
+                    break;
+                }
+            }
+        }
+        GeneCommands::Cytobands { chromosome, reference, data_dir } => {
+            let db = data_dir.join(format!("{}-cytobands.db", normalize_genome(&reference)));
+            let conn = genes::establish_connection(db.to_string_lossy().into_owned())?;
+            let stdout = io::stdout();
+            let mut handle = stdout.lock();
+            for c in genes::get_cytobands(&conn, &chromosome)? {
+                if writeln!(handle, "{}\t{}\t{}\t{}\t{}", c.chromosome, c.begin, c.end, c.name, c.stain).is_err() {
+                    break;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn search(
