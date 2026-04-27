@@ -59,23 +59,16 @@ impl StoreService {
     /// or required environment variables are missing.
     pub fn from_uri(path: &str) -> Result<StoreService, StoreError> {
         let svc = Self::new();
-        let (scheme, _) = Self::get_canonical_path(path)?;
-        svc.get_or_create_store(&scheme)?;
+        svc.get_or_create_store(path)?;
         Ok(svc)
     }
 
-    pub fn from_scheme(scheme: &ObjectStoreScheme) -> Result<StoreService, StoreError> {
-        let svc= Self::new();
-        svc.get_or_create_store(scheme)?;
-        Ok(svc)
-    }
-
-    /// Returns a cached backend client for `uri`, building one if absent.
+    /// Returns a cached backend client for `path`, building one if absent.
     ///
     /// Cache key is derived from the URI's scheme and host, so two calls with
     /// different object paths under the same bucket/host share a client.
-    pub fn get_or_create_store(&self, scheme: &ObjectStoreScheme) -> Result<Arc<dyn ObjectStore>, StoreError> {
-        let key = Self::get_key_from_scheme(&scheme);
+    pub fn get_or_create_store(&self, path: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
+        let key = Self::cache_key(path)?;
         let mut stores = self
             .stores
             .lock()
@@ -84,30 +77,34 @@ impl StoreService {
         if let Some(existing) = stores.get(&key) {
             return Ok(Arc::clone(existing));
         }
-        let store = Self::build_store(scheme)?;
+        let store = Self::build_store(path)?;
         stores.insert(key, Arc::clone(&store));
         Ok(store)
     }
 
-    fn get_key_from_scheme(scheme: &ObjectStoreScheme) -> String {
-        match scheme {
-            ObjectStoreScheme::AmazonS3 => "s3".into(),
-            ObjectStoreScheme::GoogleCloudStorage => "gs".into(),
-            ObjectStoreScheme::MicrosoftAzure => "az".into(),
-            ObjectStoreScheme::Http => "http".into(),
-            ObjectStoreScheme::Local => "local".into(),
-            _ => {
-                panic!("Unsupported store type");
-            }
+    /// Cache key is `scheme://host[:port]` so distinct buckets/hosts each get
+    /// their own client. Bare filesystem paths collapse to `file://`.
+    fn cache_key(path: &str) -> Result<String, StoreError> {
+        if !path.contains("://") {
+            return Ok("file://".to_string());
         }
+        let url: url::Url = path.parse()?;
+        let scheme = url.scheme();
+        let host = url.host_str().unwrap_or("");
+        let key = match url.port() {
+            Some(port) => format!("{}://{}:{}", scheme, host, port),
+            None => format!("{}://{}", scheme, host),
+        };
+        Ok(key)
     }
 
-    fn get_store_from_scheme(scheme: &ObjectStoreScheme) -> Result<Arc<dyn ObjectStore>, StoreError> {
+    fn build_store(path: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
+        let (scheme, _) = Self::get_canonical_path(path)?;
         let store: Arc<dyn ObjectStore> = match scheme {
-            ObjectStoreScheme::AmazonS3 => Arc::new(store::get_s3_store(None)?),
+            ObjectStoreScheme::AmazonS3 => Arc::new(store::get_s3_store(Some(path))?),
             ObjectStoreScheme::GoogleCloudStorage => Arc::new(store::get_gc_store(None)?),
             ObjectStoreScheme::MicrosoftAzure => Arc::new(store::get_azure_store(None)?),
-            ObjectStoreScheme::Http => Arc::new(store::get_http_store(None)?),
+            ObjectStoreScheme::Http => Arc::new(store::get_http_store(Some(path))?),
             ObjectStoreScheme::Local => Arc::new(store::get_local_store()?),
             _ => {
                 return Err(StoreError::ValidationError(
@@ -115,11 +112,6 @@ impl StoreService {
                 ));
             }
         };
-        Ok(store)
-    }
-
-    fn build_store(scheme: &ObjectStoreScheme) -> Result<Arc<dyn ObjectStore>, StoreError> {
-        let store: Arc<dyn ObjectStore> = Self::get_store_from_scheme(scheme)?;
         Ok(store)
     }
 
@@ -131,8 +123,8 @@ impl StoreService {
     ///
     /// Returns [`StoreError`] on path normalisation failure or storage I/O errors.
     pub async fn get_range(&self, path: &str, range: Range<u64>) -> Result<Vec<u8>, StoreError> {
-        let (scheme, url) = Self::get_canonical_path(path)?;
-        let store = self.get_or_create_store(&scheme)?;
+        let (_, url) = Self::get_canonical_path(path)?;
+        let store = self.get_or_create_store(path)?;
         Ok(store.get_range(&url, range).await?.to_vec())
     }
 
@@ -181,16 +173,16 @@ impl StoreService {
 
     /// Returns the total size of the object at `path` in bytes.
     pub async fn get_file_size(&self, path: &str) -> Result<u64, StoreError> {
-        let (scheme, canonical) = Self::get_canonical_path(path)?;
-        let store = self.get_or_create_store(&scheme)?;
+        let (_, canonical) = Self::get_canonical_path(path)?;
+        let store = self.get_or_create_store(path)?;
         let meta = store.head(&canonical).await?;
         Ok(meta.size)
     }
 
     /// Downloads the entire object at `path` and returns its bytes.
     pub async fn get_object(&self, path: &str) -> Result<Vec<u8>, StoreError> {
-        let (scheme, canonical) = Self::get_canonical_path(path)?;
-        let store = self.get_or_create_store(&scheme)?;
+        let (_, canonical) = Self::get_canonical_path(path)?;
+        let store = self.get_or_create_store(path)?;
         let result = store.get(&canonical).await?;
         let bytes = result.bytes().await?;
         Ok(bytes.to_vec())
@@ -198,8 +190,8 @@ impl StoreService {
 
     /// Uploads `contents` to the object at `path`, creating or overwriting it.
     pub async fn put_object(&self, path: &str, contents: &[u8]) -> Result<(), StoreError> {
-        let (scheme, canonical) = Self::get_canonical_path(path)?;
-        let store = self.get_or_create_store(&scheme)?;
+        let (_, canonical) = Self::get_canonical_path(path)?;
+        let store = self.get_or_create_store(path)?;
 
         let payload = PutPayload::from(contents.to_vec());
 
@@ -213,8 +205,8 @@ impl StoreService {
 
     /// Lists all objects whose path begins with `prefix`, returning their metadata.
     pub async fn list_objects(&self, prefix: &str) -> Result<Vec<ObjectMeta>, StoreError> {
-        let (scheme, canonical) = Self::get_canonical_path(prefix)?;
-        let store = self.get_or_create_store(&scheme)?;
+        let (_, canonical) = Self::get_canonical_path(prefix)?;
+        let store = self.get_or_create_store(prefix)?;
         let mut results = Vec::new();
         let mut stream = store.list(Some(&canonical));
 

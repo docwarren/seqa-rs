@@ -1,5 +1,4 @@
 use lambda_http::{Body, Error, Request, RequestPayloadExt, Response};
-use object_store::ObjectStoreScheme;
 use ::serde::{ Serialize, Deserialize };
 use seqa_core::api::search_options::{CigarFormat, SearchOptions};
 use seqa_core::stores::StoreService;
@@ -34,7 +33,7 @@ pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, E
         _ => return Ok(Response::builder().status(400).body("Invalid request body".into()).map_err(Box::new)?)
     };
 
-    if let Ok(store) = StoreService::from_scheme(&ObjectStoreScheme::AmazonS3) {
+    if let Ok(store) = StoreService::from_uri(&options.file_path) {
         let result = store.search_features(&options).await?;
             let lines = serde_json::to_string(&result.lines)?;
 
@@ -53,7 +52,16 @@ mod tests {
     use lambda_http::{Body, Request};
 
     fn build_request(options: &SearchOptions) -> Request {
-        let body = serde_json::to_string(options).unwrap();
+        let payload = SearchRequest {
+            path: options.file_path.clone(),
+            coordinates: format!("{}:{}-{}", options.chromosome, options.begin, options.end),
+            with_header: Some(options.include_header),
+            only_header: Some(options.header_only),
+            genome: options.genome.clone(),
+            index_path: Some(options.index_path.clone()),
+            output_format: Some(options.output_format.to_string()),
+        };
+        let body = serde_json::to_string(&payload).unwrap();
         let mut request = Request::new(Body::Text(body));
         request
             .headers_mut()
