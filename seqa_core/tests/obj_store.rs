@@ -56,6 +56,6 @@ async fn obj_store_get_file_size() {
 #[test]
 fn get_canonical_path_s3() {
     let path = "s3://com.gmail.docarw/test_data/density.bw";
-    let (scheme, canonical) = StoreService::get_canonical_path(path).expect("Failed to get canonical path");
+    let (_, canonical) = StoreService::get_canonical_path(path).expect("Failed to get canonical path");
     assert_eq!(canonical.as_ref(), "test_data/density.bw");
 }
