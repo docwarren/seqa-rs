@@ -109,15 +109,9 @@ impl BamHeader {
 
 impl BamHeader {
     pub fn get_chromosome_index_by_name(&self, name: &str) -> Option<usize> {
-        let full_name = if name.starts_with("chr") {
-            name.to_string()
-        } else {
-            format!("chr{}", name)
-        };
-
-        self.references
+        crate::genome::chromosome_aliases(name)
             .iter()
-            .position(|ref_| ref_.name == full_name || ref_.name == name)
+            .find_map(|alias| self.references.iter().position(|r| &r.name == alias))
     }
 
     pub fn get_chromosome_name_by_index(&self, index: usize) -> Option<String> {

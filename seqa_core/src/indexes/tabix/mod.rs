@@ -199,7 +199,9 @@ impl Tabix {
     }
 
     pub fn get_chromosome_index_by_name(&self, name: &str) -> Option<usize> {
-        self.names.iter().position(|n| n == name)
+        crate::genome::chromosome_aliases(name)
+            .iter()
+            .find_map(|alias| self.names.iter().position(|n| n == alias))
     }
 }
 

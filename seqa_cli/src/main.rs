@@ -1,11 +1,10 @@
 use clap::{Parser, Subcommand};
 use seqa_core::api::search::SearchFeaturesError;
 use seqa_core::api::search_options::SearchOptions;
-use seqa_core::sqlite::genes::{self, GeneError};
+use seqa_core::sqlite::{self, genes::{self, GeneError}};
 use seqa_core::stores::StoreService;
 use seqa_core::utils::ExtensionError;
 use std::io::{self, Write};
-use std::path::PathBuf;
 use thiserror::Error;
 use log::{debug, error};
 
@@ -68,10 +67,6 @@ enum GeneCommands {
         /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
         #[arg(short = 'r', long, default_value = "grch38")]
         reference: String,
-
-        /// Directory containing `{genome}-genes.db` files.
-        #[arg(short = 'd', long, default_value = "./data")]
-        data_dir: PathBuf,
     },
 
     /// Print every gene symbol in the database, one per line.
@@ -79,10 +74,6 @@ enum GeneCommands {
         /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
         #[arg(short = 'r', long, default_value = "grch38")]
         reference: String,
-
-        /// Directory containing `{genome}-genes.db` files.
-        #[arg(short = 'd', long, default_value = "./data")]
-        data_dir: PathBuf,
     },
 
     /// Print cytobands for a chromosome.
@@ -93,18 +84,7 @@ enum GeneCommands {
         /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
         #[arg(short = 'r', long, default_value = "grch38")]
         reference: String,
-
-        /// Directory containing `{genome}-cytobands.db` files.
-        #[arg(short = 'd', long, default_value = "./data")]
-        data_dir: PathBuf,
     },
-}
-
-fn normalize_genome(genome: &str) -> &'static str {
-    match genome.to_ascii_lowercase().as_str() {
-        "grch37" | "hg19" => "grch37",
-        _ => "grch38",
-    }
 }
 
 #[derive(Error, Debug)]
@@ -198,15 +178,13 @@ async fn main() {
 
 fn run_gene_command(command: GeneCommands) -> Result<(), ApiError> {
     match command {
-        GeneCommands::Coordinates { gene, reference, data_dir } => {
-            let db = data_dir.join(format!("{}-genes.db", normalize_genome(&reference)));
-            let conn = genes::establish_connection(db.to_string_lossy().into_owned())?;
+        GeneCommands::Coordinates { gene, reference } => {
+            let conn = sqlite::connect_genes(&reference)?;
             let coord = genes::get_gene_coordinates(&conn, &gene)?;
             println!("{}\t{}\t{}\t{}", coord.gene, coord.chr, coord.begin, coord.end);
         }
-        GeneCommands::Symbols { reference, data_dir } => {
-            let db = data_dir.join(format!("{}-genes.db", normalize_genome(&reference)));
-            let conn = genes::establish_connection(db.to_string_lossy().into_owned())?;
+        GeneCommands::Symbols { reference } => {
+            let conn = sqlite::connect_genes(&reference)?;
             let stdout = io::stdout();
             let mut handle = stdout.lock();
             for symbol in genes::get_gene_symbols(&conn)? {
@@ -215,9 +193,8 @@ fn run_gene_command(command: GeneCommands) -> Result<(), ApiError> {
                 }
             }
         }
-        GeneCommands::Cytobands { chromosome, reference, data_dir } => {
-            let db = data_dir.join(format!("{}-cytobands.db", normalize_genome(&reference)));
-            let conn = genes::establish_connection(db.to_string_lossy().into_owned())?;
+        GeneCommands::Cytobands { chromosome, reference } => {
+            let conn = sqlite::connect_cytobands(&reference)?;
             let stdout = io::stdout();
             let mut handle = stdout.lock();
             for c in genes::get_cytobands(&conn, &chromosome)? {

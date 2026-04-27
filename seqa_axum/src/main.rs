@@ -13,7 +13,7 @@ use seqa_core::api::search::SearchFeaturesError;
 use seqa_core::api::search_options::SearchOptions;
 use seqa_core::models::cytoband::Cytoband;
 use seqa_core::models::gene_coordinate::GeneCoordinate;
-use seqa_core::sqlite::genes::{self, GeneError};
+use seqa_core::sqlite::{self, genes::{self, GeneError}};
 use seqa_core::stores::StoreService;
 use seqa_core::utils::UtilError;
 use thiserror::Error;
@@ -213,17 +213,8 @@ async fn list_dir(
     Ok(Json(entries))
 }
 
-fn normalize_genome(genome: &str) -> &'static str {
-    match genome.to_ascii_lowercase().as_str() {
-        "grch37" | "hg19" => "grch37",
-        _ => "grch38",
-    }
-}
-
 async fn get_gene_symbols(Path(genome): Path<String>) -> Result<Json<Vec<String>>, ApiError> {
-    let url = format!("./data/{}-genes.db", normalize_genome(&genome));
-    let connection = genes::establish_connection(url.clone())
-        .map_err(|e| ApiError::DatabaseError(format!("Failed to open {}: {}", url, e)))?;
+    let connection = sqlite::connect_genes(&genome)?;
     let symbols = genes::get_gene_symbols(&connection)?;
     Ok(Json(symbols))
 }
@@ -231,9 +222,7 @@ async fn get_gene_symbols(Path(genome): Path<String>) -> Result<Json<Vec<String>
 async fn get_coordinates(
     Path((genome, gene)): Path<(String, String)>,
 ) -> Result<Json<GeneCoordinate>, ApiError> {
-    let url = format!("./data/{}-genes.db", normalize_genome(&genome));
-    let connection = genes::establish_connection(url.clone())
-        .map_err(|e| ApiError::DatabaseError(format!("Failed to open {}: {}", url, e)))?;
+    let connection = sqlite::connect_genes(&genome)?;
     let coord = genes::get_gene_coordinates(&connection, &gene)?;
     Ok(Json(coord))
 }
@@ -241,9 +230,7 @@ async fn get_coordinates(
 async fn get_cytobands(
     Path((genome, chromosome)): Path<(String, String)>,
 ) -> Result<Json<Vec<Cytoband>>, ApiError> {
-    let url = format!("./data/{}-cytobands.db", normalize_genome(&genome));
-    let connection = genes::establish_connection(url.clone())
-        .map_err(|e| ApiError::DatabaseError(format!("Failed to open {}: {}", url, e)))?;
+    let connection = sqlite::connect_cytobands(&genome)?;
     let cytobands = genes::get_cytobands(&connection, &chromosome)?;
     Ok(Json(cytobands))
 }
