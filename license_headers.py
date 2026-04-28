@@ -1,4 +1,6 @@
-// Copyright 2026 Seqa23
+import os
+
+HEADER = """// Copyright 2026 Seqa23
 //
 // Author: Andrew Warren
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +15,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SnvType {
-    SUBSTITUTION,
-    INSERTION,
-    DELETION,
-}
+"""
+
+for root, dirs, files in os.walk("seqa_axum"):
+    for file in files:
+        if file.endswith(".rs"):
+            path = os.path.join(root, file)
+            with open(path, 'r') as f:
+                content = f.read()
+            if "Apache License" not in content:
+                with open(path, 'w') as f:
+                    f.write(HEADER + content)
+                print(f"Added header to {path}")
