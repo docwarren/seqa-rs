@@ -13,9 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::*;
-
 use crate::api::output_format::OutputFormat;
+use crate::api::parsing_error::ParsingError;
 use crate::api::search::{init_fetch_handles, join_fetch_handles};
 use crate::api::search_error::SearchError;
 use crate::api::search_options::SearchOptions;
@@ -38,8 +37,10 @@ use crate::traits::sam_index::SamIndex;
 ///  whether to include headers, and the range of positions to consider.
 /// # Returns:
 /// * A Result containing a vector of strings with the processed lines, which may include headers.
-pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Vec<String> {
+pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Result<Vec<String>, ParsingError> {
     let raw_string = String::from_utf8_lossy(data).into_owned();
+
+
     let line_strings = raw_string
         .split('\n')
         .map(|line| line.trim())
@@ -49,21 +50,15 @@ pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Vec<String> {
 
     let model_new = options.output_format.get_model();
 
-    line_strings
+    let result = line_strings
         .iter()
-        .map(|line| model_new(line))
-        .filter_map(|line| match line {
-            Ok(feature) => Some(feature),
-            Err(e) => {
-                debug!("{}", e);
-                None
-            },
-        })
-        .filter(|feature| {
-            feature.overlaps(options)
-        })
-        .map(|feature| format!("{}", feature))
-        .collect()
+        .map(|line| model_new(line).map_err(|e| ParsingError::FormatError(e)))
+        .collect::<Result<Vec<Box<dyn crate::traits::feature::Feature>>, ParsingError>>()?
+        .into_iter()
+        .filter(|feature| feature.overlaps(options))
+        .map(|feature| feature.to_string())
+        .collect();
+    Ok(result)
 }
 
 /// Searches for data in a tabixed bgzipped file based on the provided search options.
@@ -108,6 +103,7 @@ pub async fn tabix_search(
         })?;
 
     let chr_idx = &tabix.references[chr_i as usize];
+
     let chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &options);
 
     let chunk_handles = init_fetch_handles(store_service, &options, &chunks)
@@ -124,7 +120,11 @@ pub async fn tabix_search(
             source: e
         })?;
 
-    let lines = data_to_lines(&raw_data.concat(), &options);
+    let lines = data_to_lines(&raw_data.concat(), &options).map_err(|e|SearchError::ParseError {
+        source: e,
+        path: options.file_path.clone()
+    })?;
+    
     let mut all_lines = get_header_lines(options, &tabix_header);
     all_lines.extend(lines);
     result.lines = all_lines;

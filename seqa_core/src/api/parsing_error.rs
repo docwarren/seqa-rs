@@ -12,6 +12,9 @@ pub enum ParsingError {
         reason: String
     },
 
+    #[error("Invalid line in file: {0}")]
+    FormatError(String),
+
     #[error("Insufficient bytes to read header")]
     InsufficientBytes,
 
