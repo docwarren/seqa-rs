@@ -365,10 +365,6 @@ impl Display for Read {
 }
 
 impl Feature for Read {
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::ZeroBasedHalfOpen
-    }
-
     fn get_chromosome(&self) -> String {
         self.ref_name.to_owned()
     }
@@ -393,5 +389,9 @@ impl Feature for Read {
 
     fn get_id(&self) -> String {
         String::from_utf8(self.read_name.clone()).unwrap()
+    }
+
+    fn coordinate_system(&self) -> CoordinateSystem {
+        CoordinateSystem::ZeroBasedHalfOpen
     }
 }

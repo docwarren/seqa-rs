@@ -50,6 +50,8 @@ pub trait Feature: std::fmt::Display {
     fn overlaps(&self, other: &dyn Feature) -> bool {
         let (begin, end) = self.to_canonical();
         let (other_begin, other_end) = other.to_canonical();
-        self.get_chromosome() == other.get_chromosome() && begin < other_end && end > other_begin
+        let chr1 = self.get_chromosome().replace("chr", "");
+        let chr2 = other.get_chromosome().replace("chr", "");
+        chr1 == chr2 && begin < other_end && end > other_begin
     }
 }
