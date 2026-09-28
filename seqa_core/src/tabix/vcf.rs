@@ -310,19 +310,20 @@ impl VcfLine {
     /// In Manta this will return either DEL, INS or DUP
     /// In bcftools this will fail
     pub fn get_variant_type_from_info(&self) -> Option<VariantType> {
-        match self.get_info_val("SVTYPE") {
-            Some(svtype) => {
-                if svtype == "DEL" {
-                    return Some(VariantType::SvDel);
-                } else if svtype == "INS" {
-                    return Some(VariantType::SvIns);
-                } else if svtype == "DUP" {
-                    return Some(VariantType::SvDup);
-                } else {
-                    return None;
-                }
+        if let Some(svtype) = self.get_info_val("SVTYPE") {
+            match &svtype[..] {
+                "DEL" => return Some(VariantType::SvDel),
+                "INS" => return Some(VariantType::SvIns),
+                "DUP" => return Some(VariantType::SvDup),
+                "INV" => return Some(VariantType::SvInv),
+                "ROH" => return Some(VariantType::Roh),
+                "BND" => return Some(VariantType::SvBnd),
+                "CTX" => return Some(VariantType::SvCtx),
+                "CPX" => return Some(VariantType::SvCpx),
+                _ => return None,
             }
-            _ => None,
+        } else {
+            return None;
         }
     }
 
@@ -338,6 +339,8 @@ impl VcfLine {
                 "REF" => Some(VariantType::CnRef),
                 "GAIN" => Some(VariantType::CnGain),
                 "LOSS" => Some(VariantType::CnLoss),
+                "LOH" => Some(VariantType::CnLoh),
+                "COMPLEXCNV" => Some(VariantType::CnComplex),
                 _ => None,
             }
         }
@@ -348,9 +351,7 @@ impl VcfLine {
         if self.id.starts_with("Canvas:") || self.id.starts_with("Manta") {
             return None;
         }
-
         let alt = self.longest_alt()?;
-
         if alt.len() > self.ref_allele.len() {
             Some(VariantType::IndelIns)
         } else if alt.len() < self.ref_allele.len() {
@@ -367,12 +368,15 @@ impl VcfLine {
     /// If the longest alt allele is shorter than the reference allele, it is a deletion.
     /// If the longest alt allele is the same length as the reference allele, it is a substitution.
     pub fn get_variant_type(&self) -> Result<VariantType, String> {
-        let variant_type: Option<VariantType> = match VcfLine::infer_caller(&self.id) {
-            Caller::Manta => self.get_variant_type_from_info(),
-            Caller::Canvas => self.get_variant_type_from_canvas_id(),
-            _ => self.infer_variant_type_from_alt_length(),
-        };
-        variant_type.ok_or("Unable to get variant type".to_owned())
+        if let Some(v_type) = self.get_variant_type_from_info() {
+            return Ok(v_type);
+        } else if let Some(v_type) = self.get_variant_type_from_canvas_id() {
+            return Ok(v_type);
+        } else if let Some(v_type) = self.infer_variant_type_from_alt_length() {
+            return Ok(v_type);
+        } else {
+            return Err("Unable to get variant type".to_owned());
+        }
     }
     /// Returns the longest alt allele based on the length difference from the reference allele.
     /// If there are multiple alleles with the same length difference, it returns the first one.
