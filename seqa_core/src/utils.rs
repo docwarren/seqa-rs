@@ -36,17 +36,19 @@ pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
             Ok(true) => (),
             Ok(false) => {
                 return Err(SearchError::NotFound {
-                    path: file_path.to_string()
+                    path: file_path.to_string(),
                 });
-            },
-            Err(e) => return Err(SearchError::AbsolutePathError{
-                path: file_path.to_string(),
-                source: e
-            }),
+            }
+            Err(e) => {
+                return Err(SearchError::AbsolutePathError {
+                    path: file_path.to_string(),
+                    source: e,
+                });
+            }
         }
         let abs_path = absolute(file_path).map_err(|e| SearchError::AbsolutePathError {
             path: file_path.to_string(),
-            source: e
+            source: e,
         })?;
         Ok(format!("file://{}", abs_path.to_string_lossy()))
     } else {
@@ -67,14 +69,18 @@ pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
 /// Returns [`FormatError`] when the chromosome name is not recognised or a
 /// numeric field cannot be parsed.
 pub fn parse_coordinates(coords: &str) -> Result<(String, u32, u32), SearchError> {
-
     let tokens: Vec<&str> = coords.split(':').collect();
     let chromosome = tokens[0].to_string();
-    let chr_idx = crate::genome::chr_index(&chromosome)
-        .ok_or(SearchError::InvalidCoordinateFormat(format!("Invalid chromosome: {}.", chromosome)))?;
+    let chr_idx = crate::genome::chr_index(&chromosome).ok_or(
+        SearchError::InvalidCoordinateFormat(format!("Invalid chromosome: {}.", chromosome)),
+    )?;
 
-    let (begin, end) = get_begin_end(&tokens, chr_idx)
-        .map_err(|e| SearchError::InvalidCoordinateFormat(format!("Could not parse coordinates {}, {}", coords, e)))?;
+    let (begin, end) = get_begin_end(&tokens, chr_idx).map_err(|e| {
+        SearchError::InvalidCoordinateFormat(format!(
+            "Could not parse coordinates {}, {}",
+            coords, e
+        ))
+    })?;
     Ok((chromosome, begin, end))
 }
 
@@ -268,7 +274,10 @@ fn test_get_search_options_local() {
     assert_eq!(options.end, 2000);
     assert_eq!(
         options.index_path,
-        format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz.tbi", manifest_dir)
+        format!(
+            "file://{}/mock_data/NA12878.gatk.cnv.vcf.gz.tbi",
+            manifest_dir
+        )
     );
     assert_eq!(options.output_format, OutputFormat::VCF);
 
@@ -321,20 +330,32 @@ fn test_match_format_prefers_longest_extension() {
         get_output_format("sample.bedgraph.gz").unwrap(),
         OutputFormat::BEDGRAPH
     );
-    assert_eq!(get_output_format("sample.bed.gz").unwrap(), OutputFormat::BED);
+    assert_eq!(
+        get_output_format("sample.bed.gz").unwrap(),
+        OutputFormat::BED
+    );
 }
 
 #[test]
 fn test_gff3_is_supported() {
-    assert_eq!(get_output_format("genes.gff3.gz").unwrap(), OutputFormat::GFF);
-    assert_eq!(get_index_path("genes.gff3.gz").unwrap(), "genes.gff3.gz.tbi");
+    assert_eq!(
+        get_output_format("genes.gff3.gz").unwrap(),
+        OutputFormat::GFF
+    );
+    assert_eq!(
+        get_index_path("genes.gff3.gz").unwrap(),
+        "genes.gff3.gz.tbi"
+    );
 }
 
 #[test]
 fn test_plain_text_formats_are_rejected() {
     // Un-bgzipped tabix formats cannot be range-queried.
     for path in ["a.vcf", "a.bed", "a.gff", "a.gtf", "a.bedgraph", "a.gff3"] {
-        assert!(get_output_format(path).is_err(), "{path} should be rejected");
+        assert!(
+            get_output_format(path).is_err(),
+            "{path} should be rejected"
+        );
         assert!(get_index_path(path).is_err(), "{path} should have no index");
     }
 }
@@ -356,7 +377,10 @@ fn test_embedded_index_formats() {
 #[test]
 fn test_match_format_is_case_insensitive() {
     assert_eq!(get_output_format("SAMPLE.BAM").unwrap(), OutputFormat::BAM);
-    assert_eq!(get_output_format("Sample.VCF.GZ").unwrap(), OutputFormat::VCF);
+    assert_eq!(
+        get_output_format("Sample.VCF.GZ").unwrap(),
+        OutputFormat::VCF
+    );
 }
 
 #[test]

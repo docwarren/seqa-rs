@@ -62,20 +62,19 @@
 //!
 //! - **`sqlite`** — Enables [`sqlite`] module for gene-symbol and cytoband queries via SQLite.
 
-pub mod genome;
-pub mod traits;
-pub mod stores;
-pub mod codecs;
-pub mod indexes;
 pub mod api;
+pub mod codecs;
+pub mod genome;
+pub mod indexes;
 pub mod models;
-pub mod utils;
 pub mod services;
+pub mod stores;
+pub mod traits;
+pub mod utils;
 
-#[cfg(feature = "sqlite")]
-pub mod sqlite;
 pub mod bam;
 pub mod bigwig;
 pub mod fasta;
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
 pub mod tabix;
-pub mod constants;
