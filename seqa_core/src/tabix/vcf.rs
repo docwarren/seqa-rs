@@ -14,12 +14,14 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Display;
 
+use crate::tabix::caller::Caller;
 use crate::traits::feature::Feature;
 
-use crate::constants::SnvType;
 use crate::models::coordinates::CoordinateSystem;
+use crate::tabix::variant_type::VariantType;
 
 /// A single record from a VCF (Variant Call Format) file.
 ///
@@ -53,6 +55,15 @@ pub struct VcfLine {
 }
 
 impl VcfLine {
+    /// Try to get an INFO field string value
+    fn get_info_val(&self, key: &str) -> Option<String> {
+        let val_set: HashMap<String, String> = self
+            .info
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        val_set.get(key).map(|v| v.to_string())
+    }
     /// Parses a single tab-delimited VCF data line (not a header line) into a [`VcfLine`].
     ///
     /// # Errors
@@ -65,9 +76,7 @@ impl VcfLine {
             return Err(format!("Invalid VCF line: {}", line));
         }
         let chromosome = tokens[0].to_string();
-        let position = match tokens[1]
-            .parse::<u32>()
-        {
+        let position = match tokens[1].parse::<u32>() {
             Ok(pos) => pos,
             Err(_) => {
                 return Err(format!("Invalid position in VCF line: {}", line));
@@ -84,14 +93,12 @@ impl VcfLine {
         let quality = if tokens[5] == "." {
             None
         } else {
-            Some(
-                match tokens[5].parse::<f32>() {
-                    Ok(q) => q,
-                    Err(_) => {
-                        return Err(format!("Invalid quality in VCF line: {}", line));
-                    }
-                },
-            )
+            Some(match tokens[5].parse::<f32>() {
+                Ok(q) => q,
+                Err(_) => {
+                    return Err(format!("Invalid quality in VCF line: {}", line));
+                }
+            })
         };
 
         // Parse the filter field
@@ -162,7 +169,13 @@ impl Display for VcfLine {
         let info = self
             .info
             .iter()
-            .map(|(k, v)| if v.is_empty() { k.to_string() } else { format!("{}={}", k, v) })
+            .map(|(k, v)| {
+                if v.is_empty() {
+                    k.to_string()
+                } else {
+                    format!("{}={}", k, v)
+                }
+            })
             .collect::<Vec<String>>()
             .join(";");
 
@@ -214,23 +227,27 @@ impl Feature for VcfLine {
     // which is the most significant variant
     // i.e. the one with the largest length difference
     fn get_begin(&self) -> u32 {
-        let variant_type = self.get_variant_type().unwrap_or(SnvType::SUBSTITUTION);
         let prefix_len = self.prefix_len().unwrap_or(0);
-
-        match variant_type {
-            SnvType::INSERTION => self.position + prefix_len - 1u32,
-            SnvType::DELETION => self.position + prefix_len - 1u32,
-            SnvType::SUBSTITUTION => self.position,
+        if prefix_len == 0 {
+            return self.position;
+        } else {
+            return self.position + prefix_len - 1;
         }
     }
 
     fn get_end(&self) -> u32 {
-        let variant_type = self.get_variant_type().unwrap_or(SnvType::SUBSTITUTION);
-
-        match variant_type {
-            SnvType::INSERTION => self.get_begin(),
-            SnvType::DELETION => self.get_begin() + self.get_length(),
-            SnvType::SUBSTITUTION => self.position,
+        if let Ok(v_type) = self.get_variant_type() {
+            return match v_type {
+                VariantType::CnGain
+                | VariantType::CnLoss
+                | VariantType::CnRef
+                | VariantType::IndelDel
+                | VariantType::SvDel
+                | VariantType::SvDup => self.get_begin() + self.get_length(),
+                _ => self.get_begin(),
+            };
+        } else {
+            return self.position;
         }
     }
 
@@ -239,22 +256,34 @@ impl Feature for VcfLine {
     }
 
     fn get_length(&self) -> u32 {
-        let variant_type = self.get_variant_type().unwrap_or(SnvType::SUBSTITUTION);
-        match variant_type {
-            SnvType::INSERTION => {
-                match self.longest_alt() {
-                    Some(alt) => alt.len() as u32 - self.ref_allele.len() as u32,
-                    None => 0,
-                }
-            },
-            SnvType::DELETION => {
-                match self.longest_alt() {
-                    Some(alt) => self.ref_allele.len() as u32 - alt.len() as u32,
-                    None => 0,
-                }
-            },
-            SnvType::SUBSTITUTION => 1,
+        // try SVLEN in info
+        if let Some(length) = self.get_info_val("SVLEN") {
+            if let Ok(parsed) = length.parse::<u32>() {
+                return parsed;
+            }
         }
+        // try CNVLEN in info
+        else if let Some(length) = self.get_info_val("CNVLEN") {
+            if let Ok(parsed) = length.parse::<u32>() {
+                return parsed;
+            }
+        }
+        // try END
+        else if let Some(end_result) = self.get_info_val("END") {
+            if let Ok(end) = end_result.parse::<u32>() {
+                return (end - self.position) + 1;
+            }
+        }
+        // use longest alt
+        else if let Some(alt) = self.longest_alt() {
+            if alt.len() > self.ref_allele.len() {
+                return alt.len() as u32 - self.ref_allele.len() as u32;
+            } else {
+                return self.ref_allele.len() as u32 - alt.len() as u32;
+            }
+        }
+
+        return 1;
     }
 
     fn coordinate_system(&self) -> CoordinateSystem {
@@ -263,22 +292,87 @@ impl Feature for VcfLine {
 }
 
 impl VcfLine {
+    /// Attempt to infer the caller from the ID field.
+    /// In the case of Canvas and Manta callers - the ID field starts Canvas: and Manta respectively
+    /// With bcftools the id field is either . or an rs number
+    pub fn infer_caller(id: &str) -> Caller {
+        if id.starts_with("Canvas") {
+            Caller::Canvas
+        } else if id.starts_with("Manta") {
+            Caller::Manta
+        } else {
+            Caller::Unknown
+        }
+    }
+
+    /// Get the variant type from the INFO:SVTYPE field
+    /// In Canvas this will only return CNV
+    /// In Manta this will return either DEL, INS or DUP
+    /// In bcftools this will fail
+    pub fn get_variant_type_from_info(&self) -> Option<VariantType> {
+        match self.get_info_val("SVTYPE") {
+            Some(svtype) => {
+                if svtype == "DEL" {
+                    return Some(VariantType::SvDel);
+                } else if svtype == "INS" {
+                    return Some(VariantType::SvIns);
+                } else if svtype == "DUP" {
+                    return Some(VariantType::SvDup);
+                } else {
+                    return None;
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Canvas reports the variant type in the alt field.
+    /// e.g. <CN0>,<CN3>
+    /// and in the id field
+    /// e.g. Canvas:GAIN:11:.....
+    pub fn get_variant_type_from_canvas_id(&self) -> Option<VariantType> {
+        if !self.id.starts_with("Canvas:") {
+            None
+        } else {
+            match self.id.split(':').collect::<Vec<&str>>()[1] {
+                "REF" => Some(VariantType::CnRef),
+                "GAIN" => Some(VariantType::CnGain),
+                "LOSS" => Some(VariantType::CnLoss),
+                _ => None,
+            }
+        }
+    }
+    /// Attempt to infer the variant type from the alt fields
+    /// should be ok in a bcftools vcf
+    pub fn infer_variant_type_from_alt_length(&self) -> Option<VariantType> {
+        if self.id.starts_with("Canvas:") || self.id.starts_with("Manta") {
+            return None;
+        }
+
+        let alt = self.longest_alt()?;
+
+        if alt.len() > self.ref_allele.len() {
+            Some(VariantType::IndelIns)
+        } else if alt.len() < self.ref_allele.len() {
+            Some(VariantType::IndelDel)
+        } else {
+            Some(VariantType::Substitution)
+        }
+    }
+
     /// Returns the type of the longest alt allele
     /// * @return The type of the variant (insertion, deletion, or substitution).
     /// The type is determined based on the length of the longest alt allele compared to the reference allele.
     /// If the longest alt allele is longer than the reference allele, it is an insertion.
     /// If the longest alt allele is shorter than the reference allele, it is a deletion.
     /// If the longest alt allele is the same length as the reference allele, it is a substitution.
-    pub fn get_variant_type(&self) -> Result<SnvType, String> {
-        let alt = self.longest_alt().ok_or_else(|| "No alt allele found".to_string())?;
-
-        if alt.len() > self.ref_allele.len() {
-            Ok(SnvType::INSERTION)
-        } else if alt.len() < self.ref_allele.len() {
-            Ok(SnvType::DELETION)
-        } else {
-            Ok(SnvType::SUBSTITUTION)
-        }
+    pub fn get_variant_type(&self) -> Result<VariantType, String> {
+        let variant_type: Option<VariantType> = match VcfLine::infer_caller(&self.id) {
+            Caller::Manta => self.get_variant_type_from_info(),
+            Caller::Canvas => self.get_variant_type_from_canvas_id(),
+            _ => self.infer_variant_type_from_alt_length(),
+        };
+        variant_type.ok_or("Unable to get variant type".to_owned())
     }
     /// Returns the longest alt allele based on the length difference from the reference allele.
     /// If there are multiple alleles with the same length difference, it returns the first one.
@@ -293,7 +387,12 @@ impl VcfLine {
     /// Returns the length of the prefix that is common between the longest alt allele and the reference allele.
     /// * @return The length of the common prefix.
     pub fn prefix_len(&self) -> Result<u32, String> {
-        let longest_alt = self.longest_alt().ok_or_else(|| "No alt allele found".to_string())?;
+        if self.alt_alleles[0].starts_with("<") {
+            return Ok(0);
+        }
+        let longest_alt = self
+            .longest_alt()
+            .ok_or_else(|| "No alt allele found".to_string())?;
         let longest = longest_alt.len();
         let shortest = if longest < self.ref_allele.len() {
             longest
@@ -334,5 +433,50 @@ mod test {
         assert_eq!(vcf_record.get_begin(), 2);
         assert_eq!(vcf_record.get_end(), 4);
         assert_eq!(vcf_record.get_length(), 2);
+    }
+
+    #[test]
+    pub fn should_handle_manta_symbolic_alt() {
+        let line = "1	14110160	MantaDUP:TANDEM:1137:0:1:0:0:0	G	<DUP:TANDEM>	999	PASS	END=14112070;SVTYPE=DUP;SVLEN=1910;SVINSLEN=38;SVINSSEQ=TCAGCGTCAAGTAGGAGCTGTACTAAAAATTTATGTAA	GT:FT:GQ:PL:PR:SR	0/1:PASS:591:999,0,588:24,19:36,31".to_string();
+        let record = VcfLine::from_line(line).unwrap();
+        assert_eq!(record.chromosome, "1");
+        assert_eq!(record.position, 14110160);
+        assert_eq!(record.id, "MantaDUP:TANDEM:1137:0:1:0:0:0");
+        assert_eq!(record.ref_allele, "G");
+        assert_eq!(record.alt_alleles, vec!["<DUP:TANDEM>"]);
+        assert_eq!(record.quality, Some(999 as f32));
+        assert_eq!(record.filter, vec!["PASS"]);
+        assert_eq!(record.get_info_val("END"), Some("14112070".to_string()));
+        assert_eq!(record.get_info_val("SVTYPE"), Some("DUP".to_string()));
+        assert_eq!(record.get_variant_type(), Ok(VariantType::SvDup));
+        assert_eq!(record.sample_data.len(), 1);
+        assert_eq!(record.get_id(), "MantaDUP:TANDEM:1137:0:1:0:0:0".to_owned());
+        assert_eq!(record.get_begin(), 14110160);
+        assert_eq!(record.get_end(), 14112070);
+        assert_eq!(record.get_length(), 1910);
+    }
+
+    #[test]
+    pub fn should_handle_canvas_symbolic_alt() {
+        let line = "1	25274839	Canvas:LOSS:1:25274840-25315204	N	<CN0>	36.58	PASS	SVTYPE=CNV;END=25315204;CNVLEN=40365;CIPOS=-671,671;CIEND=-685,685	GT:RC:BC:CN:MCC:MCCQ:QS:FT	0/1:52.33:4:1:1:.:36.58:PASS".to_string();
+        let record = VcfLine::from_line(line).unwrap();
+        assert_eq!(record.chromosome, "1");
+        assert_eq!(record.position, 25274839);
+        assert_eq!(record.id, "Canvas:LOSS:1:25274840-25315204");
+        assert_eq!(record.ref_allele, "N");
+        assert_eq!(record.alt_alleles, vec!["<CN0>"]);
+        assert_eq!(record.quality, Some(36.58 as f32));
+        assert_eq!(record.filter, vec!["PASS"]);
+        assert_eq!(record.get_info_val("END"), Some("25315204".to_string()));
+        assert_eq!(record.get_info_val("SVTYPE"), Some("CNV".to_string()));
+        assert_eq!(record.get_variant_type(), Ok(VariantType::CnLoss));
+        assert_eq!(record.sample_data.len(), 1);
+        assert_eq!(
+            record.get_id(),
+            "Canvas:LOSS:1:25274840-25315204".to_owned()
+        );
+        assert_eq!(record.get_begin(), 25_274_839);
+        assert_eq!(record.get_end(), 25_315_204);
+        assert_eq!(record.get_length(), 40_365);
     }
 }
