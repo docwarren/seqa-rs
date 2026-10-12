@@ -15,5 +15,4 @@
 
 pub mod feature;
 pub mod sam_index;
-pub mod optimize_offsets;
-pub mod write_index;
+pub mod from_bytes;

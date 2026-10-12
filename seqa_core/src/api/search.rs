@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use futures::TryStreamExt;
-use futures::future::try_join_all;
 use object_store::ObjectStore;
 
 use crate::api::output_format::OutputFormat;
@@ -56,34 +55,29 @@ pub async fn chunk_to_stream(
 
 /// Fetches chunks concurrently from the store service.
 ///
-/// Returns a vector of `(Chunk, bytes)` pairs preserving input order.
-pub async fn init_fetch_handles(
+/// Returns a vector of `bytes` pairs preserving input order.
+pub async fn fetch(
     store_service: &StoreService,
-    options: &SearchOptions,
+    file_path: &str,
     chunks: &[Chunk],
-) -> Result<Vec<(Chunk, Vec<u8>)>, StoreError> {
-    let futures = chunks.iter().map(|chunk| {
-        let range = chunk.to_range();
-        let file_path = options.file_path.clone();
-        let chunk_clone = chunk.clone();
-        async move {
-            let data = store_service.get_range(&file_path, range).await?;
-            Ok((chunk_clone, data))
-        }
-    });
-
-    try_join_all(futures).await
+) -> Result<Vec<Vec<u8>>, StoreError> {
+    let ranges = chunks.iter().map(|c| c.to_range()).collect::<Vec<_>>();
+    let data = store_service.get_ranges(file_path, &ranges).await?;
+    Ok(data)
 }
 
 /// Decompresses each fetched chunk and returns the post-offset data.
-pub async fn join_fetch_handles(
-    fetched: Vec<(Chunk, Vec<u8>)>,
+pub async fn join_fetched_data(
+    chunks: &[Chunk],
+    fetched: &Vec<Vec<u8>>,
 ) -> Result<Vec<Vec<u8>>, CodecError> {
     let mut raw_data = Vec::new();
 
-    for (chunk, compressed_bytes) in fetched {
-        let block_sizes = bgzip::from_bytes(&compressed_bytes)?;
-        let decompressed_bytes = bgzip::decompress(&block_sizes, &compressed_bytes)?;
+    for i in 0..chunks.len() {
+        let chunk = chunks[i];
+        let compressed_bytes = &fetched[i];
+        let block_sizes = bgzip::from_bytes(compressed_bytes)?;
+        let decompressed_bytes = bgzip::decompress(&block_sizes, compressed_bytes)?;
         let decompressed_start_byte = chunk.begin_vp.decompressed_offset as usize;
         let decompressed_slice = &decompressed_bytes[decompressed_start_byte..];
         raw_data.push(decompressed_slice.to_vec());

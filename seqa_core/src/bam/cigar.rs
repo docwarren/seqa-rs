@@ -17,6 +17,8 @@ use std::fmt::Display;
 
 use crate::bam::cigar_op::CigarOperation;
 use serde::{Deserialize, Serialize};
+use crate::api::parsing_error::ParsingError;
+use crate::traits::from_bytes::FromBytes;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cigar {
@@ -24,19 +26,6 @@ pub struct Cigar {
 }
 
 impl Cigar {
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, String> {
-        let mut operations = Vec::new();
-        let mut i = 0;
-
-        while i < bytes.len() {
-            let op = u32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid Cigar bytes".to_string())?);
-            let cigar_op = CigarOperation::new(op);
-            operations.push(cigar_op);
-            i += 4;
-        }
-
-        Ok(Cigar { operations })
-    }
 
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
@@ -52,6 +41,23 @@ impl Cigar {
 
     pub fn get_operations(&self) -> &Vec<CigarOperation> {
         &self.operations
+    }
+}
+
+impl FromBytes for Cigar {
+    type Error = ParsingError;
+
+    fn from_bytes(bytes: &[u8], i: usize) -> Result<(Self, usize), Self::Error> {
+        let mut operations = Vec::new();
+        let mut idx = i;
+        while idx < bytes.len() {
+            let op = u32::from_le_bytes(bytes[idx..idx + 4].try_into()?);
+            let cigar_op = CigarOperation::new(op);
+            operations.push(cigar_op);
+            idx += 4;
+        }
+
+        Ok((Cigar { operations }, idx - i))
     }
 }
 

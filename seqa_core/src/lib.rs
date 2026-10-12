@@ -46,7 +46,7 @@
 //! ## Coordinate system
 //!
 //! All coordinates are stored internally in **0-based half-open** `[begin, end)` form.
-//! Use [`models::coordinates::CoordinateSystem`] conversions when working with VCF/GFF/GTF
+//! Use [`models::coordinate_system::CoordinateSystem`] conversions when working with VCF/GFF/GTF
 //! data, which natively use 1-based closed coordinates.
 //!
 //! ## Storage backends
@@ -78,3 +78,4 @@ pub mod fasta;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 pub mod tabix;
+pub mod coordinate;

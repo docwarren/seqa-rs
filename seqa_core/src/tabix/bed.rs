@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use crate::models::coordinates::CoordinateSystem;
+use crate::models::coordinate_system::CoordinateSystem;
 use crate::traits::feature::Feature;
 
 /// A single record from a BED (Browser Extensible Data) file.

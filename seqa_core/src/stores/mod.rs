@@ -200,6 +200,12 @@ impl StoreService {
         Ok(store.get_range(&url, range).await?.to_vec())
     }
 
+    pub async fn get_ranges(&self, path: &str, ranges: &[Range<u64>]) -> Result<Vec<Vec<u8>>, StoreError> {
+        let (_, url) = Self::get_obj_scheme_and_path(path)?;
+        let store = self.get_or_create_store(path)?;
+        Ok(store.get_ranges(&url, ranges).await?.iter().map(|r| r.to_vec()).collect())
+    }
+
     pub fn get_absolute_path(path: &str) -> Result<String, StoreError> {
         let mut abs_path = path.to_owned();
 

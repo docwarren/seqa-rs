@@ -26,15 +26,16 @@ use crate::bigwig::zoom_data::ZoomData;
 use crate::codecs::decompress_auto;
 use crate::stores::StoreService;
 use crate::bigwig::bigwig_search::get_range_from_leaves;
+use crate::coordinate::Coordinate;
 
-pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, options: &SearchOptions) -> Vec<String> {
+pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
     let mut str_array = Vec::new();
     let mut offset = 0;
-    let chromosome_id = chr_tree.get_chromosome_id(&options.chromosome).unwrap_or(0);
+    let chromosome_id = chr_tree.get_chromosome_id(coord.get_chromosome()).unwrap_or(0);
 
     while offset < bytes.len() {
         if let Ok(bigbed_data) = BigbedData::from_bytes(&bytes[offset..], chr_tree) {
-            if bigbed_data.overlaps(chromosome_id, chromosome_id, options.begin, options.end) {
+            if bigbed_data.overlaps(chromosome_id, chromosome_id, coord.get_begin(), coord.get_end()) {
                 str_array.push(format!("{}", bigbed_data));
             }
             offset += bigbed_data.size;

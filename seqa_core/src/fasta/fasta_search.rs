@@ -18,7 +18,10 @@ use crate::api::search_options::SearchOptions;
 use crate::api::search_result::SearchResult;
 use crate::stores::StoreService;
 use crate::api::search_error::SearchError;
+use crate::coordinate::check_coords_for_length;
 use crate::fasta::fai::FaiIndex;
+
+const MAX_FASTA_SEARCH_SIZE: usize = 250_000_000;
 
 /// Searches for data in a FASTA file based on the provided search options.
 /// Returns a vector of strings containing the results.
@@ -33,11 +36,8 @@ pub async fn fasta_search(
 ) -> Result<SearchResult, SearchError> {
     let mut result = SearchResult::new();
 
-    if options.end - options.begin > 250_000_000 {
-        return Err(SearchError::InvalidRequest {
-            requested: format!("{}:{}-{}", options.chromosome, options.begin, options.end),
-            reason: "Maximum query size for fasta files 250MBases".to_string()
-        });
+    if let Err(e) = check_coords_for_length(&options.coordinates, MAX_FASTA_SEARCH_SIZE) {
+        return Err(e);
     }
 
     let index = match &options.fasta_index {
@@ -46,22 +46,24 @@ pub async fn fasta_search(
     };
     result.fasta_index = Some(index.clone());
 
-    let byte_range: Range<u64> = index.get_offsets(options)?;
+    let byte_ranges: Vec<Range<u64>> = index.get_offsets(&options.coordinates)?;
 
-    let bytes = store_service.get_range(&options.file_path, byte_range)
+    let bytes = store_service.get_ranges(&options.file_path, &byte_ranges)
         .await
         .map_err(|e| SearchError::ReadError {
             path: options.file_path.to_string(),
             source: e
         })?;
 
-    let line_string = String::from_utf8(bytes).map_err(|e| SearchError::ParseError {
-        path: options.file_path.to_string(),
-        source: ParsingError::StringParseError(e)
-    })?;
+    let lines =  bytes.iter().map(|chunk| {
+        let data = String::from_utf8(chunk.clone()).map_err(|e| SearchError::ParseError {
+            path: options.file_path.to_string(),
+            source: ParsingError::StringParseError(e)
+        })?;
 
-    result.lines = line_string.lines()
-        .map(|line| line.to_string())
-        .collect::<Vec<String>>();
+        Ok::<Vec<String>, SearchError>(data.split('\n').map(|s| s.to_string()).collect::<Vec<String>>())
+    }).collect::<Result<Vec<Vec<String>>, SearchError>>()?;
+    result.lines = lines.into_iter().flatten().collect();
+
     Ok(result)
 }

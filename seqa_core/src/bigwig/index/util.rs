@@ -1,4 +1,3 @@
-use crate::api::search_options::SearchOptions;
 use crate::bigwig::index::chr_tree::BigwigChrTree;
 use crate::bigwig::index::header::BigwigHeader;
 use crate::bigwig::index::r_tree::overlaps::Overlaps;
@@ -10,15 +9,16 @@ use crate::stores::StoreService;
 use std::ops::Range;
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
+use crate::coordinate::Coordinate;
 
-pub fn get_zoom_strings(bytes: Vec<u8>, chr_tree: &BigwigChrTree, options: &SearchOptions) -> Vec<String> {
+pub fn get_zoom_strings(bytes: Vec<u8>, chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
     let mut str_array = Vec::new();
     let mut offset = 0;
-    let chromosome_id = chr_tree.get_chromosome_id(&options.chromosome).unwrap_or(0);
+    let chromosome_id = chr_tree.get_chromosome_id(coord.get_chromosome()).unwrap_or(0);
 
     while offset + ZoomData::SIZE <= bytes.len() {
         if let Ok(zoom_data) = ZoomData::from_bytes(&bytes[offset..offset + ZoomData::SIZE], chr_tree) {
-            if zoom_data.overlaps(chromosome_id, chromosome_id, options.begin, options.end) {
+            if zoom_data.overlaps(chromosome_id, chromosome_id, coord.get_begin(), coord.get_end()) {
                 str_array.push(format!("{}", zoom_data));
             }
             offset += ZoomData::SIZE;

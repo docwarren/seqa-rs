@@ -16,8 +16,9 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-
+use crate::api::parsing_error::ParsingError;
 use crate::bam::read_utils::map_sequence_code;
+use crate::traits::from_bytes::FromBytes;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Seq {
@@ -25,10 +26,11 @@ pub struct Seq {
 }
 
 impl Seq {
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Seq { bytes }
+    pub fn new(bytes: &[u8]) -> Seq {
+        Seq {
+            bytes: bytes.to_vec()
+        }
     }
-
     pub fn as_string(&self) -> String {
         if self.bytes.is_empty() {
             return String::from("*");
@@ -51,6 +53,13 @@ impl Seq {
             i += 1;
         }
         result
+    }
+}
+
+impl FromBytes for Seq {
+    type Error = ParsingError;
+    fn from_bytes(bytes: &[u8], i: usize) -> Result<(Self, usize), ParsingError> {
+        Ok((Seq::new(bytes), bytes.len()))
     }
 }
 

@@ -15,7 +15,7 @@
 
 use crate::api::output_format::OutputFormat;
 use crate::api::parsing_error::ParsingError;
-use crate::api::search::{init_fetch_handles, join_fetch_handles};
+use crate::api::search::{fetch, join_fetched_data};
 use crate::api::search_error::SearchError;
 use crate::api::search_options::SearchOptions;
 use crate::api::search_result::SearchResult;
@@ -106,14 +106,14 @@ pub async fn tabix_search(
 
     let chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &options);
 
-    let chunk_handles = init_fetch_handles(store_service, &options, &chunks)
+    let chunk_handles = fetch(store_service, &options, &chunks)
         .await
         .map_err(|e| SearchError::ReadError {
             path: options.file_path.to_string(),
             source: e
         })?;
 
-    let raw_data = join_fetch_handles(chunk_handles)
+    let raw_data = join_fetched_data(chunk_handles)
         .await
         .map_err(|e| SearchError::CodecError {
             path: options.file_path.to_string(),

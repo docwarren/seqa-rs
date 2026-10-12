@@ -20,7 +20,7 @@ use std::fmt::Display;
 use crate::tabix::caller::Caller;
 use crate::traits::feature::Feature;
 
-use crate::models::coordinates::CoordinateSystem;
+use crate::models::coordinate_system::CoordinateSystem;
 use crate::tabix::variant_type::VariantType;
 
 /// A single record from a VCF (Variant Call Format) file.

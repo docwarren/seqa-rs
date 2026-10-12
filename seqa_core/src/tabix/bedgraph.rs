@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use std::fmt::Display;
-use crate::models::coordinates::CoordinateSystem;
+use crate::models::coordinate_system::CoordinateSystem;
 use crate::traits::feature::Feature;
 
 pub struct BedGraphLine {

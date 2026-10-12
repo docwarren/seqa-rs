@@ -12,10 +12,10 @@ pub enum ParsingError {
         reason: String
     },
 
-    #[error("Invalid line in file: {0}")]
+    #[error("Invalid format: {0}")]
     FormatError(String),
 
-    #[error("Insufficient bytes to read header")]
+    #[error("Insufficient bytes")]
     InsufficientBytes,
 
     #[error("Error parsing bytes to integer")]
@@ -24,7 +24,7 @@ pub enum ParsingError {
     #[error("Error parsing UTF8")]
     StringParseError (#[from] FromUtf8Error),
 
-    #[error("Error parsing coordinates: {0}")]
+    #[error("{0}")]
     ParseIntError(#[from] ParseIntError),
 
     #[error("Error parsing chunk")]

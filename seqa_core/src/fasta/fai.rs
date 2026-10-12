@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
 use crate::stores::StoreService;
-use crate::api::search_options::SearchOptions;
+use crate::coordinate::Coordinate;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Contig {
@@ -89,25 +89,31 @@ impl FaiIndex {
         Ok(fai_index)
     }
 
-    pub fn get_offsets(&self, options: &SearchOptions) -> Result<Range<u64>, SearchError> {
-        let contig = crate::genome::chromosome_aliases(&options.chromosome)
+    pub fn get_offsets(&self, coordinates: &[Coordinate]) -> Result<Vec<Range<u64>>, SearchError> {
+
+        coordinates.iter().map(|coord| {
+            let chr = coord.get_chromosome();
+            let begin = coord.get_begin();
+            let end = coord.get_end();
+
+            let contig = crate::genome::chromosome_aliases(chr)
             .iter()
             .find_map(|alias| self.contigs.get(alias))
             .ok_or(SearchError::InvalidRequest {
                 reason: "Contig not found".to_string(),
-                requested: options.chromosome.to_string()
+                requested: chr.to_string()
             })?;
+            if begin < 1 || end > contig.length as u32 {
+                return Err(SearchError::InvalidRequest {
+                    reason: "Invalid Coordinates".to_string(),
+                    requested: format!("{}", coord)
+                });
+            }
+            let start = Self::get_offset(begin, contig);
+            let end = Self::get_offset(end, contig);
 
-        if options.begin < 1 || options.end > contig.length as u32 {
-            return Err(SearchError::InvalidRequest {
-                reason: "Invalid Coordinates".to_string(),
-                requested: format!("{}:{}-{}", options.chromosome, options.begin, options.end)
-            });
-        }
-        let start = Self::get_offset(options.begin, contig);
-        let end = Self::get_offset(options.end, contig);
-
-        Ok(start..end)
+            Ok(start..end)
+        }).collect()
     }
 
     pub fn get_offset(position: u32, contig: &Contig) -> u64 {

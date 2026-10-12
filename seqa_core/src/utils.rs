@@ -264,27 +264,35 @@ fn test_parse_coordinates() {
 fn test_get_search_options_local() {
     use crate::api::search_options::SearchOptions;
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let options = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", "chr1:1000-2000");
-    assert_eq!(
-        options.file_path,
-        format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", manifest_dir)
-    );
-    assert_eq!(options.chromosome, "chr1");
-    assert_eq!(options.begin, 1000);
-    assert_eq!(options.end, 2000);
-    assert_eq!(
-        options.index_path,
-        format!(
-            "file://{}/mock_data/NA12878.gatk.cnv.vcf.gz.tbi",
-            manifest_dir
-        )
-    );
-    assert_eq!(options.output_format, OutputFormat::VCF);
+    if let Ok(options) = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", vec!("chr1:1000-2000")) {
+        assert_eq!(
+            options.file_path,
+            format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", manifest_dir)
+        );
+        assert_eq!(options.coordinates[0].get_chromosome(), "chr1");
+        assert_eq!(options.coordinates[0].get_begin(), 1000);
+        assert_eq!(options.coordinates[0].get_end(), 2000);
+        assert_eq!(
+            options.index_path,
+            format!(
+                "file://{}/mock_data/NA12878.gatk.cnv.vcf.gz.tbi",
+                manifest_dir
+            )
+        );
+        assert_eq!(options.output_format, OutputFormat::VCF);
+    }
+    else {
+        assert!(false);
+    }
 
-    let options = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", "chr1");
-    assert_eq!(options.chromosome, "chr1");
-    assert_eq!(options.begin, 1);
-    assert_eq!(options.end, 249_250_621); // Assuming chr1 length from longest_possible_genome
+    if let Ok(options) = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", vec!("chr1")) {
+        assert_eq!(options.coordinates[0].get_chromosome(), "chr1");
+        assert_eq!(options.coordinates[0].get_begin(), 1);
+        assert_eq!(options.coordinates[0].get_end(), 249_250_621); // Assuming chr1 length from longest_possible_genome
+    }
+    else {
+        assert!(false);
+    }
 }
 
 #[test]

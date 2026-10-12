@@ -10,6 +10,7 @@ use crate::bigwig::index::zoom_header::ZoomHeader;
 use crate::indexes::constants::DEFAULT_ZOOM_PIXELS;
 use crate::stores::StoreService;
 use crate::api::search_error::SearchError;
+use crate::coordinate::Coordinate;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BigwigIndex {
@@ -60,8 +61,8 @@ impl BigwigIndex {
         })
     }
 
-    pub fn get_zoom_header(&self, options: &SearchOptions) -> Option<&ZoomHeader> {
-        let reduction_level = (options.end as f32 - options.begin as f32) / DEFAULT_ZOOM_PIXELS;
+    pub fn get_zoom_header(&self, coords: &Coordinate) -> Option<&ZoomHeader> {
+        let reduction_level = (coords.get_length() as f32) / DEFAULT_ZOOM_PIXELS;
         self.zoom_headers.iter().find(|zoom| zoom.matches(reduction_level))
     }
 

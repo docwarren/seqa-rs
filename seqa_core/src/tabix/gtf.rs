@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::models::coordinates::CoordinateSystem;
+use crate::models::coordinate_system::CoordinateSystem;
 
 pub struct GtfLine {
     pub chromosome: String,
