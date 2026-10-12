@@ -58,7 +58,7 @@ impl Seq {
 
 impl FromBytes for Seq {
     type Error = ParsingError;
-    fn from_bytes(bytes: &[u8], i: usize) -> Result<(Self, usize), ParsingError> {
+    fn from_bytes(bytes: &[u8], _: usize) -> Result<(Self, usize), ParsingError> {
         Ok((Seq::new(bytes), bytes.len()))
     }
 }
