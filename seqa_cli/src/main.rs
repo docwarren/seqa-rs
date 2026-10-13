@@ -12,16 +12,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::io::{self, Write};
-use log::error;
+use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use anyhow::{bail, Result, Context};
-use seqa_core::api::search_options::SearchOptions;
-use seqa_core::sqlite::{self, genes::{self}};
-use seqa_core::stores::StoreService;
+use log::error;
 use seqa_core::api::search::search_features;
 use seqa_core::api::search_error::SearchError;
+use seqa_core::api::search_options::SearchOptions;
 use seqa_core::sqlite::genes::GeneError;
+use seqa_core::sqlite::{
+    self,
+    genes::{self},
+};
+use seqa_core::stores::StoreService;
+use std::io::{self, Write};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -102,7 +105,7 @@ enum GeneCommands {
 }
 
 #[tokio::main]
-async fn main() -> Result<()>{
+async fn main() -> Result<()> {
     env_logger::init();
 
     let cli = Cli::parse();
@@ -116,17 +119,20 @@ async fn main() -> Result<()>{
             only_header,
             no_cache,
         } => {
-
             // Validate reference genome if provided
             if let Some(ref genome) = reference {
                 let genome_lower = genome.to_lowercase();
                 if genome_lower != "hg38" && genome_lower != "hg19" {
-                    error!("Error: Invalid reference genome '{}'. Allowed values: hg38, hg19", genome);
+                    error!(
+                        "Error: Invalid reference genome '{}'. Allowed values: hg38, hg19",
+                        genome
+                    );
                     std::process::exit(1);
                 }
             }
 
-            let mut options = SearchOptions::new(&file, &coordinates);
+            let mut options =
+                SearchOptions::new(&file, vec![&coordinates]).expect("Invalid coordinates");
 
             // Set genome before coordinates so set_coordinates can use it
             if let Some(ref genome) = reference {
@@ -151,7 +157,7 @@ async fn main() -> Result<()>{
                 Ok(lines) => {
                     let result = print_output(&lines);
                     match result {
-                        Ok(_) => {Ok(())}
+                        Ok(_) => Ok(()),
                         Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
                             bail!("Broken pipe! {:?}", e);
                         }
@@ -174,7 +180,10 @@ fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
         GeneCommands::Coordinates { gene, reference } => {
             let conn = sqlite::connect_genes(&reference)?;
             let coord = genes::get_gene_coordinates(&conn, &gene)?;
-            println!("{}\t{}\t{}\t{}", coord.gene, coord.chr, coord.begin, coord.end);
+            println!(
+                "{}\t{}\t{}\t{}",
+                coord.gene, coord.chr, coord.begin, coord.end
+            );
         }
         GeneCommands::Symbols { reference } => {
             let conn = sqlite::connect_genes(&reference)?;
@@ -186,12 +195,21 @@ fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
                 }
             }
         }
-        GeneCommands::Cytobands { chromosome, reference } => {
+        GeneCommands::Cytobands {
+            chromosome,
+            reference,
+        } => {
             let conn = sqlite::connect_cytobands(&reference)?;
             let stdout = io::stdout();
             let mut handle = stdout.lock();
             for c in genes::get_cytobands(&conn, &chromosome)? {
-                if writeln!(handle, "{}\t{}\t{}\t{}\t{}", c.chromosome, c.begin, c.end, c.name, c.stain).is_err() {
+                if writeln!(
+                    handle,
+                    "{}\t{}\t{}\t{}\t{}",
+                    c.chromosome, c.begin, c.end, c.name, c.stain
+                )
+                .is_err()
+                {
                     break;
                 }
             }

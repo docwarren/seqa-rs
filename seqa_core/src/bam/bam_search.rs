@@ -19,28 +19,37 @@ use crate::api::search_result::SearchResult;
 use crate::bam::bai::BaiIndex;
 use crate::bam::header::header::BamHeader;
 use crate::bam::read::Read;
-use crate::coordinate::{check_coords_for_length, Coordinate};
+use crate::coordinate::{Coordinate, check_coords_for_length};
 use crate::indexes::bin_util::get_bin_numbers;
 use crate::stores::StoreService;
+use crate::traits::feature::Feature;
 use crate::traits::from_bytes::FromBytes;
 use crate::traits::sam_index::SamIndex;
 
-const MAX_BAM_SEARCH_SIZE: usize = 200_000;
+const MAX_BAM_SEARCH_SIZE: usize = 200_001;
 
-fn read_lines(data: &[u8], coordinate: &Coordinate, cigar_format: &CigarFormat) -> Result<Vec<String>, SearchError> {
+fn read_lines(
+    data: &[u8],
+    coordinate: &Coordinate,
+    cigar_format: &CigarFormat,
+    bam_header: &BamHeader,
+) -> Result<Vec<String>, SearchError> {
     let mut lines = Vec::new();
     let mut i = 0;
     let use_merged_cigar = *cigar_format == CigarFormat::Merged;
     while let Ok(read_line_result) = Read::from_bytes(&data[i..]) {
         let read_line = read_line_result.0;
         let j = read_line_result.1;
-        if read_line.pos > coordinate.get_end() as i32 {
+        if read_line.pos >= coordinate.get_end() as i32 {
             break; // Stop processing if the position exceeds the end of the search range
-        } else if read_line.get_end() < (coordinate.get_begin()) {
+        } else if !read_line
+            .coordinate()
+            .overlaps_ignore_chromosome(&coordinate)
+        {
             i += j; // Skip this read if it is before the start of the search range
             continue;
         } else {
-            lines.push(read_line.to_sam_string(use_merged_cigar));
+            lines.push(read_line.to_sam_string(use_merged_cigar, bam_header));
         }
         i += j;
     }
@@ -52,10 +61,11 @@ pub fn data_to_lines(
     data: &[Vec<u8>],
     coordinate: &[Coordinate],
     cigar_format: &CigarFormat,
+    bam_header: &BamHeader,
 ) -> Result<Vec<String>, SearchError> {
     let mut lines = Vec::new();
     for (idx, coord) in coordinate.iter().enumerate() {
-        match read_lines(&data[idx], coord, cigar_format) {
+        match read_lines(&data[idx], coord, cigar_format, bam_header) {
             Ok(l) => lines.push(l),
             Err(err) => return Err(err),
         }
@@ -73,7 +83,9 @@ pub async fn bam_search(
     store_service: &StoreService,
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
-    if let Err(e) = check_coords_for_length(&options.coordinates, MAX_BAM_SEARCH_SIZE) {
+    let coordinates = options.coordinates.clone();
+
+    if let Err(e) = check_coords_for_length(&coordinates, MAX_BAM_SEARCH_SIZE) {
         return Err(e);
     }
 
@@ -81,13 +93,15 @@ pub async fn bam_search(
 
     let bai = match &options.bam_index {
         Some(index) => index,
-        None => &BaiIndex::from_file(store_service, &options.index_path, options.no_cache).await?
+        None => &BaiIndex::from_file(store_service, &options.index_path, options.no_cache).await?,
     };
 
     let first_feature_offset = bai.get_first_feature_offset().await;
     let bam_header = match &options.bam_header {
         Some(header) => header,
-        None => &BamHeader::from_file(store_service, &options.file_path, first_feature_offset).await?
+        None => {
+            &BamHeader::from_file(store_service, &options.file_path, first_feature_offset).await?
+        }
     };
 
     result.bam_index = Some(bai.clone());
@@ -104,19 +118,19 @@ pub async fn bam_search(
         Vec::new()
     };
 
-    let mut chunks = Vec::with_capacity(options.coordinates.len());
+    let mut chunks = Vec::with_capacity(coordinates.len());
 
-    for (idx, coord) in options.coordinates.iter().enumerate() {
+    for coord in &coordinates {
         let bin_numbers = get_bin_numbers(&coord);
         let chr_i = bam_header
             .get_chromosome_index_by_name(&coord.get_chromosome())
             .ok_or_else(|| SearchError::InvalidRequest {
                 requested: coord.get_chromosome().to_string(),
-                reason: "Chromosome not found in index".to_string()
+                reason: "Chromosome not found in index".to_string(),
             })?;
 
         let chr_idx = &bai.references[chr_i];
-        chunks[idx] = (bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord));
+        chunks.push(bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord));
     }
 
     let flat_chunks = chunks.concat();
@@ -124,17 +138,18 @@ pub async fn bam_search(
         .await
         .map_err(|e| SearchError::ReadError {
             path: options.file_path.to_string(),
-            source: e
+            source: e,
         })?;
 
-    let raw_data = inflate(&flat_chunks, &compressed)
-        .await
-        .map_err(|e| SearchError::CodecError {
-            path: options.file_path.to_string(),
-            source: e
-        })?;
+    let raw_data =
+        inflate(&flat_chunks, &compressed)
+            .await
+            .map_err(|e| SearchError::CodecError {
+                path: options.file_path.to_string(),
+                source: e,
+            })?;
 
-    let lines = data_to_lines(&raw_data, &options.coordinates, &options.cigar_format)?;
+    let lines = data_to_lines(&raw_data, &coordinates, &options.cigar_format, &bam_header)?;
     start_lines.extend(lines);
     result.lines = start_lines;
     Ok(result)

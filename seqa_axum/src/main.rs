@@ -13,28 +13,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
+use crate::cache::AppCache;
+use crate::search::models::SearchRequest;
 use axum::{
     Json, Router,
     extract::{Path, Request, State, rejection::JsonRejection},
-    http::{Method, StatusCode, header, Uri},
+    http::{Method, StatusCode, Uri, header},
     response::{Html, IntoResponse},
     routing::{get, post},
 };
-use thiserror::Error;
-use serde::{Deserialize, Serialize};
 use seqa_core::api::output_format::OutputFormat;
+use seqa_core::api::search::search_features;
 use seqa_core::api::search_options::SearchOptions;
 use seqa_core::models::cytoband::Cytoband;
 use seqa_core::models::gene_coordinate::GeneCoordinate;
 use seqa_core::sqlite::{self, genes};
-use seqa_core::stores::buckets::{list_buckets as list_cloud_buckets, CloudBackend};
+use seqa_core::stores::buckets::{CloudBackend, list_buckets as list_cloud_buckets};
 use seqa_core::stores::{DirectoryEntry, StoreService};
-use seqa_core::utils::{supported_formats, FileFormat};
+use seqa_core::utils::{FileFormat, supported_formats};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use thiserror::Error;
 use tower_http::cors::CorsLayer;
-use seqa_core::api::search::search_features;
-use crate::cache::AppCache;
-use crate::search::models::SearchRequest;
 
 pub mod cache;
 pub mod search;
@@ -97,8 +97,8 @@ async fn feature_search(
     State(state): State<AppState>,
     payload: Result<Json<SearchRequest>, JsonRejection>,
 ) -> Result<String, ApiError> {
-    let Json(request) = payload
-        .map_err(|e| ApiError::BadRequest(format!("Invalid JSON payload: {}", e)))?;
+    let Json(request) =
+        payload.map_err(|e| ApiError::BadRequest(format!("Invalid JSON payload: {}", e)))?;
 
     if !request.path.ends_with(".bam")
         && !request.path.ends_with(".vcf.gz")
@@ -115,16 +115,16 @@ async fn feature_search(
         return Err(ApiError::BadRequest("Unsupported file type".to_string()));
     }
     if request.coordinates.is_empty() {
-        return Err(ApiError::BadRequest("Empty coordinate string".to_string()))
+        return Err(ApiError::BadRequest("Empty coordinate string".to_string()));
     }
 
-    let mut search_options = SearchOptions::new(&request.path, &request.coordinates);
+    let mut search_options = SearchOptions::new(&request.path, vec![&request.coordinates])
+        .map_err(|e| ApiError::BadRequest(format!("Invalid coordinates: {}", e)))?;
+
     populate_from_cache(&state.cache, &mut search_options).await;
     let result = search_features(&state.store, &search_options)
         .await
-        .map_err(|e|
-            ApiError::InternalError(format!("Search Failed: {:?}", e.to_string()))
-        )?;
+        .map_err(|e| ApiError::InternalError(format!("Search Failed: {:?}", e.to_string())))?;
     write_back_to_cache(&state.cache, &search_options, &result).await;
 
     Ok(result.lines.into_iter().collect::<Vec<String>>().join("\n"))
@@ -157,19 +157,34 @@ async fn write_back_to_cache(
     result: &seqa_core::api::search_result::SearchResult,
 ) {
     if let Some(bai) = &result.bam_index {
-        cache.bai.insert(options.index_path.clone(), bai.clone()).await;
+        cache
+            .bai
+            .insert(options.index_path.clone(), bai.clone())
+            .await;
     }
     if let Some(header) = &result.bam_header {
-        cache.bam_header.insert(options.file_path.clone(), header.clone()).await;
+        cache
+            .bam_header
+            .insert(options.file_path.clone(), header.clone())
+            .await;
     }
     if let Some(tabix) = &result.tabix_index {
-        cache.tabix.insert(options.index_path.clone(), tabix.clone()).await;
+        cache
+            .tabix
+            .insert(options.index_path.clone(), tabix.clone())
+            .await;
     }
     if let Some(header) = &result.tabix_header {
-        cache.tabix_header.insert(options.file_path.clone(), header.clone()).await;
+        cache
+            .tabix_header
+            .insert(options.file_path.clone(), header.clone())
+            .await;
     }
     if let Some(fai) = &result.fasta_index {
-        cache.fai.insert(options.index_path.clone(), fai.clone()).await;
+        cache
+            .fai
+            .insert(options.index_path.clone(), fai.clone())
+            .await;
     }
 }
 
@@ -210,8 +225,9 @@ async fn get_coordinates(
 ) -> Result<Json<GeneCoordinate>, ApiError> {
     let connection = sqlite::connect_genes(&genome)
         .map_err(|e| ApiError::InternalError(format!("Error connecting to DB: {}", e)))?;
-    let coord = genes::get_gene_coordinates(&connection, &gene)
-        .map_err(|e| ApiError::InternalError(format!("Error fetching gene coordinates from DB: {}", e)))?;
+    let coord = genes::get_gene_coordinates(&connection, &gene).map_err(|e| {
+        ApiError::InternalError(format!("Error fetching gene coordinates from DB: {}", e))
+    })?;
     Ok(Json(coord))
 }
 
@@ -236,8 +252,8 @@ async fn list_directory(
     State(state): State<AppState>,
     payload: Result<Json<ListDirectoryRequest>, JsonRejection>,
 ) -> Result<Json<Vec<DirectoryEntry>>, ApiError> {
-    let Json(request) = payload
-        .map_err(|e| ApiError::BadRequest(format!("Invalid JSON payload: {}", e)))?;
+    let Json(request) =
+        payload.map_err(|e| ApiError::BadRequest(format!("Invalid JSON payload: {}", e)))?;
 
     if is_local_uri(&request.uri) {
         return Err(ApiError::BadRequest(
@@ -262,8 +278,8 @@ fn is_local_uri(uri: &str) -> bool {
 }
 
 async fn list_buckets(Path(backend): Path<String>) -> Result<Json<Vec<String>>, ApiError> {
-    let backend = CloudBackend::from_id(&backend)
-        .map_err(|e| ApiError::BadRequest(format!("{}", e)))?;
+    let backend =
+        CloudBackend::from_id(&backend).map_err(|e| ApiError::BadRequest(format!("{}", e)))?;
 
     let buckets = list_cloud_buckets(backend)
         .await
@@ -421,11 +437,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_files_s3() {
-        let req = json_request(
-            "POST",
-            "/files",
-            r#""s3://com.gmail.docarw/test_data/""#,
-        );
+        let req = json_request("POST", "/files", r#""s3://com.gmail.docarw/test_data/""#);
         let response = app().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let body = body_string(response).await;

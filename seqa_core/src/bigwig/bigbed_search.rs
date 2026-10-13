@@ -1,4 +1,3 @@
-use crate::api::search_error::SearchError;
 // Copyright 2026 Seqa23
 //
 // Author: Andrew Warren
@@ -13,29 +12,38 @@ use crate::api::search_error::SearchError;
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use crate::api::search_error::SearchError;
 use crate::api::search_options::SearchOptions;
 use crate::api::search_result::SearchResult;
 use crate::bigwig::bigbed_data::BigbedData;
+use crate::bigwig::bigwig_search::{decompress_data, get_bw_chromosome_id, get_range_from_leaves};
 use crate::bigwig::index::bigwig_index::BigwigIndex;
 use crate::bigwig::index::chr_tree::BigwigChrTree;
 use crate::bigwig::index::r_tree::RTree;
 use crate::bigwig::index::r_tree::overlaps::Overlaps;
+use crate::bigwig::index::r_tree::r_tree_leaf::RTreeLeaf;
 use crate::bigwig::index::util::get_zoom_strings;
 use crate::bigwig::index::zoom_header::ZoomHeader;
 use crate::bigwig::zoom_data::ZoomData;
-use crate::codecs::decompress_auto;
-use crate::stores::StoreService;
-use crate::bigwig::bigwig_search::get_range_from_leaves;
 use crate::coordinate::Coordinate;
+use crate::stores::StoreService;
+use std::ops::Range;
 
 pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
     let mut str_array = Vec::new();
     let mut offset = 0;
-    let chromosome_id = chr_tree.get_chromosome_id(coord.get_chromosome()).unwrap_or(0);
+    let chromosome_id = chr_tree
+        .get_chromosome_id(coord.get_chromosome())
+        .unwrap_or(0);
 
     while offset < bytes.len() {
         if let Ok(bigbed_data) = BigbedData::from_bytes(&bytes[offset..], chr_tree) {
-            if bigbed_data.overlaps(chromosome_id, chromosome_id, coord.get_begin(), coord.get_end()) {
+            if bigbed_data.overlaps(
+                chromosome_id,
+                chromosome_id,
+                coord.get_begin(),
+                coord.get_end(),
+            ) {
                 str_array.push(format!("{}", bigbed_data));
             }
             offset += bigbed_data.size;
@@ -48,25 +56,30 @@ pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordina
 }
 
 /// Converts raw data bytes into a vector of strings
-pub fn data_to_lines(
-    bytes: Vec<Vec<u8>>,
-    is_zoom: bool,
+fn data_to_lines(
+    bytes: &[Vec<u8>],
     chr_tree: &BigwigChrTree,
-    options: &SearchOptions,
-) -> Result<Vec<String>, SearchError> {
-    let mut str_array: Vec<String> = if options.include_header {
+    coordinate: &Coordinate,
+    is_zoom: bool,
+    include_header: bool,
+) -> Vec<String> {
+    let mut str_array: Vec<String> = if include_header {
         if is_zoom {
-            vec![ZoomData::COLUMNS
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .join("\t")]
+            vec![
+                ZoomData::COLUMNS
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\t"),
+            ]
         } else {
-            vec![BigbedData::COLUMNS
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .join("\t")]
+            vec![
+                BigbedData::COLUMNS
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\t"),
+            ]
         }
     } else {
         Vec::new()
@@ -74,13 +87,13 @@ pub fn data_to_lines(
 
     for block in bytes {
         let strings = if is_zoom {
-            get_zoom_strings(block, chr_tree, options)
+            get_zoom_strings(&block, chr_tree, coordinate)
         } else {
-            get_data_strings(&block, chr_tree, options)
+            get_data_strings(&block, chr_tree, coordinate)
         };
         str_array.extend(strings);
     }
-    Ok(str_array)
+    str_array
 }
 
 /// Searches for data in a BigBed file based on the provided search options.
@@ -91,67 +104,69 @@ pub async fn bigbed_search(
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
     let mut result = SearchResult::new();
+    let coordinates = options.coordinates.clone();
 
     // Reuse BigwigIndex since the index structure is identical
     let index = match &options.bigbed_index {
         Some(index) => index,
         _ => &BigwigIndex::new(store_service, &options.file_path).await?,
     };
+    let is_compressed = index.header.is_compressed();
     result.bigbed_index = Some(index.clone());
 
-    let zoom_header = index.get_zoom_header(options);
-    let is_compressed = index.header.is_compressed();
+    let mut ranges: Vec<Range<u64>> = Vec::with_capacity(coordinates.len());
+    let mut leaves: Vec<Vec<RTreeLeaf>> = Vec::with_capacity(coordinates.len());
+    let mut zoom_headers: Vec<Option<&ZoomHeader>> = Vec::with_capacity(coordinates.len());
 
-    let chr_id = match index.chromosome_tree.get_chromosome_id(&options.chromosome) {
-        Some(id) => id,
-        _ => {
-            return Err(SearchError::InvalidRequest {
-                requested: options.chromosome.to_string(),
-                reason: "Chromosome not found in index".to_string()
-            });
+    for coord in &coordinates {
+        let zoom_header = index.get_zoom_header(&coord);
+        let chr_id = get_bw_chromosome_id(&index, &coord)?;
+        let index_offset = get_index_begin(index, zoom_header);
+        let index_end = get_index_end(store_service, index, zoom_header).await?;
+        let r_tree =
+            RTree::from_file(store_service, &options.file_path, index_offset..index_end).await?;
+        let leaves_instance = r_tree.get_overlapping_leaves(chr_id, &coord);
+        let range = get_range_from_leaves(&leaves_instance);
+        ranges.push(range);
+        leaves.push(leaves_instance);
+        zoom_headers.push(zoom_header);
+    }
+
+    let data = index
+        .get_data(store_service, &ranges, &options.file_path)
+        .await?;
+
+    let mut decompressed_data: Vec<Vec<Vec<u8>>> = Vec::new();
+
+    for i in 0..coordinates.len() {
+        if leaves[i].is_empty() {
+            decompressed_data.push(vec![]);
+            continue;
         }
-    };
-
-    let index_offset = get_index_begin(index, zoom_header);
-    let index_end = get_index_end(store_service, index, zoom_header).await?;
-    let r_tree = RTree::from_file(store_service, &options.file_path, index_offset..index_end).await?;
-    let leaves = r_tree.get_overlapping_leaves(chr_id, options.begin, options.end);
-
-    if leaves.is_empty() {
-        return Ok(result);
+        let decompressed = decompress_data(&data[i], &leaves[i], &ranges[i], is_compressed)
+            .map_err(|e| SearchError::CodecError {
+                path: options.file_path.to_string(),
+                source: e,
+            })?;
+        decompressed_data.push(decompressed);
     }
-
-    let range = get_range_from_leaves(&leaves);
-    let data = index.get_data(store_service, &range, &options.file_path).await?;
-    let mut decompressed_blocks: Vec<Vec<u8>> = Vec::new();
-
-    for leaf in leaves {
-        let begin = (leaf.data_offset - range.start) as usize;
-        let end = begin + leaf.data_size as usize;
-        let compressed = data[begin..end].to_vec();
-        if is_compressed {
-            match decompress_auto(&compressed) {
-                Ok(decompressed) => decompressed_blocks.push(decompressed),
-                Err(_e) => {
-                    continue;
-                }
-            }
-        } else {
-            decompressed_blocks.push(compressed);
-        };
+    let mut lines: Vec<Vec<String>> = Vec::new();
+    for (i, coord) in coordinates.iter().enumerate() {
+        let is_zoom = zoom_headers[i].is_some();
+        let blocks = &decompressed_data[i];
+        lines.push(data_to_lines(
+            &blocks,
+            &index.chromosome_tree,
+            &coord,
+            is_zoom,
+            options.include_header,
+        ));
     }
-
-    let is_zoom = zoom_header.is_some();
-
-    result.lines = data_to_lines(decompressed_blocks, is_zoom, &index.chromosome_tree, options)?;
-
+    result.lines = lines.concat();
     Ok(result)
 }
 
-fn get_index_begin(
-    index: &BigwigIndex,
-    zoom_header: Option<&ZoomHeader>,
-) -> u64 {
+fn get_index_begin(index: &BigwigIndex, zoom_header: Option<&ZoomHeader>) -> u64 {
     match zoom_header {
         Some(zoom_header) => zoom_header.index_offset,
         None => index.header.full_index_offset,
@@ -167,6 +182,10 @@ async fn get_index_end(
         Some(zoom_header) => Ok(index
             .get_end_for_zoom_header(store_service, zoom_header, &index.file_path)
             .await?),
-        None => index.get_full_index_end(store_service, &index.file_path).await,
+        None => {
+            index
+                .get_full_index_end(store_service, &index.file_path)
+                .await
+        }
     }
 }

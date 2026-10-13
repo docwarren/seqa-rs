@@ -26,17 +26,16 @@ use crate::codecs::bgzip;
 use crate::codecs::codec_error::CodecError;
 use crate::fasta::fasta_search::fasta_search;
 use crate::indexes::chunk::Chunk;
-use crate::stores::error::StoreError;
 use crate::stores::StoreService;
+use crate::stores::error::StoreError;
 use crate::tabix::tabix_search::tabix_search;
 
 pub async fn chunk_to_stream(
     chunk: &Chunk,
     store: &dyn ObjectStore,
     path: &object_store::path::Path,
-
-) -> Result<impl futures::Stream<Item = Result<Vec<u8>, object_store::Error>>, object_store::Error> {
-
+) -> Result<impl futures::Stream<Item = Result<Vec<u8>, object_store::Error>>, object_store::Error>
+{
     let range = chunk.to_range();
 
     let get_opts = object_store::GetOptions {
@@ -67,10 +66,7 @@ pub async fn fetch(
 }
 
 /// Decompresses each fetched chunk and returns the post-offset data.
-pub async fn inflate(
-    chunks: &[Chunk],
-    fetched: &Vec<Vec<u8>>,
-) -> Result<Vec<Vec<u8>>, CodecError> {
+pub async fn inflate(chunks: &[Chunk], fetched: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, CodecError> {
     let mut raw_data = Vec::new();
 
     for i in 0..chunks.len() {
@@ -104,7 +100,9 @@ pub async fn search_features(
         | OutputFormat::GFF
         | OutputFormat::GTF => tabix_search(store, options).await,
         OutputFormat::FASTA => fasta_search(store, options).await,
-        _ => Err(SearchError::UnsupportedFileFormat(options.file_path.to_string())),
+        _ => Err(SearchError::UnsupportedFileFormat(
+            options.file_path.to_string(),
+        )),
     };
 
     result

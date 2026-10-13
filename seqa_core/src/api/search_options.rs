@@ -48,9 +48,10 @@ pub enum CigarFormat {
 /// ```rust
 /// use seqa_core::api::search_options::SearchOptions;
 ///
-/// let opts = SearchOptions::new("s3://my-bucket/sample.bam", "chr1")
+/// let opts = SearchOptions::new("s3://my-bucket/sample.bam", vec!["chr1"])
+///     .unwrap()
 ///     .set_index_path("s3://my-bucket/sample.bam.bai")
-///     .set_output_format("bam")
+///     .set_output_format("bam");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchOptions {
@@ -105,11 +106,13 @@ impl SearchOptions {
     pub fn new(path: &str, coord_strings: Vec<&str>) -> Result<Self, ParsingError> {
         let system = CoordinateSystem::OneBasedClosed;
         let file_path = crate::utils::format_file_path(path).unwrap_or_else(|_| path.to_string());
-        let index_path = crate::utils::get_index_path(&file_path).unwrap_or_else(|_| file_path.clone());
+        let index_path =
+            crate::utils::get_index_path(&file_path).unwrap_or_else(|_| file_path.clone());
         let output_format = get_output_format(&file_path).unwrap_or(OutputFormat::STRING);
-        let coordinates = coord_strings.iter().map(|c| {
-            Coordinate::new(*c, system)
-        }).collect::<Result<Vec<Coordinate>, ParsingError>>()?;
+        let coordinates = coord_strings
+            .iter()
+            .map(|c| Coordinate::new(*c, system))
+            .collect::<Result<Vec<Coordinate>, ParsingError>>()?;
         Ok(SearchOptions {
             file_path,
             index_path,
@@ -126,7 +129,7 @@ impl SearchOptions {
             bam_index: None,
             tabix_index: None,
             tabix_header: None,
-            fasta_index: None
+            fasta_index: None,
         })
     }
 
@@ -156,6 +159,15 @@ impl SearchOptions {
         self.clone()
     }
 
+    /// Sets the reference genome build (stored in lowercase).
+    ///
+    /// Supported values: `"hg19"`, `"hg38"`, `"grch37"`, `"grch38"`.
+    /// Used by [`SearchOptions::set_coordinates`] to resolve chromosome lengths.
+    pub fn set_genome(&mut self, genome: &str) -> Self {
+        self.genome = Some(genome.to_lowercase());
+        self.clone()
+    }
+
     /// When `true`, only header lines are returned and data records are skipped.
     pub fn set_header_only(&mut self, header_only: bool) -> Self {
         self.header_only = header_only;
@@ -167,13 +179,18 @@ impl SearchOptions {
         self.no_cache = no_cache;
         self.clone()
     }
-
 }
 
 impl Display for SearchOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for c in self.coordinates.iter() {
-            write!(f, "{}:{}-{}\n", c.get_chromosome(), c.get_begin(), c.get_end())?;
+            write!(
+                f,
+                "{}:{}-{}\n",
+                c.get_chromosome(),
+                c.get_begin(),
+                c.get_end()
+            )?;
         }
         Ok(())
     }

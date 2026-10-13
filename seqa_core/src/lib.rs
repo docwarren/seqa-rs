@@ -17,7 +17,7 @@
 //!
 //! Core library for querying genomic files across cloud and local storage backends.
 //!
-//! Soma supports BAM, VCF, GFF, GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats,
+//! Seqa supports BAM, VCF, GFF, GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats,
 //! with automatic index resolution and cloud-agnostic file access via [`object_store`].
 //!
 //! ## Quick start
@@ -31,8 +31,8 @@
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let opts = SearchOptions::new(
 //!         "s3://my-bucket/sample.bam",
-//!         "chr1:100000-200000",
-//!     );
+//!         vec!["chr1:100000-200000"],
+//!     )?;
 //!
 //!     let store_service = StoreService::new();
 //!     let result = search_features(&store_service, &opts).await?;
@@ -45,9 +45,16 @@
 //!
 //! ## Coordinate system
 //!
-//! All coordinates are stored internally in **0-based half-open** `[begin, end)` form.
-//! Use [`models::coordinate_system::CoordinateSystem`] conversions when working with VCF/GFF/GTF
-//! data, which natively use 1-based closed coordinates.
+//! All coordinates are stored with their coordinate system and can be compared without
+//! concern for the coordinate system. e.g.
+//! ```rust,no_run
+//! use seqa_core::coordinate::Coordinate;
+//! use seqa_core::models::coordinate_system::CoordinateSystem;
+//!
+//! let coord1 = Coordinate::new("chr1:1-10", CoordinateSystem::OneBasedClosed).unwrap();
+//! let coord2 = Coordinate::new("1:10-100", CoordinateSystem::ZeroBasedHalfOpen).unwrap();
+//! assert!(!coord1.overlaps(&coord2))
+//! ```
 //!
 //! ## Storage backends
 //!
@@ -74,8 +81,8 @@ pub mod utils;
 
 pub mod bam;
 pub mod bigwig;
+pub mod coordinate;
 pub mod fasta;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 pub mod tabix;
-pub mod coordinate;

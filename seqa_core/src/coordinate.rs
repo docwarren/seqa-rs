@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt::Display;
-use serde::{Deserialize, Serialize};
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
 use crate::models::coordinate_system::CoordinateSystem;
 use crate::utils::parse_coordinates;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 /// Test each coordinate to ensure it doesnt request too much data
 pub fn check_coords_for_length(coords: &Vec<Coordinate>, len: usize) -> Result<(), SearchError> {
@@ -26,7 +26,11 @@ pub fn check_coords_for_length(coords: &Vec<Coordinate>, len: usize) -> Result<(
         if coord.get_length() as usize > len {
             return Err(SearchError::InvalidRequest {
                 requested: format!("{}", coord),
-                reason: "Maximum query size for fasta files 250MBases".to_string()
+                reason: format!(
+                    "Maximum query size exceeded: coords length: {}, max length: {}",
+                    coord.get_length(),
+                    len
+                ),
             });
         }
     }
@@ -58,13 +62,13 @@ impl Display for Coordinate {
 /// convert everything to **0-based half-open** coordinates before comparing.
 impl Coordinate {
     pub fn new(coord_str: &str, system: CoordinateSystem) -> Result<Coordinate, ParsingError> {
-        let result = parse_coordinates(coord_str)
-            .map_err(|e| ParsingError::FormatError(format!("{e}")))?;
+        let result =
+            parse_coordinates(coord_str).map_err(|e| ParsingError::FormatError(format!("{e}")))?;
         Ok(Coordinate {
             chromosome: result.0,
             begin: result.1,
             end: result.2,
-            system
+            system,
         })
     }
     /// Returns the chromosome/contig name (e.g. `"chr1"` or `"1"`).
@@ -83,7 +87,7 @@ impl Coordinate {
     pub fn get_length(&self) -> u32 {
         match self.system {
             CoordinateSystem::OneBasedClosed => (self.end - self.begin) + 1,
-            CoordinateSystem::ZeroBasedHalfOpen => self.end - self.begin
+            CoordinateSystem::ZeroBasedHalfOpen => self.end - self.begin,
         }
     }
     /// Returns the coordinate system used by this coordinate.
@@ -106,5 +110,11 @@ impl Coordinate {
         let chr1 = self.get_chromosome().replace("chr", "");
         let chr2 = other.get_chromosome().replace("chr", "");
         chr1 == chr2 && begin < other_end && end > other_begin
+    }
+
+    pub fn overlaps_ignore_chromosome(&self, other: &Coordinate) -> bool {
+        let (begin, end) = self.to_canonical();
+        let (other_begin, other_end) = other.to_canonical();
+        begin < other_end && end > other_begin
     }
 }

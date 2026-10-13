@@ -15,10 +15,10 @@
 
 use std::fmt::Display;
 
-use crate::bam::cigar_op::CigarOperation;
-use serde::{Deserialize, Serialize};
 use crate::api::parsing_error::ParsingError;
+use crate::bam::cigar_op::CigarOperation;
 use crate::traits::from_bytes::FromBytes;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cigar {
@@ -26,13 +26,15 @@ pub struct Cigar {
 }
 
 impl Cigar {
-
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
     }
 
     pub fn get_reference_length(&self) -> u32 {
-        self.operations.iter().map(|op| op.get_reference_length()).sum()
+        self.operations
+            .iter()
+            .map(|op| op.get_reference_length())
+            .sum()
     }
 
     pub fn get_read_length(&self) -> u32 {
@@ -63,9 +65,14 @@ impl FromBytes for Cigar {
 
 impl Display for Cigar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for op in self.operations.iter() {
-            write!(f, "{}", op)?;
-        }
+        if self.is_empty() {
+            write!(f, "*")?;
+        } else {
+            for op in self.operations.iter() {
+                write!(f, "{}", op)?;
+            }
+        };
+
         Ok(())
     }
 }

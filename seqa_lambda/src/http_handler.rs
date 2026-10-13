@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ::serde::{Deserialize, Serialize};
 use lambda_http::http::Method;
 use lambda_http::{Body, Error, Request, RequestPayloadExt, Response};
-use ::serde::{ Serialize, Deserialize };
 use seqa_core::api::search::search_features;
 use seqa_core::api::search_options::{CigarFormat, SearchOptions};
 use seqa_core::sqlite::{self, genes};
@@ -38,15 +38,9 @@ pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, E
     let segments: Vec<&str> = path.trim_matches('/').split('/').collect();
 
     match (&method, segments.as_slice()) {
-        (&Method::GET, ["genes", "symbols", genome]) => {
-            gene_symbols(genome)
-        }
-        (&Method::GET, ["genes", "coordinates", genome, gene]) => {
-            gene_coordinates(genome, gene)
-        }
-        (&Method::GET, ["genes", "cytobands", genome, chromosome]) => {
-            cytobands(genome, chromosome)
-        }
+        (&Method::GET, ["genes", "symbols", genome]) => gene_symbols(genome),
+        (&Method::GET, ["genes", "coordinates", genome, gene]) => gene_coordinates(genome, gene),
+        (&Method::GET, ["genes", "cytobands", genome, chromosome]) => cytobands(genome, chromosome),
         (&Method::POST, _) => search_handler(event).await,
         _ => Ok(Response::builder()
             .status(404)
@@ -59,7 +53,7 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
     let options: SearchOptions = match event.payload::<SearchRequest>()? {
         Some(request) => {
             let genome = request.genome.unwrap_or("hg38".to_string());
-            SearchOptions::new(&request.path, &request.coordinates)
+            SearchOptions::new(&request.path, vec![&request.coordinates])?
                 .set_include_header(request.with_header.unwrap_or(false))
                 .set_header_only(request.only_header.unwrap_or(false))
                 .set_cigar_format(CigarFormat::Standard)
@@ -74,14 +68,14 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
     };
 
     let store = StoreService::new();
-        let result = search_features(&store, &options).await?;
-        let lines = serde_json::to_string(&result.lines)?;
+    let result = search_features(&store, &options).await?;
+    let lines = serde_json::to_string(&result.lines)?;
 
-        Ok(Response::builder()
-            .status(200)
-            .header("content-type", "application/json")
-            .body(Body::Text(lines))
-            .map_err(Box::new)?)
+    Ok(Response::builder()
+        .status(200)
+        .header("content-type", "application/json")
+        .body(Body::Text(lines))
+        .map_err(Box::new)?)
 }
 
 fn gene_symbols(genome: &str) -> Result<Response<Body>, Error> {
@@ -130,7 +124,9 @@ fn error_response(status: u16, message: &str) -> Result<Response<Body>, Error> {
     Ok(Response::builder()
         .status(status)
         .header("content-type", "application/json")
-        .body(Body::Text(serde_json::json!({ "error": message }).to_string()))
+        .body(Body::Text(
+            serde_json::json!({ "error": message }).to_string(),
+        ))
         .map_err(Box::new)?)
 }
 
@@ -140,9 +136,15 @@ mod tests {
     use lambda_http::{Body, Request};
 
     fn build_request(options: &SearchOptions) -> Request {
+        let coordinate = &options.coordinates[0];
         let payload = SearchRequest {
             path: options.file_path.clone(),
-            coordinates: format!("{}:{}-{}", options.chromosome, options.begin, options.end),
+            coordinates: format!(
+                "{}:{}-{}",
+                coordinate.get_chromosome(),
+                coordinate.get_begin(),
+                coordinate.get_end()
+            ),
             with_header: Some(options.include_header),
             only_header: Some(options.header_only),
             genome: options.genome.clone(),
@@ -167,10 +169,12 @@ mod tests {
 
     #[tokio::test]
     async fn bigwig_chr12() {
-        let options = SearchOptions::new("s3://com.gmail.docarw/test_data/density.bw", "chr12")
-            .set_index_path("-")
-            .set_output_format("bigwig")
-            .set_include_header(false);
+        let options =
+            SearchOptions::new("s3://com.gmail.docarw/test_data/density.bw", vec!["chr12"])
+                .unwrap()
+                .set_index_path("-")
+                .set_output_format("bigwig")
+                .set_include_header(false);
 
         let response = function_handler(build_request(&options)).await.unwrap();
         assert_eq!(response.status(), 200);
@@ -180,7 +184,11 @@ mod tests {
 
         for line in &lines {
             let fields: Vec<&str> = line.split('\t').collect();
-            assert_eq!(fields[0], "chr12", "unexpected chromosome in line: {}", line);
+            assert_eq!(
+                fields[0], "chr12",
+                "unexpected chromosome in line: {}",
+                line
+            );
             let begin: u32 = fields[1].parse().unwrap();
             let end: u32 = fields[2].parse().unwrap();
             assert!(begin < end, "expected begin < end, got {}-{}", begin, end);
@@ -191,8 +199,9 @@ mod tests {
     async fn bam_chr2_range() {
         let options = SearchOptions::new(
             "s3://com.gmail.docarw/test_data/NA12877.bam",
-            "chr2:50000000-50000100",
+            vec!["chr2:50000000-50000100"],
         )
+        .unwrap()
         .set_index_path("s3://com.gmail.docarw/test_data/NA12877.bam.bai")
         .set_output_format("bam")
         .set_include_header(false);
