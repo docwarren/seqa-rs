@@ -1,6 +1,41 @@
-# Introduction
+# seqa_lambda
 
-seqa_lambda is a Rust project that implements an AWS Lambda function in Rust.
+An AWS Lambda function (HTTP, via API Gateway) that runs `seqa_core` genomic searches and gene lookups.
+
+## Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | any path | Genomic range query — JSON body below; returns the result lines as a JSON array of strings |
+| `GET`  | `/genes/symbols/{genome}` | List gene symbols |
+| `GET`  | `/genes/coordinates/{genome}/{gene}` | Look up coordinates for a gene symbol |
+| `GET`  | `/genes/cytobands/{genome}/{chromosome}` | Cytobands for a chromosome |
+
+`genome` is one of `hg19`, `hg38`, `grch37` or `grch38`.
+
+### Search request body
+
+```json
+{
+    "path": "s3://my-bucket/sample.bam",
+    "coordinates": "chr12:10000000-10010000",
+    "with_header": false,
+    "only_header": false,
+    "genome": "hg38"
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `path` | yes | URI of the data file; the format and index path are inferred from its extension |
+| `coordinates` | yes | One region, 1-based inclusive, e.g. `chr1:1000-2000` |
+| `with_header` | no | Include the file header in the result. Defaults to `false` |
+| `only_header` | no | Return only the header. Defaults to `false` |
+| `genome` | no | Genome build, defaults to `hg38`. Stored but not currently used by the search |
+
+`index_path` and `output_format` are accepted but currently ignored.
+
+Cloud credentials are read from the Lambda's environment — see [seqa_core/README.md](../seqa_core/README.md#environment-variables).
 
 ## Prerequisites
 

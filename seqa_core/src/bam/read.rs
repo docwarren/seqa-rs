@@ -340,7 +340,12 @@ impl Read {
             .to_string()
     }
 
-    /// Formats the read as a SAM line with the specified cigar format.
+    /// Formats the read as a SAM line.
+    ///
+    /// `bam_header` is used to turn `ref_id` and `next_ref_id` into reference names
+    /// (`next_ref_id` becomes `"="` when it matches `ref_id`).  If an id is not in the
+    /// header, the raw number is written instead.  When `use_merged_cigar` is `true` the
+    /// CIGAR column comes from [`Read::get_merged_cigar`].
     pub fn to_sam_string(&self, use_merged_cigar: bool, bam_header: &BamHeader) -> String {
         let chr = self
             .get_ref_name(bam_header)
@@ -388,6 +393,8 @@ impl Read {
     }
 }
 
+/// Debug-style tab-separated output with raw reference ids and the read name as bytes.
+/// This is not valid SAM; use [`Read::to_sam_string`] for that.
 impl Display for Read {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

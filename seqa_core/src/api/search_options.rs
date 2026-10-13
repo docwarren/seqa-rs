@@ -39,9 +39,9 @@ pub enum CigarFormat {
 /// Configuration for a genomic region search.
 ///
 /// Build a `SearchOptions` with [`SearchOptions::new`] and the setter methods, or set
-/// fields directly.  Pass the finished value to
-/// [`crate::stores::StoreService::search_features`] or to one of the
-/// format-specific search functions in [`crate::api`].
+/// fields directly.  Pass the finished value to [`crate::api::search::search_features`],
+/// or to a format-specific search function such as [`crate::bam::bam_search::bam_search`]
+/// or [`crate::tabix::tabix_search::tabix_search`].
 ///
 /// # Example
 ///
@@ -60,12 +60,11 @@ pub struct SearchOptions {
     /// URI of the companion index file.  Set to `"-"` for self-indexed formats
     /// (BigWig, BigBed).
     pub index_path: String,
-    /// Vec of coordinates to search
-    /// usually will only be one but may be many
+    /// Regions to search, in the order results are returned.  Usually one, but may be many.
     pub coordinates: Vec<Coordinate>,
-    /// Optional reference genome build (e.g. `"hg38"`, `"hg19"`).
-    /// When set, chromosome lengths are resolved from that build instead of
-    /// the longest known length across all supported builds.
+    /// Optional reference genome build (e.g. `"hg38"`, `"hg19"`), stored in lowercase.
+    /// Not currently used by the searches: open-ended coordinates always resolve to the
+    /// longest known chromosome length across all supported builds.
     pub genome: Option<String>,
     /// File format of [`SearchOptions::file_path`].
     pub output_format: OutputFormat,
@@ -99,21 +98,33 @@ pub struct SearchOptions {
 }
 
 impl SearchOptions {
-    /// Creates a `SearchOptions` with sensible defaults.
+    /// Creates a `SearchOptions` for `path` and one or more coordinate strings.
     ///
-    /// All path/chromosome fields are empty strings; `include_header` is `true`,
-    /// `header_only` is `false`, and `output_format` is [`OutputFormat::STRING`].
+    /// - `path` is normalised with [`crate::utils::format_file_path`], so local paths become
+    ///   `file://` URIs.
+    /// - `index_path` is inferred from the file extension (e.g. `.bam` → `.bam.bai`, `"-"` for
+    ///   BigWig/BigBed), falling back to `path` itself if the extension is not recognised.
+    /// - `output_format` is inferred from the file extension, falling back to
+    ///   [`OutputFormat::STRING`].
+    /// - Each coordinate string is parsed with [`crate::utils::parse_coordinates`] as
+    ///   **1-based closed**.
+    ///
+    /// `include_header` defaults to `true`; `header_only` and `no_cache` default to `false`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ParsingError::FormatError`] if any coordinate string cannot be parsed.
     pub fn new(path: &str, coord_strings: Vec<&str>) -> Result<Self, ParsingError> {
         let system = CoordinateSystem::OneBasedClosed;
         let file_path = crate::utils::format_file_path(path).unwrap_or_else(|_| path.to_string());
         let index_path =
             crate::utils::get_index_path(&file_path).unwrap_or_else(|_| file_path.clone());
         let output_format = get_output_format(&file_path).unwrap_or(OutputFormat::STRING);
-        let coordinates = merge_overlapping_coordinates(&coord_strings);
-        coord_strings
+        let coordinates = coord_strings
             .iter()
             .map(|c| Coordinate::new(*c, system))
             .collect::<Result<Vec<Coordinate>, ParsingError>>()?;
+
         Ok(SearchOptions {
             file_path,
             index_path,
@@ -163,7 +174,7 @@ impl SearchOptions {
     /// Sets the reference genome build (stored in lowercase).
     ///
     /// Supported values: `"hg19"`, `"hg38"`, `"grch37"`, `"grch38"`.
-    /// Used by [`SearchOptions::set_coordinates`] to resolve chromosome lengths.
+    /// See [`SearchOptions::genome`]: the value is stored but not currently used by the searches.
     pub fn set_genome(&mut self, genome: &str) -> Self {
         self.genome = Some(genome.to_lowercase());
         self.clone()

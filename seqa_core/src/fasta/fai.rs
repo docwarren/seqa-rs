@@ -91,6 +91,15 @@ impl FaiIndex {
         Ok(fai_index)
     }
 
+    /// Returns the byte range in the FASTA file that holds the sequence for each coordinate.
+    ///
+    /// Coordinates are 1-based closed.  Each range starts at the first base and ends one
+    /// byte after the last base, so it includes any newlines in between.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SearchError::InvalidRequest`] if a contig is not in the index, or if
+    /// `begin` is 0 or `end` is past the end of the contig.
     pub fn get_offsets(&self, coordinates: &[Coordinate]) -> Result<Vec<Range<u64>>, SearchError> {
         coordinates
             .iter()

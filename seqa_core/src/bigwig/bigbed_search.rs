@@ -29,6 +29,7 @@ use crate::coordinate::Coordinate;
 use crate::stores::StoreService;
 use std::ops::Range;
 
+/// Parses a decompressed BigBed data block and formats each record that overlaps `coord`.
 pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
     let mut str_array = Vec::new();
     let mut offset = 0;
@@ -55,7 +56,10 @@ pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordina
     str_array
 }
 
-/// Converts raw data bytes into a vector of strings
+/// Formats the decompressed blocks for one coordinate as text lines.
+///
+/// Zoom blocks are formatted as zoom summaries, otherwise as BED records.  When
+/// `include_header` is set, the matching column-name line comes first.
 fn data_to_lines(
     bytes: &[Vec<u8>],
     chr_tree: &BigwigChrTree,
@@ -96,9 +100,20 @@ fn data_to_lines(
     str_array
 }
 
-/// Searches for data in a BigBed file based on the provided search options.
-/// BigBed files share the same index structure as BigWig files (same header, chr tree, r-tree).
-/// The difference is in the data format: BigBed stores BED records instead of wig data.
+/// Searches a BigBed file for records overlapping each of [`SearchOptions::coordinates`].
+///
+/// BigBed files share the same index structure as BigWig files (same header, chr tree,
+/// r-tree), so this works like [`crate::bigwig::bigwig_search::bigwig_search`] except
+/// the data blocks hold BED records.  The index is taken from `options.bigbed_index` if
+/// present and is returned in the [`SearchResult`].
+///
+/// Lines are grouped by coordinate in the order given.  When `include_header` is set,
+/// each coordinate's lines start with a column-name line.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] if a coordinate names a chromosome that is not
+/// in the file.
 pub async fn bigbed_search(
     store_service: &StoreService,
     options: &SearchOptions,

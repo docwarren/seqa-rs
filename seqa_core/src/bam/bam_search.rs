@@ -57,6 +57,10 @@ fn read_lines(
     Ok(lines)
 }
 
+/// Converts decompressed BAM data into SAM lines.
+///
+/// `data[i]` is searched for reads overlapping `coordinate[i]`, so the two slices must
+/// line up one-to-one (one entry per fetched chunk).  Lines are returned in that order.
 pub fn data_to_lines(
     data: &[Vec<u8>],
     coordinate: &[Coordinate],
@@ -73,12 +77,21 @@ pub fn data_to_lines(
     Ok(lines.concat())
 }
 
-/// Searches for data in a bam based on the provided search options.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file paths, chromosome,
-///  start and end positions, output format, and whether to include headers or only headers.
-/// # Returns:
-/// * A Result containing a vector of strings with the search results, or an error message if the search fails.
+/// Searches a BAM file for reads overlapping each of [`SearchOptions::coordinates`].
+///
+/// The `.bai` index and BAM header are taken from `options` if present, otherwise read
+/// from `index_path` / `file_path`.  Both are returned in the [`SearchResult`] so callers
+/// can pass them back in on later queries.
+///
+/// Result lines are SAM records, grouped by coordinate in the order the coordinates were
+/// given.  When `include_header` is set the SAM header lines come first; when
+/// `header_only` is set only the header is returned.  Overlapping coordinates can return
+/// the same read more than once.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] if a coordinate covers more than 200,001 bases
+/// or names a chromosome that is not in the BAM header.
 pub async fn bam_search(
     store_service: &StoreService,
     options: &SearchOptions,

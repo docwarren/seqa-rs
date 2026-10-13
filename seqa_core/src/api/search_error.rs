@@ -3,8 +3,8 @@ use crate::api::parsing_error::ParsingError;
 use crate::codecs::codec_error::CodecError;
 use crate::stores::error::StoreError;
 
-/// Unified error returned by [`StoreService::search_features`].
-/// Wraps the format-specific error from the underlying search function.
+/// Unified error returned by [`crate::api::search::search_features`] and the
+/// format-specific search functions.
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum SearchError {

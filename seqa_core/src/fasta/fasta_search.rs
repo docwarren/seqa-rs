@@ -23,13 +23,20 @@ use crate::fasta::fai::FaiIndex;
 
 const MAX_FASTA_SEARCH_SIZE: usize = 250_000_000;
 
-/// Searches for data in a FASTA file based on the provided search options.
-/// Returns a vector of strings containing the results.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file
-///   paths, chromosome, start and end positions, output format, and whether to include headers or only headers.
-/// # Returns:
-/// * A Result containing a vector of strings with the search results, or an error message if the search fails.
+/// Reads the sequence for each of [`SearchOptions::coordinates`] from an indexed FASTA file.
+///
+/// The `.fai` index is taken from `options` if present, otherwise read from `index_path`,
+/// and is returned in the [`SearchResult`].  Coordinates are 1-based closed, so
+/// `chr1:1-100` returns 100 bases.
+///
+/// Result lines are the sequence lines as stored in the file, with no `>` header line,
+/// one coordinate after another in the order given.  `include_header` and `header_only`
+/// are ignored.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] if a coordinate covers more than 250,000,000
+/// bases, names a contig that is not in the index, or falls outside the contig.
 pub async fn fasta_search(
     store_service: &StoreService,
     options: &SearchOptions,

@@ -20,7 +20,11 @@ use crate::utils::parse_coordinates;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-/// Test each coordinate to ensure it doesnt request too much data
+/// Checks that no coordinate is longer than `len` bases.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] for the first coordinate that is too long.
 pub fn check_coords_for_length(coords: &Vec<Coordinate>, len: usize) -> Result<(), SearchError> {
     for coord in coords {
         if coord.get_length() as usize > len {
@@ -37,30 +41,39 @@ pub fn check_coords_for_length(coords: &Vec<Coordinate>, len: usize) -> Result<(
     Ok(())
 }
 
+/// A genomic interval: a chromosome plus begin and end positions in a given
+/// [`CoordinateSystem`].
+///
+/// `begin` and `end` are stored as given.  [`Coordinate::to_canonical`] and
+/// [`Coordinate::overlaps`] convert to **0-based half-open** first, so coordinates in
+/// different systems can be compared directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Coordinate {
+    /// Chromosome/contig name (e.g. `"chr1"` or `"1"`).
     pub chromosome: String,
+    /// Begin position in `system`.
     pub begin: u32,
+    /// End position in `system`.
     pub end: u32,
+    /// The coordinate system `begin` and `end` are expressed in.
     pub system: CoordinateSystem,
 }
 
+/// Formats as `chromosome\tbegin\tend` using the native positions.
 impl Display for Coordinate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}\t{}\t{}", self.chromosome, self.begin, self.end)
     }
 }
 
-/// A genomic interval with a chromosome, begin, and end position.
-///
-/// All record types (`VcfLine`, `BedLine`, `GffLine`, `GtfLine`, `BedGraphLine`) and
-/// [`crate::api::search_options::SearchOptions`] implement this trait so that interval
-/// arithmetic (e.g. overlap detection) works uniformly across formats.
-///
-/// Implementors must report their native [`CoordinateSystem`].  The provided
-/// [`Feature::to_canonical`] and [`Feature::overlaps`] methods use that information to
-/// convert everything to **0-based half-open** coordinates before comparing.
 impl Coordinate {
+    /// Parses a coordinate string such as `"chr1:1000-2000"` and tags it with `system`.
+    ///
+    /// See [`crate::utils::parse_coordinates`] for the accepted formats.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ParsingError::FormatError`] if the string cannot be parsed.
     pub fn new(coord_str: &str, system: CoordinateSystem) -> Result<Coordinate, ParsingError> {
         let result =
             parse_coordinates(coord_str).map_err(|e| ParsingError::FormatError(format!("{e}")))?;
@@ -75,15 +88,15 @@ impl Coordinate {
     pub fn get_chromosome(&self) -> &str {
         &self.chromosome
     }
-    /// Returns the begin position in the feature's native coordinate system.
+    /// Returns the begin position in this coordinate's own system.
     pub fn get_begin(&self) -> u32 {
         self.begin
     }
-    /// Returns the end position in the feature's native coordinate system.
+    /// Returns the end position in this coordinate's own system.
     pub fn get_end(&self) -> u32 {
         self.end
     }
-    /// Returns the length of the feature in bases.
+    /// Returns the length of the interval in bases.
     pub fn get_length(&self) -> u32 {
         match self.system {
             CoordinateSystem::OneBasedClosed => (self.end - self.begin) + 1,
@@ -100,10 +113,12 @@ impl Coordinate {
         self.system.to_canonical(self.begin, self.end)
     }
 
-    /// Returns `true` if this feature overlaps `other` on the same chromosome.
+    /// Returns `true` if this interval overlaps `other` on the same chromosome.
     ///
-    /// Both features are converted to canonical coordinates before comparison,
-    /// so VCF/GFF (1-based) and BED/BAM (0-based) features can be compared directly.
+    /// Both intervals are converted to canonical coordinates before comparison,
+    /// so VCF/GFF (1-based) and BED/BAM (0-based) coordinates can be compared directly.
+    /// Chromosome names are compared with any `"chr"` prefix removed, so `"chr1"`
+    /// matches `"1"`.
     pub fn overlaps(&self, other: &Coordinate) -> bool {
         let (begin, end) = self.to_canonical();
         let (other_begin, other_end) = other.to_canonical();
@@ -112,6 +127,11 @@ impl Coordinate {
         chr1 == chr2 && begin < other_end && end > other_begin
     }
 
+    /// Returns `true` if the positions of this interval overlap `other`, without
+    /// comparing chromosomes.
+    ///
+    /// For callers that have already matched the chromosome some other way, e.g. BAM
+    /// reads, whose coordinates carry a reference index rather than a name.
     pub fn overlaps_ignore_chromosome(&self, other: &Coordinate) -> bool {
         let (begin, end) = self.to_canonical();
         let (other_begin, other_end) = other.to_canonical();

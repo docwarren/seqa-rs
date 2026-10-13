@@ -29,8 +29,8 @@ use crate::tabix::variant_type::VariantType;
 /// represented with multiple entries in [`VcfLine::alt_alleles`].
 ///
 /// Coordinates are **1-based closed** as per the VCF specification.
-/// Use [`crate::traits::feature::Feature::to_canonical`] to convert to
-/// 0-based half-open for interval arithmetic.
+/// [`crate::traits::feature::Feature::coordinate`] returns them tagged as such, and
+/// [`crate::coordinate::Coordinate::to_canonical`] converts to 0-based half-open.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VcfLine {
     /// CHROM — chromosome/contig name.
@@ -335,7 +335,7 @@ impl VcfLine {
     }
 
     /// Canvas reports the variant type in the alt field.
-    /// e.g. <CN0>,<CN3>
+    /// e.g. `<CN0>,<CN3>`
     /// and in the id field
     /// e.g. Canvas:GAIN:11:.....
     pub fn get_variant_type_from_canvas_id(&self) -> Option<VariantType> {

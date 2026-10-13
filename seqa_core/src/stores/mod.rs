@@ -38,7 +38,8 @@ use error::StoreError;
 ///
 /// # Creating a service
 ///
-/// Use [`StoreService::from_uri`] to auto-detect the backend from the URL scheme:
+/// Create one with [`StoreService::new`] and share it.  Nothing is connected up front:
+/// the backend for each path is picked from its URL scheme and built on first use.
 ///
 /// ```rust,no_run
 /// use seqa_core::stores::StoreService;

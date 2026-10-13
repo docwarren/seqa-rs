@@ -15,18 +15,18 @@
 
 use crate::coordinate::Coordinate;
 
-/// A genomic interval with a chromosome, begin, and end position.
+/// A record parsed from a genomic file that has a position on the genome.
 ///
-/// All record types (`VcfLine`, `BedLine`, `GffLine`, `GtfLine`, `BedGraphLine`) and
-/// [`crate::api::search_options::SearchOptions`] implement this trait so that interval
-/// arithmetic (e.g. overlap detection) works uniformly across formats.
+/// Implemented by the record types (`VcfLine`, `BedLine`, `BedGraphLine`, `GffLine`,
+/// `GtfLine` and BAM `Read`) so that overlap detection works the same way across
+/// formats: compare [`Feature::coordinate`] against a query with
+/// [`Coordinate::overlaps`].
 ///
-/// Implementors must report their native [`CoordinateSystem`].  The provided
-/// [`Feature::to_canonical`] and [`Feature::overlaps`] methods use that information to
-/// convert everything to **0-based half-open** coordinates before comparing.
+/// `Display` must write the record back out in its native text format; the tabix
+/// search uses it to produce result lines.
 pub trait Feature: std::fmt::Display {
-    /// Returns a unique identifier for the feature (e.g. rsID for VCF, name for BED).
+    /// Returns an identifier for the feature (e.g. rsID for VCF, name for BED).
     fn get_id(&self) -> String;
-    /// Returns the coordinate system used by this feature type.
+    /// Returns the feature's position, tagged with its format's native coordinate system.
     fn coordinate(&self) -> Coordinate;
 }

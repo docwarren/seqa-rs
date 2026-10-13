@@ -30,6 +30,7 @@ use crate::coordinate::Coordinate;
 use crate::stores::StoreService;
 use std::ops::Range;
 
+/// Parses a decompressed BigWig data block and formats each data point that overlaps `coord`.
 pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
     let mut str_array = Vec::new();
     let mut offset = 0;
@@ -52,13 +53,10 @@ pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordina
 
     str_array
 }
-/// Converts raw data bytes into a vector of strings, processing each line according to the search options.
-/// # Arguments:
-/// * `data` - A vector of bytes representing the raw data to be processed.
-/// * `options` - A `SearchOptions` struct containing the search parameters such as output format,
-///  whether to include headers, and the range of positions to consider.
-/// # Returns:
-/// * A vector of strings containing the processed lines, which may include headers.
+/// Formats the decompressed blocks for one coordinate as text lines.
+///
+/// Zoom blocks are formatted as zoom summaries, otherwise as data points.  When
+/// `include_header` is set, the matching column-name line comes first.
 fn data_to_lines(
     bytes: &[Vec<u8>],
     chr_tree: &BigwigChrTree,
@@ -99,6 +97,9 @@ fn data_to_lines(
     str_array
 }
 
+/// Cuts each leaf's block out of `data` and decompresses it if `is_compressed`.
+///
+/// `data` holds the bytes for `range`, which must cover every leaf.
 pub fn decompress_data(
     data: &[u8],
     leaves: &[RTreeLeaf],
@@ -122,6 +123,11 @@ pub fn decompress_data(
     Ok(decompressed_blocks)
 }
 
+/// Looks up the chromosome id for `coordinate` in the file's chromosome tree.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] if the chromosome is not in the file.
 pub fn get_bw_chromosome_id(
     index: &BigwigIndex,
     coordinate: &Coordinate,
@@ -140,13 +146,20 @@ pub fn get_bw_chromosome_id(
     }
 }
 
-/// Searches for data in a bigwig file based on the provided search options.
-/// Returns a vector of strings containing the results, which may include headers.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file paths, chromosome,
-///  start and end positions, output format, and whether to include headers or only headers.
-/// # Returns:
-/// * A Result containing a vector of strings with the search results, or an error message if the search fails.
+/// Searches a BigWig file for data overlapping each of [`SearchOptions::coordinates`].
+///
+/// The index is embedded in the file; it is taken from `options.bigwig_index` if present,
+/// otherwise read from `file_path`, and is returned in the [`SearchResult`].
+///
+/// A zoom level is chosen per coordinate from the coordinate's length.  When one matches,
+/// that coordinate's lines are zoom summaries; otherwise they are the raw data points.
+/// Lines are grouped by coordinate in the order given.  When `include_header` is set,
+/// each coordinate's lines start with a column-name line.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] if a coordinate names a chromosome that is not
+/// in the file.
 pub async fn bigwig_search(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -241,6 +254,9 @@ async fn get_index_end(
     }
 }
 
+/// Returns the byte range spanning every leaf's data block.
+///
+/// For an empty slice the range is `u64::MAX..u64::MAX`.
 pub fn get_range_from_leaves(leaves: &[RTreeLeaf]) -> Range<u64> {
     let begin = leaves
         .iter()

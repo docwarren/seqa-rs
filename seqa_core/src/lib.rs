@@ -29,9 +29,10 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // One or more regions; results come back in the order the regions are given.
 //!     let opts = SearchOptions::new(
 //!         "s3://my-bucket/sample.bam",
-//!         vec!["chr1:100000-200000"],
+//!         vec!["chr1:100000-200000", "chr2:5000-6000"],
 //!     )?;
 //!
 //!     let store_service = StoreService::new();
@@ -45,9 +46,11 @@
 //!
 //! ## Coordinate system
 //!
-//! All coordinates are stored with their coordinate system and can be compared without
-//! concern for the coordinate system. e.g.
-//! ```rust,no_run
+//! Query strings passed to [`api::search_options::SearchOptions::new`] are **1-based closed**,
+//! e.g. `chr1:1-10` is the first ten bases. Every [`coordinate::Coordinate`] carries its
+//! [`models::coordinate_system::CoordinateSystem`] and is converted to **0-based half-open**
+//! before comparing, so coordinates from different systems can be compared directly:
+//! ```rust
 //! use seqa_core::coordinate::Coordinate;
 //! use seqa_core::models::coordinate_system::CoordinateSystem;
 //!
@@ -58,16 +61,17 @@
 //!
 //! ## Storage backends
 //!
-//! [`stores::StoreService::from_uri`] auto-detects the backend from the URL scheme:
-//! - `s3://` — AWS S3 (requires `AWS_*` environment variables)
-//! - `az://` — Azure Blob Storage (requires `AZURE_*` environment variables)
-//! - `gs://` — Google Cloud Storage (requires `GOOGLE_*` environment variables)
-//! - `file://` or a bare path — local filesystem
+//! [`stores::StoreService`] picks the backend from the URL scheme and builds each client
+//! the first time it is used, then reuses it for the same bucket or host:
+//! - `s3://` — AWS S3 (credentials from `AWS_*` environment variables)
+//! - `az://` — Azure Blob Storage (credentials from `AZURE_*` environment variables)
+//! - `gs://` — Google Cloud Storage (credentials from `GOOGLE_*` environment variables)
+//! - `file://` or a local path (`/`, `./`, `../`) — local filesystem
 //! - `http(s)://` — HTTP/HTTPS
 //!
 //! ## Feature flags
 //!
-//! - **`sqlite`** — Enables [`sqlite`] module for gene-symbol and cytoband queries via SQLite.
+//! - **`sqlite`** — Enables the `sqlite` module for gene-symbol and cytoband queries via SQLite.
 
 pub mod api;
 pub mod codecs;

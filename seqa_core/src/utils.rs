@@ -19,9 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::output_format::OutputFormat;
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
-use crate::coordinate::Coordinate;
 use crate::genome::get_longest_possible_genome;
-use crate::models::coordinate_system::CoordinateSystem;
 
 /// Normalises a file path to a URI accepted by [`crate::stores::StoreService`].
 ///
@@ -31,7 +29,8 @@ use crate::models::coordinate_system::CoordinateSystem;
 ///
 /// # Errors
 ///
-/// Returns [`UtilError`] when a local path does not exist or cannot be canonicalised.
+/// Returns [`SearchError::NotFound`] when a local path does not exist, or
+/// [`SearchError::AbsolutePathError`] when it cannot be made absolute.
 pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
     if file_path.starts_with("/") || file_path.starts_with("./") || file_path.starts_with("../") {
         match std::fs::exists(file_path) {
@@ -60,16 +59,19 @@ pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
 
 /// Parses a genomic coordinate string into `(chromosome, begin, end)`.
 ///
-/// Accepted formats:
-/// - `"chr1"` — whole chromosome; `begin` = 1, `end` = chromosome's maximum length.
-/// - `"chr1:1000"` — single-base query; `end` = `begin`.
+/// Positions are returned exactly as written; the caller decides which coordinate
+/// system they are in.  Accepted formats:
+/// - `"chr1"` — whole chromosome; `begin` = 1, `end` = the chromosome's length.
+/// - `"chr1:1000"` — from `begin` to the end of the chromosome; `end` = the chromosome's length.
 /// - `"chr1:1000-2000"` — explicit range.
 /// - Commas in numbers are stripped (e.g. `"chr1:1,000-2,000"`).
 ///
+/// Chromosome lengths are the longest length across all supported genome builds.
+///
 /// # Errors
 ///
-/// Returns [`FormatError`] when the chromosome name is not recognised or a
-/// numeric field cannot be parsed.
+/// Returns [`SearchError::InvalidCoordinateFormat`] when the chromosome name is not
+/// recognised or a numeric field cannot be parsed.
 pub fn parse_coordinates(coords: &str) -> Result<(String, u32, u32), SearchError> {
     let tokens: Vec<&str> = coords.split(':').collect();
     let chromosome = tokens[0].to_string();

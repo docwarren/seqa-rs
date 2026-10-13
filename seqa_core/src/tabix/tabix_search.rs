@@ -57,6 +57,15 @@ fn read_lines(
         .collect();
     Ok(result)
 }
+/// Parses decompressed tabix data and keeps the records that overlap.
+///
+/// `data[i]` is filtered against `coordinates[i]`, so the two slices must line up
+/// one-to-one (one entry per fetched chunk).  Records are written back out in their
+/// native text format, in that order.
+///
+/// # Errors
+///
+/// Returns [`ParsingError::FormatError`] if a line cannot be parsed as `output_format`.
 pub fn data_to_lines(
     data: &[Vec<u8>],
     coordinates: &[Coordinate],
@@ -72,13 +81,21 @@ pub fn data_to_lines(
     Ok(lines.concat())
 }
 
-/// Searches for data in a tabixed bgzipped file based on the provided search options.
-/// Returns a vector of strings containing the results, which may include  headers.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file paths, chromosome,
-///  start and end positions, output format, and whether to include headers or only headers.
-/// # Returns:
-/// * a Result containing a vector of strings with the search results, or an error message if the search fails.
+/// Searches a bgzipped, tabix-indexed file (VCF, BED, BedGraph, GFF, GTF) for records
+/// overlapping each of [`SearchOptions::coordinates`].
+///
+/// The `.tbi` index and file header are taken from `options` if present, otherwise read
+/// from `index_path` / `file_path`.  Both are returned in the [`SearchResult`] so callers
+/// can pass them back in on later queries.
+///
+/// Result lines are grouped by coordinate in the order the coordinates were given.  Header
+/// lines from [`get_header_lines`] come first when `include_header` is set; when
+/// `header_only` is set only the file header is returned.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] if a coordinate names a chromosome that is not
+/// in the index, or [`SearchError::ParseError`] if a record cannot be parsed.
 pub async fn tabix_search(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -156,13 +173,9 @@ pub async fn tabix_search(
     Ok(result)
 }
 
-/// Searches for data in a vcf file using the provided search options.
-/// Returns a vector of `VcfLine` objects containing the results.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file
-///     paths, chromosome, start and end positions, output format, and whether to include headers or only headers.
-/// # Returns:
-/// * A  Result containing a vector of `VcfLine` objects with the search results, or an error message if the search fails.
+/// Runs [`tabix_search`] on a VCF and parses the result lines into [`VcfLine`]s.
+///
+/// Lines that do not parse, including any header lines, are skipped.
 pub async fn tabix_search_vcf(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -178,13 +191,11 @@ pub async fn tabix_search_vcf(
     Ok(vcf_lines)
 }
 
-/// Gets the header lines for the specified output format.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file
-///     paths, chromosome, start and end positions, output format, and whether to include headers or only headers.
-/// * `tabix_header` - A `TabixHeader` struct containing the header information for the tabix file.
-/// # Returns:
-/// * A vector of strings containing the header lines for the specified output format.
+/// Returns the header lines to put before the results when `options.include_header` is set.
+///
+/// VCF returns the file's own `#` header lines.  BED, BedGraph, GFF and GTF return a
+/// single tab-separated line of column names.  Returns nothing when `include_header` is
+/// `false`.
 pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> Vec<String> {
     if options.include_header {
         match options.output_format {

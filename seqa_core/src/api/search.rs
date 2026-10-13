@@ -30,6 +30,7 @@ use crate::stores::StoreService;
 use crate::stores::error::StoreError;
 use crate::tabix::tabix_search::tabix_search;
 
+/// Opens a streaming download of the compressed byte range covered by `chunk`.
 pub async fn chunk_to_stream(
     chunk: &Chunk,
     store: &dyn ObjectStore,
@@ -52,9 +53,12 @@ pub async fn chunk_to_stream(
     Ok(stream.map_ok(|get_result| get_result.to_vec()))
 }
 
-/// Fetches chunks concurrently from the store service.
+/// Fetches the compressed byte range for every chunk in a single
+/// [`StoreService::get_ranges`] call.
 ///
-/// Returns a vector of `bytes` pairs preserving input order.
+/// Each range runs from the chunk's first block to one maximum block size past its
+/// last block, so the last block is always fetched whole.  Returns one buffer per
+/// chunk, in the same order as `chunks`.
 pub async fn fetch(
     store_service: &StoreService,
     file_path: &str,
@@ -65,7 +69,11 @@ pub async fn fetch(
     Ok(data)
 }
 
-/// Decompresses each fetched chunk and returns the post-offset data.
+/// Decompresses each fetched chunk and drops the bytes before the chunk's first record.
+///
+/// `fetched[i]` must be the data returned by [`fetch`] for `chunks[i]`.  Returns one
+/// buffer per chunk, starting at `begin_vp`.  The tail is not trimmed, so the buffer may
+/// end part way through a record.
 pub async fn decompress_chunks(
     chunks: &[Chunk],
     fetched: &[Vec<u8>],
@@ -87,8 +95,13 @@ pub async fn decompress_chunks(
 /// Searches for features in a file based on the provided search options.
 ///
 /// Dispatches to the format-specific search function indicated by
-/// [`SearchOptions::output_format`] and reuses this `StoreService`'s cached
-/// object_store clients for every backend access.
+/// [`SearchOptions::output_format`], searching every coordinate in
+/// [`SearchOptions::coordinates`].  Backend clients are reused from `store`'s cache.
+///
+/// # Errors
+///
+/// Returns [`SearchError::UnsupportedFileFormat`] for [`OutputFormat::STRING`], otherwise
+/// whatever the format-specific search returns.
 pub async fn search_features(
     store: &StoreService,
     options: &SearchOptions,
