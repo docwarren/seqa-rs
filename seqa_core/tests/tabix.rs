@@ -137,6 +137,30 @@ async fn vcf_chr4() {
 }
 
 #[tokio::test]
+async fn vcf_multiple_coords() {
+    let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
+    let options = SearchOptions::new(S3_VCF, vec!["chr12:1-120000", "chrX:154927181-154929412"])
+        .unwrap()
+        .set_index_path(S3_VCF_INDEX)
+        .set_output_format("vcf")
+        .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = tabix_search(&store_service, &options)
+        .await
+        .expect(&format!("Failed to search VCF for chr4"));
+    assert_eq!(result.lines.len(), 9);
+    assert_eq!(
+        result.lines[0],
+        "chr12	86886	.	G	C	.	PASS	MTD=isaac2,bwa_freebayes,bwa_platypus,bwa_gatk3	GT	1|1"
+    );
+    assert_eq!(
+        result.lines[8],
+        "chrX	154929412	.	C	T	.	PASS	MTD=bwa_freebayes,bwa_platypus,cortex,bwa_gatk3	GT	1"
+    );
+}
+
+#[tokio::test]
 async fn vcf_many_lines() {
     let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
     let options = SearchOptions::new(S3_VCF, vec!["chr1:100000000-200000000"])

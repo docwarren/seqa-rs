@@ -169,3 +169,43 @@ async fn http_bigwig() {
     assert!(end > last_begin);
     assert!(last_begin < 140000000);
 }
+
+#[tokio::test]
+async fn bigwig_multiple_coordinates() {
+    use seqa_core::api::search::search_features;
+    use seqa_core::api::search_options::SearchOptions;
+    use seqa_core::stores::StoreService;
+
+    let options = SearchOptions::new(
+        "s3://com.gmail.docarw/test_data/density.bw",
+        vec!["chr4:120000000-140000000", "chr5:1-100000000"],
+    )
+    .unwrap()
+    .set_index_path("-")
+    .set_output_format("bigwig")
+    .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = search_features(&store_service, &options)
+        .await
+        .expect("Failed to search BigWig for chr4");
+
+    let first = result.lines[0].split('\t').collect::<Vec<&str>>();
+    let begin = first[1].parse::<u32>().unwrap();
+    let chr1 = first[0];
+
+    let last = result.lines[result.lines.len() - 1]
+        .split('\t')
+        .collect::<Vec<&str>>();
+
+    let chr2 = last[0];
+    let last_begin = last[1].parse::<u32>().unwrap();
+    let end = last[2].parse::<u32>().unwrap();
+
+    assert!(begin > 120_000_000);
+    assert!(begin < 140_000_000);
+    assert!(end < 100_000_000);
+    assert!(last_begin < 100_000_000);
+    assert_eq!(chr1, "chr4");
+    assert_eq!(chr2, "chr5");
+}

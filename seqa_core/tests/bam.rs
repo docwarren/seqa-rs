@@ -113,3 +113,25 @@ async fn bam_chr_m() {
     );
     cleanup_bam_index();
 }
+
+#[tokio::test]
+async fn bam_multiple_coordinates() {
+    use seqa_core::api::search::search_features;
+    use seqa_core::api::search_options::SearchOptions;
+    use seqa_core::stores::StoreService;
+    let options = SearchOptions::new(
+        S3_BAM,
+        vec!["chr1:10000000-10000000", "chr12:10000000-10000000"],
+    )
+    .unwrap()
+    .set_index_path(S3_BAM_INDEX)
+    .set_output_format("bam")
+    .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = search_features(&store_service, &options)
+        .await
+        .unwrap_or_else(|e| panic!("Failed to search BAM: {}", e));
+    assert_eq!(result.lines.len(), 48 + 51);
+    cleanup_bam_index();
+}

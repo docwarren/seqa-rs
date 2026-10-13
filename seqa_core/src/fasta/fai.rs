@@ -13,13 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::ops::Range;
-use serde::{Deserialize, Serialize};
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
-use crate::stores::StoreService;
 use crate::coordinate::Coordinate;
+use crate::stores::StoreService;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::ops::Range;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Contig {
@@ -28,7 +28,7 @@ pub struct Contig {
     pub bases_per_line: u32,
     pub bytes_per_line: u32,
     pub offset: u64,
-    pub qual_offset: u64
+    pub qual_offset: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -47,16 +47,18 @@ impl FaiIndex {
         store_service: &StoreService,
         idx_path: &str,
     ) -> Result<Self, SearchError> {
-        let bytes = store_service.get_object(idx_path)
-            .await
-            .map_err(|e| SearchError::ReadError {
-                path: idx_path.to_string(),
-                source: e
-            })?;
+        let bytes =
+            store_service
+                .get_object(idx_path)
+                .await
+                .map_err(|e| SearchError::ReadError {
+                    path: idx_path.to_string(),
+                    source: e,
+                })?;
 
         FaiIndex::from_bytes(bytes).map_err(|e| SearchError::ParseError {
             path: idx_path.to_string(),
-            source: e
+            source: e,
         })
     }
 
@@ -90,30 +92,33 @@ impl FaiIndex {
     }
 
     pub fn get_offsets(&self, coordinates: &[Coordinate]) -> Result<Vec<Range<u64>>, SearchError> {
-
-        coordinates.iter().map(|coord| {
-            let chr = coord.get_chromosome();
-            let begin = coord.get_begin();
-            let end = coord.get_end();
-
-            let contig = crate::genome::chromosome_aliases(chr)
+        coordinates
             .iter()
-            .find_map(|alias| self.contigs.get(alias))
-            .ok_or(SearchError::InvalidRequest {
-                reason: "Contig not found".to_string(),
-                requested: chr.to_string()
-            })?;
-            if begin < 1 || end > contig.length as u32 {
-                return Err(SearchError::InvalidRequest {
-                    reason: "Invalid Coordinates".to_string(),
-                    requested: format!("{}", coord)
-                });
-            }
-            let start = Self::get_offset(begin, contig);
-            let end = Self::get_offset(end, contig);
+            .map(|coord| {
+                let chr = coord.get_chromosome();
+                let begin = coord.get_begin();
+                let end = coord.get_end();
 
-            Ok(start..end)
-        }).collect()
+                let contig: &Contig = crate::genome::chromosome_aliases(chr)
+                    .iter()
+                    .find_map(|alias| self.contigs.get(alias))
+                    .ok_or(SearchError::InvalidRequest {
+                        reason: "Contig not found".to_string(),
+                        requested: chr.to_string(),
+                    })?;
+
+                if begin < 1 || end > contig.length as u32 {
+                    return Err(SearchError::InvalidRequest {
+                        reason: "Invalid Coordinates".to_string(),
+                        requested: format!("{}", coord),
+                    });
+                }
+                let start = Self::get_offset(begin, contig);
+                let end = Self::get_offset(end, contig) + 1;
+
+                Ok(start..end)
+            })
+            .collect()
     }
 
     pub fn get_offset(position: u32, contig: &Contig) -> u64 {
