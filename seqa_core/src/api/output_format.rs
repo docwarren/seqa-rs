@@ -35,7 +35,7 @@ pub enum OutputFormat {
     FASTA,
     /// Variant Call Format (bgzipped + tabix-indexed `.vcf.gz`).
     VCF,
-    /// Browser Extensible Data (bgzipped + tabix-indexed `.bed.gz`, or plain `.bed`).
+    /// Browser Extensible Data (bgzipped + tabix-indexed `.bed.gz`).
     BED,
     /// BedGraph signal track (bgzipped + tabix-indexed `.bedgraph.gz`).
     BEDGRAPH,
@@ -43,7 +43,7 @@ pub enum OutputFormat {
     BIGWIG,
     /// BigBed annotation track — index is embedded in the file.
     BIGBED,
-    /// General Feature Format v3 (bgzipped + tabix-indexed `.gff.gz`).
+    /// General Feature Format v3 (bgzipped + tabix-indexed `.gff.gz` or `.gff3.gz`).
     GFF,
     /// Gene Transfer Format (bgzipped + tabix-indexed `.gtf.gz`).
     GTF,

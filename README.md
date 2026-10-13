@@ -5,7 +5,7 @@
 
 A set of Rust tools for making genomic range requests against files stored locally, over HTTP, or in cloud storage (AWS S3, Azure Blob Storage, Google Cloud Storage).
 
-Supports BAM, VCF, GFF/GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats. Indexes (BAI, TBI) are fetched automatically from the same storage backend as the data file.
+Supports BAM, VCF, GFF/GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats. Indexes (BAI, TBI, FAI) are fetched automatically from the same storage backend as the data file. A single search can cover several regions of one file.
 
 ## Crates
 
@@ -13,7 +13,8 @@ Supports BAM, VCF, GFF/GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats. In
 |-------|-------------|--------|
 | [`seqa_core`](seqa_core/) | Core library — genomic file parsing, binary index reading, cloud storage via `object_store` | [seqa_core/README.md](seqa_core/README.md) |
 | [`seqa`](seqa_cli/) | CLI tool — query any supported file from the command line | [seqa_cli/README.md](seqa_cli/README.md) |
-| [`seqa_axum`](seqa_axum/) | REST API server — HTTP endpoints for genomic search and file browsing |
+| [`seqa_axum`](seqa_axum/) | REST API server — HTTP endpoints for genomic search and file browsing | |
+| [`seqa_lambda`](seqa_lambda/) | AWS Lambda function — genomic search and gene lookups behind API Gateway | [seqa_lambda/README.md](seqa_lambda/README.md) |
 
 ## Storage Backends
 
@@ -58,12 +59,18 @@ The server binds to `127.0.0.1:8000` and exposes:
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET`  | `/` | Health check |
-| `POST` | `/search` | Genomic range query — JSON body `{"path": "...", "coordinates": "chr:start-end"}` |
-| `POST` | `/files` | List objects under a storage URI — JSON body is a bare string, e.g. `"s3://bucket/prefix/"` |
-| `GET`  | `/genes/symbols/{genome}` | List gene symbols for `hg19`/`hg38` |
+| `POST` | `/search` | Genomic range query — JSON body `{"path": "...", "coordinates": "chr:begin-end"}`; returns the result lines as plain text |
+| `POST` | `/files` | Recursively list objects under a storage URI — JSON body is a bare string, e.g. `"s3://bucket/prefix/"` |
+| `POST` | `/files/list` | List one level of a cloud URI (folders and files) — JSON body `{"uri": "s3://bucket/prefix/"}`; local paths are rejected |
+| `GET`  | `/files/buckets/{backend}` | List the buckets/containers the configured credentials can see — `backend` is `s3`, `gcs` or `azure` |
+| `GET`  | `/files/formats` | Supported file formats, their extensions and index extensions |
+| `GET`  | `/genes/symbols/{genome}` | List gene symbols for `hg19`/`hg38`/`grch37`/`grch38` |
 | `GET`  | `/genes/coordinates/{genome}/{gene}` | Look up coordinates for a gene symbol |
+| `GET`  | `/cytobands/{genome}/{chromosome}` | Cytobands for a chromosome |
 
-CORS is preconfigured for `http://localhost:5173` (Vite dev server). Cloud-backed requests require the same credentials as the CLI — see `seqa_core/README.md`.
+Parsed indexes and headers are cached in memory between `/search` requests.
+
+CORS is preconfigured for `http://localhost:5173` (Vite dev server) and `http://localhost:6006`/`6007` (Storybook). Cloud-backed requests require the same credentials as the CLI — see `seqa_core/README.md`.
 
 Run the axum test suite:
 
@@ -83,6 +90,10 @@ cargo test -p seqa_core --test bam
 cargo test -p seqa_core --test tabix
 cargo test -p seqa_core --test bigwig
 cargo test -p seqa_core --test bigbed
+cargo test -p seqa_core --test fasta
+
+# Run every test in the workspace
+cargo test
 ```
 
 ### Code coverage

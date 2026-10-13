@@ -16,8 +16,8 @@
 pub mod bgzip_block;
 
 use super::gzip::gzip_decompress;
-use bgzip_block::BgZipBlock;
 use crate::codecs::codec_error::CodecError;
+use bgzip_block::BgZipBlock;
 
 /// Reads BGZIP blocks from a byte vector
 /// Returns a vector of block sizes.
@@ -47,7 +47,6 @@ pub fn decompress(block_sizes: &[usize], bytes: &[u8]) -> Result<Vec<u8>, CodecE
 
     for &size in block_sizes {
         let compressed: Vec<u8> = bytes[i..i + size].to_vec();
-
         let handle = std::thread::spawn(move || gzip_decompress(&compressed));
         i += size;
         zip_handles.push(handle);
@@ -55,11 +54,11 @@ pub fn decompress(block_sizes: &[usize], bytes: &[u8]) -> Result<Vec<u8>, CodecE
 
     for handle in zip_handles {
         match handle.join() {
-            Ok(decompressed) => {
-                result.push(decompressed?)
-            },
+            Ok(decompressed) => result.push(decompressed?),
             Err(_) => {
-                return Err(CodecError::UnknownError("Error joining decompression thread results".to_string()))
+                return Err(CodecError::UnknownError(
+                    "Error joining decompression thread results".to_string(),
+                ));
             }
         }
     }

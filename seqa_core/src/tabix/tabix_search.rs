@@ -15,10 +15,11 @@
 
 use crate::api::output_format::OutputFormat;
 use crate::api::parsing_error::ParsingError;
-use crate::api::search::{init_fetch_handles, join_fetch_handles};
+use crate::api::search::{decompress_chunks, fetch};
 use crate::api::search_error::SearchError;
 use crate::api::search_options::SearchOptions;
 use crate::api::search_result::SearchResult;
+use crate::coordinate::Coordinate;
 use crate::indexes::bin_util::get_bin_numbers;
 use crate::stores::StoreService;
 use crate::tabix::bed::BedLine;
@@ -30,16 +31,12 @@ use crate::tabix::tabix_header::TabixHeader;
 use crate::tabix::vcf::VcfLine;
 use crate::traits::sam_index::SamIndex;
 
-/// Converts raw data bytes into a vector of strings, processing each line according to the search options.
-/// # Arguments:
-/// * `data` - A vector of bytes representing the raw data to be processed.
-/// * `options` - A `SearchOptions` struct containing the search parameters such as output format,
-///  whether to include headers, and the range of positions to consider.
-/// # Returns:
-/// * A Result containing a vector of strings with the processed lines, which may include headers.
-pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Result<Vec<String>, ParsingError> {
+fn read_lines(
+    data: &[u8],
+    coordinate: &Coordinate,
+    output_format: &OutputFormat,
+) -> Result<Vec<String>, ParsingError> {
     let raw_string = String::from_utf8_lossy(data).into_owned();
-
 
     let line_strings = raw_string
         .split('\n')
@@ -48,26 +45,57 @@ pub fn data_to_lines(data: &Vec<u8>, options: &SearchOptions) -> Result<Vec<Stri
         .map(|line| line.to_string())
         .collect::<Vec<String>>();
 
-    let model_new = options.output_format.get_model();
+    let model_new = output_format.get_model();
 
     let result = line_strings
         .iter()
         .map(|line| model_new(line).map_err(|e| ParsingError::FormatError(e)))
         .collect::<Result<Vec<Box<dyn crate::traits::feature::Feature>>, ParsingError>>()?
         .into_iter()
-        .filter(|feature| feature.overlaps(options))
+        .filter(|feature| feature.coordinate().overlaps(coordinate))
         .map(|feature| feature.to_string())
         .collect();
     Ok(result)
 }
+/// Parses decompressed tabix data and keeps the records that overlap.
+///
+/// `data[i]` is filtered against `coordinates[i]`, so the two slices must line up
+/// one-to-one (one entry per fetched chunk).  Records are written back out in their
+/// native text format, in that order.
+///
+/// # Errors
+///
+/// Returns [`ParsingError::FormatError`] if a line cannot be parsed as `output_format`.
+pub fn data_to_lines(
+    data: &[Vec<u8>],
+    coordinates: &[Coordinate],
+    output_format: &OutputFormat,
+) -> Result<Vec<String>, ParsingError> {
+    let mut lines = Vec::new();
+    for (idx, coord) in coordinates.iter().enumerate() {
+        match read_lines(&data[idx], &coord, output_format) {
+            Ok(l) => lines.push(l),
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(lines.concat())
+}
 
-/// Searches for data in a tabixed bgzipped file based on the provided search options.
-/// Returns a vector of strings containing the results, which may include  headers.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file paths, chromosome,
-///  start and end positions, output format, and whether to include headers or only headers.
-/// # Returns:
-/// * a Result containing a vector of strings with the search results, or an error message if the search fails.
+/// Searches a bgzipped, tabix-indexed file (VCF, BED, BedGraph, GFF, GTF) for records
+/// overlapping each of [`SearchOptions::coordinates`].
+///
+/// The `.tbi` index and file header are taken from `options` if present, otherwise read
+/// from `index_path` / `file_path`.  Both are returned in the [`SearchResult`] so callers
+/// can pass them back in on later queries.
+///
+/// Result lines are grouped by coordinate in the order the coordinates were given.  Header
+/// lines from [`get_header_lines`] come first when `include_header` is set; when
+/// `header_only` is set only the file header is returned.
+///
+/// # Errors
+///
+/// Returns [`SearchError::InvalidRequest`] if a coordinate names a chromosome that is not
+/// in the index, or [`SearchError::ParseError`] if a record cannot be parsed.
 pub async fn tabix_search(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -76,7 +104,10 @@ pub async fn tabix_search(
 
     let tabix = match &options.tabix_index {
         Some(index) => index,
-        None => &Tabix::from_compressed_file(store_service, &options.index_path, options.no_cache).await?
+        None => {
+            &Tabix::from_compressed_file(store_service, &options.index_path, options.no_cache)
+                .await?
+        }
     };
     let tabix_header = match &options.tabix_header {
         Some(header) => header,
@@ -94,50 +125,57 @@ pub async fn tabix_search(
         return Ok(result);
     }
 
-    let bin_numbers = get_bin_numbers(options.begin, options.end);
+    let mut chunks = Vec::new();
+    let mut flat_coords = Vec::new();
 
-    let chr_i = tabix.get_chromosome_index_by_name(&options.chromosome)
-        .ok_or(SearchError::InvalidRequest {
-            reason: format!("Chromosome not found in index: {}", options.chromosome),
-            requested: format!("{}:{}-{}", options.chromosome, options.begin, options.end)
-        })?;
+    for coord in &options.coordinates {
+        let bin_numbers = get_bin_numbers(&coord);
+        let chr_i = tabix
+            .get_chromosome_index_by_name(&coord.get_chromosome())
+            .ok_or(SearchError::InvalidRequest {
+                reason: format!("Chromosome not found in index: {}", coord.get_chromosome()),
+                requested: format!("{}", coord),
+            })?;
+        let chr_idx = &tabix.references[chr_i as usize];
+        let coord_chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
+        for _ in 0..coord_chunks.len() {
+            flat_coords.push(coord.clone());
+        }
+        chunks.push(coord_chunks);
+    }
 
-    let chr_idx = &tabix.references[chr_i as usize];
-
-    let chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &options);
-
-    let chunk_handles = init_fetch_handles(store_service, &options, &chunks)
+    let flat_chunks = chunks.concat();
+    let data = fetch(store_service, &options.file_path, &flat_chunks)
         .await
         .map_err(|e| SearchError::ReadError {
             path: options.file_path.to_string(),
-            source: e
+            source: e,
         })?;
 
-    let raw_data = join_fetch_handles(chunk_handles)
-        .await
-        .map_err(|e| SearchError::CodecError {
-            path: options.file_path.to_string(),
-            source: e
-        })?;
+    let raw_data =
+        decompress_chunks(&flat_chunks, &data)
+            .await
+            .map_err(|e| SearchError::CodecError {
+                path: options.file_path.to_string(),
+                source: e,
+            })?;
 
-    let lines = data_to_lines(&raw_data.concat(), &options).map_err(|e|SearchError::ParseError {
-        source: e,
-        path: options.file_path.clone()
+    let lines = data_to_lines(&raw_data, &flat_coords, &options.output_format).map_err(|e| {
+        SearchError::ParseError {
+            source: e,
+            path: options.file_path.clone(),
+        }
     })?;
-    
+
     let mut all_lines = get_header_lines(options, &tabix_header);
     all_lines.extend(lines);
     result.lines = all_lines;
     Ok(result)
 }
 
-/// Searches for data in a vcf file using the provided search options.
-/// Returns a vector of `VcfLine` objects containing the results.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file
-///     paths, chromosome, start and end positions, output format, and whether to include headers or only headers.
-/// # Returns:
-/// * A  Result containing a vector of `VcfLine` objects with the search results, or an error message if the search fails.
+/// Runs [`tabix_search`] on a VCF and parses the result lines into [`VcfLine`]s.
+///
+/// Lines that do not parse, including any header lines, are skipped.
 pub async fn tabix_search_vcf(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -153,13 +191,11 @@ pub async fn tabix_search_vcf(
     Ok(vcf_lines)
 }
 
-/// Gets the header lines for the specified output format.
-/// # Arguments:
-/// * `options` - A `SearchOptions` struct containing the search parameters such as file
-///     paths, chromosome, start and end positions, output format, and whether to include headers or only headers.
-/// * `tabix_header` - A `TabixHeader` struct containing the header information for the tabix file.
-/// # Returns:
-/// * A vector of strings containing the header lines for the specified output format.
+/// Returns the header lines to put before the results when `options.include_header` is set.
+///
+/// VCF returns the file's own `#` header lines.  BED, BedGraph, GFF and GTF return a
+/// single tab-separated line of column names.  Returns nothing when `include_header` is
+/// `false`.
 pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> Vec<String> {
     if options.include_header {
         match options.output_format {
@@ -177,19 +213,19 @@ pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> 
 
 #[test]
 fn test_get_header_lines() {
-    let mut options = SearchOptions::new("test.gff.gz", "chr1:1-10000000");
+    let mut options = SearchOptions::new("test.gff.gz", vec!["chr1:1-10000000"]).unwrap();
     options.include_header = true;
     options.output_format = OutputFormat::GFF;
     options.index_path = "test.gff.gz.tbi".to_string();
-    options.begin = 0;
-    options.end = 1000;
-    options.chromosome = "chr1".to_string();
     options.header_only = false;
     options.bigwig_index = None;
 
     let tabix_header = TabixHeader::new();
     let header_lines = get_header_lines(&options, &tabix_header);
     println!("{:?}", header_lines);
-    assert!(header_lines.len() == 1);
-    assert!(header_lines[0] == "chromosome\tsource\tfeature\tbegin\tend\tscore\tstrand\tframe\tgroup");
+    assert_eq!(header_lines.len(), 1);
+    assert_eq!(
+        header_lines[0],
+        "chromosome\tsource\tfeature\tbegin\tend\tscore\tstrand\tframe\tgroup"
+    );
 }

@@ -1,24 +1,33 @@
-use crate::api::search_options::SearchOptions;
+use crate::api::parsing_error::ParsingError;
+use crate::api::search_error::SearchError;
 use crate::bigwig::index::chr_tree::BigwigChrTree;
 use crate::bigwig::index::header::BigwigHeader;
 use crate::bigwig::index::r_tree::overlaps::Overlaps;
 use crate::bigwig::index::total_summary::TotalSummary;
 use crate::bigwig::index::zoom_header::ZoomHeader;
 use crate::bigwig::zoom_data::ZoomData;
+use crate::coordinate::Coordinate;
 use crate::indexes::constants::{BIGWIG_HEADER_SIZE, BIGWIG_ZOOM_HEADER_SIZE};
 use crate::stores::StoreService;
 use std::ops::Range;
-use crate::api::parsing_error::ParsingError;
-use crate::api::search_error::SearchError;
 
-pub fn get_zoom_strings(bytes: Vec<u8>, chr_tree: &BigwigChrTree, options: &SearchOptions) -> Vec<String> {
+pub fn get_zoom_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
     let mut str_array = Vec::new();
     let mut offset = 0;
-    let chromosome_id = chr_tree.get_chromosome_id(&options.chromosome).unwrap_or(0);
+    let chromosome_id = chr_tree
+        .get_chromosome_id(coord.get_chromosome())
+        .unwrap_or(0);
 
     while offset + ZoomData::SIZE <= bytes.len() {
-        if let Ok(zoom_data) = ZoomData::from_bytes(&bytes[offset..offset + ZoomData::SIZE], chr_tree) {
-            if zoom_data.overlaps(chromosome_id, chromosome_id, options.begin, options.end) {
+        if let Ok(zoom_data) =
+            ZoomData::from_bytes(&bytes[offset..offset + ZoomData::SIZE], chr_tree)
+        {
+            if zoom_data.overlaps(
+                chromosome_id,
+                chromosome_id,
+                coord.get_begin(),
+                coord.get_end(),
+            ) {
                 str_array.push(format!("{}", zoom_data));
             }
             offset += ZoomData::SIZE;
@@ -30,7 +39,6 @@ pub fn get_zoom_strings(bytes: Vec<u8>, chr_tree: &BigwigChrTree, options: &Sear
     str_array
 }
 
-
 pub fn get_bigwig_header_range() -> Range<u64> {
     Range {
         start: 0u64,
@@ -38,29 +46,44 @@ pub fn get_bigwig_header_range() -> Range<u64> {
     }
 }
 
-pub async fn get_bigwig_header(store: &StoreService, path_str: &str) -> Result<BigwigHeader, SearchError> {
+pub async fn get_bigwig_header(
+    store: &StoreService,
+    path_str: &str,
+) -> Result<BigwigHeader, SearchError> {
     let header_range = get_bigwig_header_range();
-    let header_bytes = store.get_range(path_str, header_range).await.map_err(|e| SearchError::ReadError {
-        path: path_str.to_string(),
-        source: e
-    })?;
+    let header_bytes =
+        store
+            .get_range(path_str, header_range)
+            .await
+            .map_err(|e| SearchError::ReadError {
+                path: path_str.to_string(),
+                source: e,
+            })?;
     BigwigHeader::from_bytes(&header_bytes).map_err(|e| SearchError::ParseError {
         path: path_str.to_string(),
-        source: e
+        source: e,
     })
 }
 
-pub async fn get_bigwig_detail_bytes(store: &StoreService, header: &BigwigHeader, path_str: &str) -> Result<Vec<u8>, SearchError> {
+pub async fn get_bigwig_detail_bytes(
+    store: &StoreService,
+    header: &BigwigHeader,
+    path_str: &str,
+) -> Result<Vec<u8>, SearchError> {
     let index_range = 0u64..header.full_data_offset + 4;
-    store.get_range(path_str, index_range)
+    store
+        .get_range(path_str, index_range)
         .await
         .map_err(|e| SearchError::ReadError {
             path: path_str.to_string(),
-            source: e
+            source: e,
         })
 }
 
-pub fn get_zoom_headers(header: &BigwigHeader, index_bytes: &[u8]) -> Result<Vec<ZoomHeader>, ParsingError> {
+pub fn get_zoom_headers(
+    header: &BigwigHeader,
+    index_bytes: &[u8],
+) -> Result<Vec<ZoomHeader>, ParsingError> {
     if header.zoom_levels == 0 {
         return Ok(Vec::new());
     }
@@ -73,7 +96,9 @@ pub fn get_zoom_headers(header: &BigwigHeader, index_bytes: &[u8]) -> Result<Vec
             return Err(ParsingError::InsufficientBytes);
         }
 
-        let zoom_header = ZoomHeader::from_bytes(&index_bytes[offset..offset + BIGWIG_ZOOM_HEADER_SIZE as usize])?;
+        let zoom_header = ZoomHeader::from_bytes(
+            &index_bytes[offset..offset + BIGWIG_ZOOM_HEADER_SIZE as usize],
+        )?;
         zoom_headers.push(zoom_header);
         offset += BIGWIG_ZOOM_HEADER_SIZE as usize;
     }
@@ -83,7 +108,10 @@ pub fn get_zoom_headers(header: &BigwigHeader, index_bytes: &[u8]) -> Result<Vec
     Ok(zoom_headers)
 }
 
-pub fn get_total_summary(header: &BigwigHeader, index_bytes: &[u8]) -> Result<TotalSummary, ParsingError> {
+pub fn get_total_summary(
+    header: &BigwigHeader,
+    index_bytes: &[u8],
+) -> Result<TotalSummary, ParsingError> {
     let start = header.total_summary_offset as usize;
     let end = header.chromosome_tree_offset as usize;
 

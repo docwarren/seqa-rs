@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::coordinate::Coordinate;
 use super::constants::MAX_BIN_SIZE;
 
 fn update_bins(mut k: u32, max_k: u32, bins: &mut [u32; MAX_BIN_SIZE], i: &mut usize) {
@@ -52,9 +53,9 @@ pub fn region_to_bins(begin: u32, end: u32, bins: &mut [u32; MAX_BIN_SIZE]) -> u
     i
 }
 
-pub fn get_bin_numbers(begin: u32, end: u32) -> Vec<u32> {
+pub fn get_bin_numbers(coord: &Coordinate) -> Vec<u32> {
     let mut bin_numbers = [0u32; MAX_BIN_SIZE];
-    let length = region_to_bins(begin, end, &mut bin_numbers);
+    let length = region_to_bins(coord.get_begin(), coord.get_end(), &mut bin_numbers);
     bin_numbers[..length].to_vec()
 }
 

@@ -15,7 +15,9 @@
 
 use std::fmt::Display;
 
+use crate::api::parsing_error::ParsingError;
 use crate::bam::cigar_op::CigarOperation;
+use crate::traits::from_bytes::FromBytes;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -24,26 +26,15 @@ pub struct Cigar {
 }
 
 impl Cigar {
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, String> {
-        let mut operations = Vec::new();
-        let mut i = 0;
-
-        while i < bytes.len() {
-            let op = u32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid Cigar bytes".to_string())?);
-            let cigar_op = CigarOperation::new(op);
-            operations.push(cigar_op);
-            i += 4;
-        }
-
-        Ok(Cigar { operations })
-    }
-
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
     }
 
     pub fn get_reference_length(&self) -> u32 {
-        self.operations.iter().map(|op| op.get_reference_length()).sum()
+        self.operations
+            .iter()
+            .map(|op| op.get_reference_length())
+            .sum()
     }
 
     pub fn get_read_length(&self) -> u32 {
@@ -55,11 +46,33 @@ impl Cigar {
     }
 }
 
+impl FromBytes for Cigar {
+    type Error = ParsingError;
+
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), Self::Error> {
+        let mut operations = Vec::new();
+        let mut idx = 0;
+        while idx < bytes.len() {
+            let op = u32::from_le_bytes(bytes[idx..idx + 4].try_into()?);
+            let cigar_op = CigarOperation::new(op);
+            operations.push(cigar_op);
+            idx += 4;
+        }
+
+        Ok((Cigar { operations }, idx))
+    }
+}
+
 impl Display for Cigar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for op in self.operations.iter() {
-            write!(f, "{}", op)?;
-        }
+        if self.is_empty() {
+            write!(f, "*")?;
+        } else {
+            for op in self.operations.iter() {
+                write!(f, "{}", op)?;
+            }
+        };
+
         Ok(())
     }
 }

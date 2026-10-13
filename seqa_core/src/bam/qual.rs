@@ -16,6 +16,8 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
+use crate::api::parsing_error::ParsingError;
+use crate::traits::from_bytes::FromBytes;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Qual {
@@ -23,9 +25,6 @@ pub struct Qual {
 }
 
 impl Qual {
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Qual { bytes }
-    }
 
     pub fn as_string(&self) -> String {
         if self.bytes.is_empty() {
@@ -40,6 +39,15 @@ impl Qual {
                 .map(|&q| (q + 33) as char) // Convert to ASCII quality scores
                 .collect::<String>()
         }
+    }
+}
+
+impl FromBytes for Qual {
+    type Error = ParsingError;
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), ParsingError> {
+        Ok((Qual {
+            bytes: bytes.to_vec()
+        }, bytes.len()))
     }
 }
 

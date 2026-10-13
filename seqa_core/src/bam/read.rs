@@ -12,21 +12,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+use crate::api::parsing_error::ParsingError;
 use crate::bam::cigar::Cigar;
 use crate::bam::header::header::BamHeader;
 use crate::bam::qual::Qual;
 use crate::bam::seq::Seq;
 use crate::bam::tags::Tags;
-use crate::{models::coordinates::CoordinateSystem, traits::feature::Feature};
+use crate::coordinate::Coordinate;
+use crate::traits::from_bytes::FromBytes;
+use crate::{models::coordinate_system::CoordinateSystem, traits::feature::Feature};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Read {
     block_size: u32,
-    ref_id: i32,
-    ref_name: String, // This will be set later based on the ref_id
+    pub ref_id: i32,
     pub pos: i32,
     l_read_name: u8,
     mapq: u8,
@@ -35,7 +36,6 @@ pub struct Read {
     flag: u16,
     pub l_seq: u32,
     next_ref_id: i32,
-    next_ref_str: String, // This will be set later based on the next_ref_id
     next_pos: i32,
     t_len: i32,
     read_name: Vec<u8>,
@@ -228,27 +228,40 @@ impl Read {
         Self::init_merged_cigar_string(&clipped_ref, &enhanced_read)
     }
 
-    pub fn from_bytes(bytes: &Vec<u8>, mut i: usize, bam_header: &BamHeader) -> Result<(Self, usize), String> {
+    pub fn get_ref_name(&self, bam_header: &BamHeader) -> Option<String> {
+        bam_header.get_chromosome_name_by_index(self.ref_id as usize)
+    }
+
+    pub fn get_next_ref_name(&self, bam_header: &BamHeader) -> Option<String> {
+        if self.next_ref_id == self.ref_id {
+            Some("=".to_string())
+        } else {
+            bam_header.get_chromosome_name_by_index(self.next_ref_id as usize)
+        }
+    }
+}
+
+impl FromBytes for Read {
+    type Error = ParsingError;
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), ParsingError> {
+        let mut i = 0;
         if bytes.len() < i + 4 {
-            return Err("Not enough bytes for block size".into());
+            return Err(ParsingError::InsufficientBytes);
         }
 
-        let block_size = u32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid block size".to_string())?);
+        let block_size = u32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
         let block_end = i + block_size as usize;
 
         if block_end > bytes.len() {
-            return Err("Not enough bytes for a complete read".into());
+            return Err(ParsingError::InsufficientBytes);
         }
 
-        let ref_id = i32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid ref_id".to_string())?);
+        let ref_id = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
-        let ref_name = bam_header.get_chromosome_name_by_index(ref_id as usize)
-            .unwrap_or_else(|| format!("chr{}", ref_id));
-
-        let pos = i32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid pos".to_string())?);
+        let pos = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
         let l_read_name = bytes[i];
@@ -257,55 +270,48 @@ impl Read {
         let mapq = bytes[i];
         i += 1;
 
-        let bin = u16::from_le_bytes(bytes[i..i + 2].try_into().map_err(|_| "Invalid bin".to_string())?);
+        let bin = u16::from_le_bytes(bytes[i..i + 2].try_into()?);
         i += 2;
 
-        let n_cigar_op = u16::from_le_bytes(bytes[i..i + 2].try_into().map_err(|_| "Invalid n_cigar_op".to_string())?);
+        let n_cigar_op = u16::from_le_bytes(bytes[i..i + 2].try_into()?);
         i += 2;
 
-        let flag = u16::from_le_bytes(bytes[i..i + 2].try_into().map_err(|_| "Invalid flag".to_string())?);
+        let flag = u16::from_le_bytes(bytes[i..i + 2].try_into()?);
         i += 2;
 
-        let l_seq = u32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid l_seq".to_string())?);
+        let l_seq = u32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
-        let next_ref_id = i32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid next_ref_id".to_string())?);
+        let next_ref_id = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
-        let next_ref_str = if next_ref_id == ref_id {
-            format!("=")
-        }
-        else {
-            bam_header.get_chromosome_name_by_index(next_ref_id as usize)
-            .unwrap_or_else(|| format!("*"))
-        };
-
-        let next_pos = i32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid next_pos".to_string())?);
+        let next_pos = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
-        let t_len = i32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|_| "Invalid t_len".to_string())?);
+        let t_len = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
         let read_name = bytes[i..i + l_read_name as usize].to_vec();
         i += l_read_name as usize;
 
-        let cigar = Cigar::from_bytes(bytes[i..i + (n_cigar_op as usize * 4)].to_vec())?;
+        let cigar_end = i + n_cigar_op as usize * 4;
+        let cigar = Cigar::from_bytes(&bytes[i..cigar_end])?.0;
         i += n_cigar_op as usize * 4;
 
-        let seq = Seq::from_bytes(bytes[i..i + ((l_seq as usize + 1) / 2)].to_vec());
+        let seq_end = i + ((l_seq as usize + 1) / 2);
+        let seq = Seq::from_bytes(&bytes[i..seq_end])?.0;
         i += (l_seq as usize + 1) / 2;
 
-        let qual = Qual::from_bytes(bytes[i..i + l_seq as usize].to_vec());
+        let qual = Qual::from_bytes(&bytes[i..i + l_seq as usize])?.0;
         i += l_seq as usize;
 
-        let tags = Tags::from_bytes(bytes[i..block_end].to_vec());
+        let tags = Tags::from_bytes(&bytes[i..block_end])?.0;
         i = block_end;
 
         Ok((
             Read {
                 block_size,
                 ref_id,
-                ref_name,
                 pos,
                 l_read_name,
                 mapq,
@@ -314,7 +320,6 @@ impl Read {
                 flag,
                 l_seq,
                 next_ref_id,
-                next_ref_str,
                 next_pos,
                 t_len,
                 read_name,
@@ -329,26 +334,42 @@ impl Read {
 }
 
 impl Read {
-    /// Formats the read as a SAM line with the specified cigar format.
-    pub fn to_sam_string(&self, use_merged_cigar: bool) -> String {
-        let read_name = String::from_utf8_lossy(&self.read_name).trim_matches('\0').to_string();
-        let cigar_str = if self.cigar.is_empty() {
-            "*".to_string()
-        } else if use_merged_cigar {
+    fn get_read_name(&self) -> String {
+        String::from_utf8_lossy(&self.read_name)
+            .trim_matches('\0')
+            .to_string()
+    }
+
+    /// Formats the read as a SAM line.
+    ///
+    /// `bam_header` is used to turn `ref_id` and `next_ref_id` into reference names
+    /// (`next_ref_id` becomes `"="` when it matches `ref_id`).  If an id is not in the
+    /// header, the raw number is written instead.  When `use_merged_cigar` is `true` the
+    /// CIGAR column comes from [`Read::get_merged_cigar`].
+    pub fn to_sam_string(&self, use_merged_cigar: bool, bam_header: &BamHeader) -> String {
+        let chr = self
+            .get_ref_name(bam_header)
+            .unwrap_or_else(|| format!("{}", self.ref_id));
+
+        let next_chr = self
+            .get_next_ref_name(bam_header)
+            .unwrap_or_else(|| format!("{}", self.next_ref_id));
+
+        let cigar_str = if use_merged_cigar {
             self.get_merged_cigar()
         } else {
-            self.cigar.to_string()
+            format!("{}", self.cigar)
         };
 
         format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-            read_name,
+            self.get_read_name(),
             self.flag,
-            self.ref_name,
+            chr,
             self.pos + 1,
             self.mapq,
             cigar_str,
-            self.next_ref_str,
+            next_chr,
             self.next_pos + 1,
             self.t_len,
             self.seq,
@@ -356,24 +377,12 @@ impl Read {
             self.tags
         )
     }
-}
 
-impl Display for Read {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_sam_string(false))
-    }
-}
-
-impl Feature for Read {
-    fn get_chromosome(&self) -> String {
-        self.ref_name.to_owned()
-    }
-
-    fn get_begin(&self) -> u32 {
+    pub fn get_begin(&self) -> u32 {
         self.pos as u32
     }
 
-    fn get_end(&self) -> u32 {
+    pub fn get_end(&self) -> u32 {
         let cigar_len = self.cigar.get_reference_length();
         if cigar_len == 0 {
             // Unmapped reads: use sequence length or treat as 1-base point
@@ -382,16 +391,43 @@ impl Feature for Read {
             self.get_begin() + cigar_len
         }
     }
+}
 
-    fn get_length(&self) -> u32 {
-        self.cigar.get_read_length()
+/// Debug-style tab-separated output with raw reference ids and the read name as bytes.
+/// This is not valid SAM; use [`Read::to_sam_string`] for that.
+impl Display for Read {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            self.read_name,
+            self.flag,
+            self.ref_id,
+            self.pos + 1,
+            self.mapq,
+            self.cigar,
+            self.next_ref_id,
+            self.next_pos + 1,
+            self.t_len,
+            self.seq,
+            self.qual,
+            self.tags
+        )?;
+        Ok(())
     }
+}
 
+impl Feature for Read {
     fn get_id(&self) -> String {
         String::from_utf8(self.read_name.clone()).unwrap()
     }
 
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::ZeroBasedHalfOpen
+    fn coordinate(&self) -> Coordinate {
+        Coordinate {
+            chromosome: self.ref_id.to_string(),
+            begin: self.get_begin(),
+            end: self.get_end(),
+            system: CoordinateSystem::ZeroBasedHalfOpen,
+        }
     }
 }

@@ -13,13 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::ops::Range;
-use serde::{Deserialize, Serialize};
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
+use crate::coordinate::Coordinate;
 use crate::stores::StoreService;
-use crate::api::search_options::SearchOptions;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::ops::Range;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Contig {
@@ -28,7 +28,7 @@ pub struct Contig {
     pub bases_per_line: u32,
     pub bytes_per_line: u32,
     pub offset: u64,
-    pub qual_offset: u64
+    pub qual_offset: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -47,16 +47,18 @@ impl FaiIndex {
         store_service: &StoreService,
         idx_path: &str,
     ) -> Result<Self, SearchError> {
-        let bytes = store_service.get_object(idx_path)
-            .await
-            .map_err(|e| SearchError::ReadError {
-                path: idx_path.to_string(),
-                source: e
-            })?;
+        let bytes =
+            store_service
+                .get_object(idx_path)
+                .await
+                .map_err(|e| SearchError::ReadError {
+                    path: idx_path.to_string(),
+                    source: e,
+                })?;
 
         FaiIndex::from_bytes(bytes).map_err(|e| SearchError::ParseError {
             path: idx_path.to_string(),
-            source: e
+            source: e,
         })
     }
 
@@ -89,25 +91,43 @@ impl FaiIndex {
         Ok(fai_index)
     }
 
-    pub fn get_offsets(&self, options: &SearchOptions) -> Result<Range<u64>, SearchError> {
-        let contig = crate::genome::chromosome_aliases(&options.chromosome)
+    /// Returns the byte range in the FASTA file that holds the sequence for each coordinate.
+    ///
+    /// Coordinates are 1-based closed.  Each range starts at the first base and ends one
+    /// byte after the last base, so it includes any newlines in between.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SearchError::InvalidRequest`] if a contig is not in the index, or if
+    /// `begin` is 0 or `end` is past the end of the contig.
+    pub fn get_offsets(&self, coordinates: &[Coordinate]) -> Result<Vec<Range<u64>>, SearchError> {
+        coordinates
             .iter()
-            .find_map(|alias| self.contigs.get(alias))
-            .ok_or(SearchError::InvalidRequest {
-                reason: "Contig not found".to_string(),
-                requested: options.chromosome.to_string()
-            })?;
+            .map(|coord| {
+                let chr = coord.get_chromosome();
+                let begin = coord.get_begin();
+                let end = coord.get_end();
 
-        if options.begin < 1 || options.end > contig.length as u32 {
-            return Err(SearchError::InvalidRequest {
-                reason: "Invalid Coordinates".to_string(),
-                requested: format!("{}:{}-{}", options.chromosome, options.begin, options.end)
-            });
-        }
-        let start = Self::get_offset(options.begin, contig);
-        let end = Self::get_offset(options.end, contig);
+                let contig: &Contig = crate::genome::chromosome_aliases(chr)
+                    .iter()
+                    .find_map(|alias| self.contigs.get(alias))
+                    .ok_or(SearchError::InvalidRequest {
+                        reason: "Contig not found".to_string(),
+                        requested: chr.to_string(),
+                    })?;
 
-        Ok(start..end)
+                if begin < 1 || end > contig.length as u32 {
+                    return Err(SearchError::InvalidRequest {
+                        reason: "Invalid Coordinates".to_string(),
+                        requested: format!("{}", coord),
+                    });
+                }
+                let start = Self::get_offset(begin, contig);
+                let end = Self::get_offset(end, contig) + 1;
+
+                Ok(start..end)
+            })
+            .collect()
     }
 
     pub fn get_offset(position: u32, contig: &Contig) -> u64 {

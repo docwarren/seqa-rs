@@ -15,7 +15,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use crate::models::coordinates::CoordinateSystem;
+use crate::coordinate::Coordinate;
+use crate::models::coordinate_system::CoordinateSystem;
 use crate::traits::feature::Feature;
 
 /// A single record from a BED (Browser Extensible Data) file.
@@ -249,22 +250,6 @@ impl Display for BedLine {
 
 impl Feature for BedLine {
 
-    fn get_chromosome(&self) -> String {
-        self.chromosome.clone()
-    }
-
-    fn get_begin(&self) -> u32 {
-        self.begin
-    }
-
-    fn get_end(&self) -> u32 {
-        self.end
-    }
-
-    fn get_length(&self) -> u32 {
-        self.end - self.begin
-    }
-
     fn get_id(&self) -> String {
         if let Some(name) = &self.name {
             name.clone()
@@ -273,8 +258,13 @@ impl Feature for BedLine {
         }
     }
 
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::ZeroBasedHalfOpen
+    fn coordinate(&self) -> Coordinate {
+        Coordinate {
+            chromosome: self.chromosome.clone(),
+            begin: self.begin,
+            end: self.end,
+            system: CoordinateSystem::ZeroBasedHalfOpen
+        }
     }
 }
 

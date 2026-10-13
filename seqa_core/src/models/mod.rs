@@ -15,4 +15,4 @@
 
 pub mod gene_coordinate;
 pub mod cytoband;
-pub mod coordinates;
+pub mod coordinate_system;

@@ -29,7 +29,8 @@ use crate::genome::get_longest_possible_genome;
 ///
 /// # Errors
 ///
-/// Returns [`UtilError`] when a local path does not exist or cannot be canonicalised.
+/// Returns [`SearchError::NotFound`] when a local path does not exist, or
+/// [`SearchError::AbsolutePathError`] when it cannot be made absolute.
 pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
     if file_path.starts_with("/") || file_path.starts_with("./") || file_path.starts_with("../") {
         match std::fs::exists(file_path) {
@@ -58,16 +59,19 @@ pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
 
 /// Parses a genomic coordinate string into `(chromosome, begin, end)`.
 ///
-/// Accepted formats:
-/// - `"chr1"` — whole chromosome; `begin` = 1, `end` = chromosome's maximum length.
-/// - `"chr1:1000"` — single-base query; `end` = `begin`.
+/// Positions are returned exactly as written; the caller decides which coordinate
+/// system they are in.  Accepted formats:
+/// - `"chr1"` — whole chromosome; `begin` = 1, `end` = the chromosome's length.
+/// - `"chr1:1000"` — from `begin` to the end of the chromosome; `end` = the chromosome's length.
 /// - `"chr1:1000-2000"` — explicit range.
 /// - Commas in numbers are stripped (e.g. `"chr1:1,000-2,000"`).
 ///
+/// Chromosome lengths are the longest length across all supported genome builds.
+///
 /// # Errors
 ///
-/// Returns [`FormatError`] when the chromosome name is not recognised or a
-/// numeric field cannot be parsed.
+/// Returns [`SearchError::InvalidCoordinateFormat`] when the chromosome name is not
+/// recognised or a numeric field cannot be parsed.
 pub fn parse_coordinates(coords: &str) -> Result<(String, u32, u32), SearchError> {
     let tokens: Vec<&str> = coords.split(':').collect();
     let chromosome = tokens[0].to_string();
@@ -264,27 +268,36 @@ fn test_parse_coordinates() {
 fn test_get_search_options_local() {
     use crate::api::search_options::SearchOptions;
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let options = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", "chr1:1000-2000");
-    assert_eq!(
-        options.file_path,
-        format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", manifest_dir)
-    );
-    assert_eq!(options.chromosome, "chr1");
-    assert_eq!(options.begin, 1000);
-    assert_eq!(options.end, 2000);
-    assert_eq!(
-        options.index_path,
-        format!(
-            "file://{}/mock_data/NA12878.gatk.cnv.vcf.gz.tbi",
-            manifest_dir
-        )
-    );
-    assert_eq!(options.output_format, OutputFormat::VCF);
+    if let Ok(options) = SearchOptions::new(
+        "./mock_data/NA12878.gatk.cnv.vcf.gz",
+        vec!["chr1:1000-2000"],
+    ) {
+        assert_eq!(
+            options.file_path,
+            format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", manifest_dir)
+        );
+        assert_eq!(options.coordinates[0].get_chromosome(), "chr1");
+        assert_eq!(options.coordinates[0].get_begin(), 1000);
+        assert_eq!(options.coordinates[0].get_end(), 2000);
+        assert_eq!(
+            options.index_path,
+            format!(
+                "file://{}/mock_data/NA12878.gatk.cnv.vcf.gz.tbi",
+                manifest_dir
+            )
+        );
+        assert_eq!(options.output_format, OutputFormat::VCF);
+    } else {
+        assert!(false);
+    }
 
-    let options = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", "chr1");
-    assert_eq!(options.chromosome, "chr1");
-    assert_eq!(options.begin, 1);
-    assert_eq!(options.end, 249_250_621); // Assuming chr1 length from longest_possible_genome
+    if let Ok(options) = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", vec!["chr1"]) {
+        assert_eq!(options.coordinates[0].get_chromosome(), "chr1");
+        assert_eq!(options.coordinates[0].get_begin(), 1);
+        assert_eq!(options.coordinates[0].get_end(), 249_250_621); // Assuming chr1 length from longest_possible_genome
+    } else {
+        assert!(false);
+    }
 }
 
 #[test]

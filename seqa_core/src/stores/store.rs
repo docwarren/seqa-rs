@@ -22,10 +22,8 @@ use object_store::local::LocalFileSystem;
 
 use url::Url;
 
-/// Extracts the bucket name from an S3 URL.
-/// For s3:// URLs, the bucket is the host (e.g. s3://bucket/key -> "bucket").
-/// For https:// S3 URLs, the bucket is the first path segment
-/// (e.g. https://s3.region.amazonaws.com/bucket/key -> "bucket").
+/// Builds an S3 store for `bucket`, with credentials and region from the `AWS_*`
+/// environment variables.
 pub fn get_s3_store_from_bucket(bucket: &str) -> Result<AmazonS3, StoreError> {
     match AmazonS3Builder::from_env()
         .with_bucket_name(bucket)
@@ -38,6 +36,10 @@ pub fn get_s3_store_from_bucket(bucket: &str) -> Result<AmazonS3, StoreError> {
     }
 }
 
+/// Extracts the bucket name from an S3 URL.
+/// For `s3://` URLs, the bucket is the host (e.g. `s3://bucket/key` -> `"bucket"`).
+/// For `https://` S3 URLs, the bucket is the first path segment
+/// (e.g. `https://s3.region.amazonaws.com/bucket/key` -> `"bucket"`).
 pub fn get_s3_bucket_from_url(s3_url: &str) -> Option<String> {
     let url = Url::parse(s3_url).ok()?;
     match url.scheme() {

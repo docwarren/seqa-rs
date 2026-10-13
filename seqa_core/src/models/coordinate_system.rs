@@ -42,15 +42,4 @@ impl CoordinateSystem {
             CoordinateSystem::OneBasedClosed => (begin - 1, end),
         }
     }
-
-    /// Converts a canonical 0-based half-open `(begin, end)` pair back to this
-    /// coordinate system.
-    ///
-    /// For [`OneBasedClosed`](CoordinateSystem::OneBasedClosed), `begin` is incremented by 1.
-    pub fn from_canonical(&self, begin: u32, end: u32) -> (u32, u32) {
-        match self {
-            CoordinateSystem::ZeroBasedHalfOpen => (begin, end),
-            CoordinateSystem::OneBasedClosed => (begin + 1, end),
-        }
-    }
 }

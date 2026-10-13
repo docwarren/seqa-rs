@@ -38,7 +38,8 @@ use error::StoreError;
 ///
 /// # Creating a service
 ///
-/// Use [`StoreService::from_uri`] to auto-detect the backend from the URL scheme:
+/// Create one with [`StoreService::new`] and share it.  Nothing is connected up front:
+/// the backend for each path is picked from its URL scheme and built on first use.
 ///
 /// ```rust,no_run
 /// use seqa_core::stores::StoreService;
@@ -198,6 +199,12 @@ impl StoreService {
         let (_, url) = Self::get_obj_scheme_and_path(path)?;
         let store = self.get_or_create_store(path)?;
         Ok(store.get_range(&url, range).await?.to_vec())
+    }
+
+    pub async fn get_ranges(&self, path: &str, ranges: &[Range<u64>]) -> Result<Vec<Vec<u8>>, StoreError> {
+        let (_, url) = Self::get_obj_scheme_and_path(path)?;
+        let store = self.get_or_create_store(path)?;
+        Ok(store.get_ranges(&url, ranges).await?.iter().map(|r| r.to_vec()).collect())
     }
 
     pub fn get_absolute_path(path: &str) -> Result<String, StoreError> {

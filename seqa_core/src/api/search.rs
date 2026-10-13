@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use futures::TryStreamExt;
-use futures::future::try_join_all;
 use object_store::ObjectStore;
 
 use crate::api::output_format::OutputFormat;
@@ -27,17 +26,17 @@ use crate::codecs::bgzip;
 use crate::codecs::codec_error::CodecError;
 use crate::fasta::fasta_search::fasta_search;
 use crate::indexes::chunk::Chunk;
-use crate::stores::error::StoreError;
 use crate::stores::StoreService;
+use crate::stores::error::StoreError;
 use crate::tabix::tabix_search::tabix_search;
 
+/// Opens a streaming download of the compressed byte range covered by `chunk`.
 pub async fn chunk_to_stream(
     chunk: &Chunk,
     store: &dyn ObjectStore,
     path: &object_store::path::Path,
-
-) -> Result<impl futures::Stream<Item = Result<Vec<u8>, object_store::Error>>, object_store::Error> {
-
+) -> Result<impl futures::Stream<Item = Result<Vec<u8>, object_store::Error>>, object_store::Error>
+{
     let range = chunk.to_range();
 
     let get_opts = object_store::GetOptions {
@@ -54,36 +53,38 @@ pub async fn chunk_to_stream(
     Ok(stream.map_ok(|get_result| get_result.to_vec()))
 }
 
-/// Fetches chunks concurrently from the store service.
+/// Fetches the compressed byte range for every chunk in a single
+/// [`StoreService::get_ranges`] call.
 ///
-/// Returns a vector of `(Chunk, bytes)` pairs preserving input order.
-pub async fn init_fetch_handles(
+/// Each range runs from the chunk's first block to one maximum block size past its
+/// last block, so the last block is always fetched whole.  Returns one buffer per
+/// chunk, in the same order as `chunks`.
+pub async fn fetch(
     store_service: &StoreService,
-    options: &SearchOptions,
+    file_path: &str,
     chunks: &[Chunk],
-) -> Result<Vec<(Chunk, Vec<u8>)>, StoreError> {
-    let futures = chunks.iter().map(|chunk| {
-        let range = chunk.to_range();
-        let file_path = options.file_path.clone();
-        let chunk_clone = chunk.clone();
-        async move {
-            let data = store_service.get_range(&file_path, range).await?;
-            Ok((chunk_clone, data))
-        }
-    });
-
-    try_join_all(futures).await
+) -> Result<Vec<Vec<u8>>, StoreError> {
+    let ranges = chunks.iter().map(|c| c.to_range()).collect::<Vec<_>>();
+    let data = store_service.get_ranges(file_path, &ranges).await?;
+    Ok(data)
 }
 
-/// Decompresses each fetched chunk and returns the post-offset data.
-pub async fn join_fetch_handles(
-    fetched: Vec<(Chunk, Vec<u8>)>,
+/// Decompresses each fetched chunk and drops the bytes before the chunk's first record.
+///
+/// `fetched[i]` must be the data returned by [`fetch`] for `chunks[i]`.  Returns one
+/// buffer per chunk, starting at `begin_vp`.  The tail is not trimmed, so the buffer may
+/// end part way through a record.
+pub async fn decompress_chunks(
+    chunks: &[Chunk],
+    fetched: &[Vec<u8>],
 ) -> Result<Vec<Vec<u8>>, CodecError> {
     let mut raw_data = Vec::new();
 
-    for (chunk, compressed_bytes) in fetched {
-        let block_sizes = bgzip::from_bytes(&compressed_bytes)?;
-        let decompressed_bytes = bgzip::decompress(&block_sizes, &compressed_bytes)?;
+    for i in 0..chunks.len() {
+        let chunk = chunks[i];
+        let compressed_bytes = &fetched[i];
+        let block_sizes = bgzip::from_bytes(compressed_bytes)?;
+        let decompressed_bytes = bgzip::decompress(&block_sizes, compressed_bytes)?;
         let decompressed_start_byte = chunk.begin_vp.decompressed_offset as usize;
         let decompressed_slice = &decompressed_bytes[decompressed_start_byte..];
         raw_data.push(decompressed_slice.to_vec());
@@ -94,8 +95,13 @@ pub async fn join_fetch_handles(
 /// Searches for features in a file based on the provided search options.
 ///
 /// Dispatches to the format-specific search function indicated by
-/// [`SearchOptions::output_format`] and reuses this `StoreService`'s cached
-/// object_store clients for every backend access.
+/// [`SearchOptions::output_format`], searching every coordinate in
+/// [`SearchOptions::coordinates`].  Backend clients are reused from `store`'s cache.
+///
+/// # Errors
+///
+/// Returns [`SearchError::UnsupportedFileFormat`] for [`OutputFormat::STRING`], otherwise
+/// whatever the format-specific search returns.
 pub async fn search_features(
     store: &StoreService,
     options: &SearchOptions,
@@ -110,7 +116,9 @@ pub async fn search_features(
         | OutputFormat::GFF
         | OutputFormat::GTF => tabix_search(store, options).await,
         OutputFormat::FASTA => fasta_search(store, options).await,
-        _ => Err(SearchError::UnsupportedFileFormat(options.file_path.to_string())),
+        _ => Err(SearchError::UnsupportedFileFormat(
+            options.file_path.to_string(),
+        )),
     };
 
     result
