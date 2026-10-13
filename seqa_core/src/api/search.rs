@@ -66,7 +66,10 @@ pub async fn fetch(
 }
 
 /// Decompresses each fetched chunk and returns the post-offset data.
-pub async fn inflate(chunks: &[Chunk], fetched: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, CodecError> {
+pub async fn decompress_chunks(
+    chunks: &[Chunk],
+    fetched: &[Vec<u8>],
+) -> Result<Vec<Vec<u8>>, CodecError> {
     let mut raw_data = Vec::new();
 
     for i in 0..chunks.len() {

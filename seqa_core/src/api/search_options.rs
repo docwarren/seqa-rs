@@ -109,7 +109,8 @@ impl SearchOptions {
         let index_path =
             crate::utils::get_index_path(&file_path).unwrap_or_else(|_| file_path.clone());
         let output_format = get_output_format(&file_path).unwrap_or(OutputFormat::STRING);
-        let coordinates = coord_strings
+        let coordinates = merge_overlapping_coordinates(&coord_strings);
+        coord_strings
             .iter()
             .map(|c| Coordinate::new(*c, system))
             .collect::<Result<Vec<Coordinate>, ParsingError>>()?;

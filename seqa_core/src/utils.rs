@@ -19,7 +19,9 @@ use serde::{Deserialize, Serialize};
 use crate::api::output_format::OutputFormat;
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
+use crate::coordinate::Coordinate;
 use crate::genome::get_longest_possible_genome;
+use crate::models::coordinate_system::CoordinateSystem;
 
 /// Normalises a file path to a URI accepted by [`crate::stores::StoreService`].
 ///
@@ -264,7 +266,10 @@ fn test_parse_coordinates() {
 fn test_get_search_options_local() {
     use crate::api::search_options::SearchOptions;
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    if let Ok(options) = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", vec!("chr1:1000-2000")) {
+    if let Ok(options) = SearchOptions::new(
+        "./mock_data/NA12878.gatk.cnv.vcf.gz",
+        vec!["chr1:1000-2000"],
+    ) {
         assert_eq!(
             options.file_path,
             format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", manifest_dir)
@@ -280,17 +285,15 @@ fn test_get_search_options_local() {
             )
         );
         assert_eq!(options.output_format, OutputFormat::VCF);
-    }
-    else {
+    } else {
         assert!(false);
     }
 
-    if let Ok(options) = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", vec!("chr1")) {
+    if let Ok(options) = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", vec!["chr1"]) {
         assert_eq!(options.coordinates[0].get_chromosome(), "chr1");
         assert_eq!(options.coordinates[0].get_begin(), 1);
         assert_eq!(options.coordinates[0].get_end(), 249_250_621); // Assuming chr1 length from longest_possible_genome
-    }
-    else {
+    } else {
         assert!(false);
     }
 }

@@ -15,7 +15,7 @@
 
 use crate::api::output_format::OutputFormat;
 use crate::api::parsing_error::ParsingError;
-use crate::api::search::{fetch, inflate};
+use crate::api::search::{decompress_chunks, fetch};
 use crate::api::search_error::SearchError;
 use crate::api::search_options::SearchOptions;
 use crate::api::search_result::SearchResult;
@@ -31,7 +31,11 @@ use crate::tabix::tabix_header::TabixHeader;
 use crate::tabix::vcf::VcfLine;
 use crate::traits::sam_index::SamIndex;
 
-fn read_lines(data: &[u8], coordinate: &Coordinate, output_format: &OutputFormat) -> Result<Vec<String>, ParsingError> {
+fn read_lines(
+    data: &[u8],
+    coordinate: &Coordinate,
+    output_format: &OutputFormat,
+) -> Result<Vec<String>, ParsingError> {
     let raw_string = String::from_utf8_lossy(data).into_owned();
 
     let line_strings = raw_string
@@ -53,12 +57,16 @@ fn read_lines(data: &[u8], coordinate: &Coordinate, output_format: &OutputFormat
         .collect();
     Ok(result)
 }
-pub fn data_to_lines(data: &[Vec<u8>], coordinates: &[Coordinate], output_format: &OutputFormat) -> Result<Vec<String>, ParsingError> {
+pub fn data_to_lines(
+    data: &[Vec<u8>],
+    coordinates: &[Coordinate],
+    output_format: &OutputFormat,
+) -> Result<Vec<String>, ParsingError> {
     let mut lines = Vec::new();
     for (idx, coord) in coordinates.iter().enumerate() {
         match read_lines(&data[idx], &coord, output_format) {
             Ok(l) => lines.push(l),
-            Err(e) => return Err(e)
+            Err(e) => return Err(e),
         }
     }
     Ok(lines.concat())
@@ -79,7 +87,10 @@ pub async fn tabix_search(
 
     let tabix = match &options.tabix_index {
         Some(index) => index,
-        None => &Tabix::from_compressed_file(store_service, &options.index_path, options.no_cache).await?
+        None => {
+            &Tabix::from_compressed_file(store_service, &options.index_path, options.no_cache)
+                .await?
+        }
     };
     let tabix_header = match &options.tabix_header {
         Some(header) => header,
@@ -98,15 +109,22 @@ pub async fn tabix_search(
     }
 
     let mut chunks = Vec::new();
+    let mut flat_coords = Vec::new();
+
     for coord in &options.coordinates {
         let bin_numbers = get_bin_numbers(&coord);
-        let chr_i = tabix.get_chromosome_index_by_name(&coord.get_chromosome())
+        let chr_i = tabix
+            .get_chromosome_index_by_name(&coord.get_chromosome())
             .ok_or(SearchError::InvalidRequest {
                 reason: format!("Chromosome not found in index: {}", coord.get_chromosome()),
-                requested: format!("{}", coord)
+                requested: format!("{}", coord),
             })?;
         let chr_idx = &tabix.references[chr_i as usize];
-        chunks.push(tabix.get_optimized_chunks(&chr_idx, bin_numbers, &coord));
+        let coord_chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
+        for _ in 0..coord_chunks.len() {
+            flat_coords.push(coord.clone());
+        }
+        chunks.push(coord_chunks);
     }
 
     let flat_chunks = chunks.concat();
@@ -114,22 +132,24 @@ pub async fn tabix_search(
         .await
         .map_err(|e| SearchError::ReadError {
             path: options.file_path.to_string(),
-            source: e
-        })?;
-
-    let raw_data = inflate(&flat_chunks, &data)
-        .await
-        .map_err(|e| SearchError::CodecError {
-            path: options.file_path.to_string(),
-            source: e
-        })?;
-
-    let lines = data_to_lines(&raw_data, &options.coordinates, &options.output_format)
-        .map_err(|e|SearchError::ParseError {
             source: e,
-            path: options.file_path.clone()
         })?;
-    
+
+    let raw_data =
+        decompress_chunks(&flat_chunks, &data)
+            .await
+            .map_err(|e| SearchError::CodecError {
+                path: options.file_path.to_string(),
+                source: e,
+            })?;
+
+    let lines = data_to_lines(&raw_data, &flat_coords, &options.output_format).map_err(|e| {
+        SearchError::ParseError {
+            source: e,
+            path: options.file_path.clone(),
+        }
+    })?;
+
     let mut all_lines = get_header_lines(options, &tabix_header);
     all_lines.extend(lines);
     result.lines = all_lines;
@@ -182,7 +202,7 @@ pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> 
 
 #[test]
 fn test_get_header_lines() {
-    let mut options = SearchOptions::new("test.gff.gz", vec!("chr1:1-10000000")).unwrap();
+    let mut options = SearchOptions::new("test.gff.gz", vec!["chr1:1-10000000"]).unwrap();
     options.include_header = true;
     options.output_format = OutputFormat::GFF;
     options.index_path = "test.gff.gz.tbi".to_string();
@@ -193,5 +213,8 @@ fn test_get_header_lines() {
     let header_lines = get_header_lines(&options, &tabix_header);
     println!("{:?}", header_lines);
     assert_eq!(header_lines.len(), 1);
-    assert_eq!(header_lines[0], "chromosome\tsource\tfeature\tbegin\tend\tscore\tstrand\tframe\tgroup");
+    assert_eq!(
+        header_lines[0],
+        "chromosome\tsource\tfeature\tbegin\tend\tscore\tstrand\tframe\tgroup"
+    );
 }

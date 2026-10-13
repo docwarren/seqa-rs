@@ -45,15 +45,18 @@ pub trait SamIndex {
         Some(first_record)
     }
 
-    fn get_optimized_chunks(&self, chr_idx: &ChrIdx, bins: Vec<u32>, coord: &Coordinate) -> Vec<Chunk> {
+    fn get_optimized_chunks(
+        &self,
+        chr_idx: &ChrIdx,
+        bins: Vec<u32>,
+        coord: &Coordinate,
+    ) -> Vec<Chunk> {
         let chunks = self.get_chunks(chr_idx, bins);
         let linear_bin_begin = self.get_linear_bin(chr_idx, coord.get_begin());
 
         let chunks = match linear_bin_begin {
             None => chunks, // If no linear bin is found, return the original chunks
-            Some(linear_bin_begin) => { 
-                filter_chunks(chunks, linear_bin_begin)
-            }
+            Some(linear_bin_begin) => filter_chunks(chunks, linear_bin_begin),
         };
         optimize(chunks)
     }

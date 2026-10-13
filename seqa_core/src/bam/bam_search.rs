@@ -12,7 +12,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::api::search::{fetch, inflate};
+use crate::api::search::{decompress_chunks, fetch};
 use crate::api::search_error::SearchError;
 use crate::api::search_options::{CigarFormat, SearchOptions};
 use crate::api::search_result::SearchResult;
@@ -119,6 +119,7 @@ pub async fn bam_search(
     };
 
     let mut chunks = Vec::with_capacity(coordinates.len());
+    let mut flat_coords = Vec::new();
 
     for coord in &coordinates {
         let bin_numbers = get_bin_numbers(&coord);
@@ -130,7 +131,11 @@ pub async fn bam_search(
             })?;
 
         let chr_idx = &bai.references[chr_i];
-        chunks.push(bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord));
+        let chunks_for_coord = bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
+        for _ in 0..chunks_for_coord.len() {
+            flat_coords.push(coord.clone());
+        }
+        chunks.push(chunks_for_coord);
     }
 
     let flat_chunks = chunks.concat();
@@ -141,15 +146,14 @@ pub async fn bam_search(
             source: e,
         })?;
 
-    let raw_data =
-        inflate(&flat_chunks, &compressed)
-            .await
-            .map_err(|e| SearchError::CodecError {
-                path: options.file_path.to_string(),
-                source: e,
-            })?;
+    let raw_data = decompress_chunks(&flat_chunks, &compressed)
+        .await
+        .map_err(|e| SearchError::CodecError {
+            path: options.file_path.to_string(),
+            source: e,
+        })?;
 
-    let lines = data_to_lines(&raw_data, &coordinates, &options.cigar_format, &bam_header)?;
+    let lines = data_to_lines(&raw_data, &flat_coords, &options.cigar_format, &bam_header)?;
     start_lines.extend(lines);
     result.lines = start_lines;
     Ok(result)
