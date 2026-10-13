@@ -95,7 +95,7 @@ impl Tags {
 
 impl FromBytes for Tags {
     type Error = ParsingError;
-    fn from_bytes(bytes: &[u8], _: usize) -> Result<(Self, usize), Self::Error> {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), Self::Error> {
         Ok((Tags {
             bytes: bytes.to_vec(),
         }, bytes.len()))
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_empty_tags() {
-        if let Ok(tags) = Tags::from_bytes(&[], 0) {
+        if let Ok(tags) = Tags::from_bytes(&[]) {
             assert_eq!(tags.0.to_string().unwrap(), "*");
         }
         else {
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_single_z_tag() {
         let bytes = build_z_tag("RG", "NA12877");
-        if let Ok(tags) = Tags::from_bytes(&bytes, 0) {
+        if let Ok(tags) = Tags::from_bytes(&bytes) {
             assert_eq!(tags.0.to_string().unwrap(), "RG:Z:NA12877");
         }
         else {
@@ -160,7 +160,7 @@ mod tests {
         let mut bytes = build_z_tag("RG", "NA12877");
         bytes.extend(build_a_tag("XT", b'U'));
         bytes.extend(build_i32_tag("NM", 0));
-        if let Ok((tags, _)) = Tags::from_bytes(&bytes, 0) {
+        if let Ok((tags, _)) = Tags::from_bytes(&bytes) {
             assert_eq!(tags.to_string().unwrap(), "RG:Z:NA12877\tXT:A:U\tNM:i:0");
         }
         else {
@@ -172,7 +172,7 @@ mod tests {
     fn test_get_value_found() {
         let mut bytes = build_z_tag("RG", "sample1");
         bytes.extend(build_i32_tag("NM", 5));
-        if let Ok((tags, _)) = Tags::from_bytes(&bytes, 0) {
+        if let Ok((tags, _)) = Tags::from_bytes(&bytes) {
             assert_eq!(tags.get_value("NM"), Some("5".into()));
             assert_eq!(tags.get_value("RG"), Some("sample1".into()));
         }
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn test_get_value_not_found() {
         let bytes = build_z_tag("RG", "sample1");
-        if let Ok((tags, _)) = Tags::from_bytes(&bytes, 0) {
+        if let Ok((tags, _)) = Tags::from_bytes(&bytes) {
             assert_eq!(tags.get_value("MD"), None);
         }
         else {
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_get_value_empty_tags() {
-        if let Ok((tags, _)) = Tags::from_bytes(&[], 0) {
+        if let Ok((tags, _)) = Tags::from_bytes(&[]) {
             assert_eq!(tags.get_value("RG"), None);
         }
         else {
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn test_get_value_invalid_tag_name() {
         let bytes = build_z_tag("RG", "sample1");
-        if let Ok((tags, _)) = Tags::from_bytes(&bytes, 0) {
+        if let Ok((tags, _)) = Tags::from_bytes(&bytes) {
             assert_eq!(tags.get_value("R"), None);
             assert_eq!(tags.get_value("RGX"), None);
         }
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn test_display() {
         let bytes = build_z_tag("RG", "NA12877");
-        if let Ok((tags, _)) = Tags::from_bytes(&bytes, 0) {
+        if let Ok((tags, _)) = Tags::from_bytes(&bytes) {
             assert_eq!(format!("{}", tags), "RG:Z:NA12877");
         }
         else {
@@ -230,7 +230,7 @@ mod tests {
         let mut bytes = vec![b'B', b'C', b'B', b'C'];
         bytes.extend_from_slice(&3i32.to_le_bytes());
         bytes.extend_from_slice(&[10, 20, 30]);
-        if let Ok((tags, _)) = Tags::from_bytes(&bytes, 0) {
+        if let Ok((tags, _)) = Tags::from_bytes(&bytes) {
             assert_eq!(tags.get_value("BC"), Some("10,20,30".into()));
         }
         else {

@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Display;
-
+use crate::coordinate::Coordinate;
 use crate::tabix::caller::Caller;
 use crate::traits::feature::Feature;
 
@@ -55,6 +55,69 @@ pub struct VcfLine {
 }
 
 impl VcfLine {
+    fn get_chromosome(&self) -> String {
+        self.chromosome.clone()
+    }
+    // If there are multiple alts all values
+    // are calculated based on the longest alt allele
+    // which is the most significant variant
+    // i.e. the one with the largest length difference
+    fn get_begin(&self) -> u32 {
+        let prefix_len = self.prefix_len().unwrap_or(0);
+        if prefix_len == 0 {
+            self.position
+        } else {
+            self.position + prefix_len - 1
+        }
+    }
+
+    fn get_end(&self) -> u32 {
+        if let Ok(v_type) = self.get_variant_type() {
+            match v_type {
+                VariantType::CnGain
+                | VariantType::CnLoss
+                | VariantType::CnRef
+                | VariantType::IndelDel
+                | VariantType::SvDel
+                | VariantType::SvDup => self.get_begin() + self.get_length(),
+                _ => self.get_begin(),
+            }
+        } else {
+            self.position
+        }
+    }
+
+    fn get_length(&self) -> u32 {
+        // try SVLEN in info
+        if let Some(length) = self.get_info_val("SVLEN") {
+            if let Ok(parsed) = length.parse::<u32>() {
+                return parsed;
+            }
+        }
+        // try CNVLEN in info
+        else if let Some(length) = self.get_info_val("CNVLEN") {
+            if let Ok(parsed) = length.parse::<u32>() {
+                return parsed;
+            }
+        }
+        // try END
+        else if let Some(end_result) = self.get_info_val("END") {
+            if let Ok(end) = end_result.parse::<u32>() {
+                return (end - self.position) + 1;
+            }
+        }
+        // use longest alt
+        else if let Some(alt) = self.longest_alt() {
+            if alt.len() > self.ref_allele.len() {
+                return alt.len() as u32 - self.ref_allele.len() as u32;
+            } else {
+                return self.ref_allele.len() as u32 - alt.len() as u32;
+            }
+        }
+
+        1
+    }
+
     /// Try to get an INFO field string value
     fn get_info_val(&self, key: &str) -> Option<String> {
         let val_set: HashMap<String, String> = self
@@ -219,75 +282,19 @@ impl Display for VcfLine {
 }
 
 impl Feature for VcfLine {
-    fn get_chromosome(&self) -> String {
-        self.chromosome.clone()
-    }
-    // If there are multiple alts all values
-    // are calculated based on the longest alt allele
-    // which is the most significant variant
-    // i.e. the one with the largest length difference
-    fn get_begin(&self) -> u32 {
-        let prefix_len = self.prefix_len().unwrap_or(0);
-        if prefix_len == 0 {
-            return self.position;
-        } else {
-            return self.position + prefix_len - 1;
-        }
-    }
 
-    fn get_end(&self) -> u32 {
-        if let Ok(v_type) = self.get_variant_type() {
-            return match v_type {
-                VariantType::CnGain
-                | VariantType::CnLoss
-                | VariantType::CnRef
-                | VariantType::IndelDel
-                | VariantType::SvDel
-                | VariantType::SvDup => self.get_begin() + self.get_length(),
-                _ => self.get_begin(),
-            };
-        } else {
-            return self.position;
-        }
-    }
 
     fn get_id(&self) -> String {
         self.id.clone()
     }
 
-    fn get_length(&self) -> u32 {
-        // try SVLEN in info
-        if let Some(length) = self.get_info_val("SVLEN") {
-            if let Ok(parsed) = length.parse::<u32>() {
-                return parsed;
-            }
+    fn coordinate(&self) -> Coordinate {
+        Coordinate {
+            chromosome: self.get_chromosome(),
+            begin: self.get_begin(),
+            end: self.get_end(),
+            system: CoordinateSystem::OneBasedClosed
         }
-        // try CNVLEN in info
-        else if let Some(length) = self.get_info_val("CNVLEN") {
-            if let Ok(parsed) = length.parse::<u32>() {
-                return parsed;
-            }
-        }
-        // try END
-        else if let Some(end_result) = self.get_info_val("END") {
-            if let Ok(end) = end_result.parse::<u32>() {
-                return (end - self.position) + 1;
-            }
-        }
-        // use longest alt
-        else if let Some(alt) = self.longest_alt() {
-            if alt.len() > self.ref_allele.len() {
-                return alt.len() as u32 - self.ref_allele.len() as u32;
-            } else {
-                return self.ref_allele.len() as u32 - alt.len() as u32;
-            }
-        }
-
-        return 1;
-    }
-
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::OneBasedClosed
     }
 }
 

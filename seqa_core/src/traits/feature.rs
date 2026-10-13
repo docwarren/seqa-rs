@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::models::coordinate_system::CoordinateSystem;
+use crate::coordinate::Coordinate;
 
 /// A genomic interval with a chromosome, begin, and end position.
 ///
@@ -28,5 +28,5 @@ pub trait Feature: std::fmt::Display {
     /// Returns a unique identifier for the feature (e.g. rsID for VCF, name for BED).
     fn get_id(&self) -> String;
     /// Returns the coordinate system used by this feature type.
-    fn coordinate_system(&self) -> CoordinateSystem;
+    fn coordinate(&self) -> Coordinate;
 }

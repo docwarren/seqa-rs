@@ -67,7 +67,7 @@ pub async fn fetch(
 }
 
 /// Decompresses each fetched chunk and returns the post-offset data.
-pub async fn join_fetched_data(
+pub async fn inflate(
     chunks: &[Chunk],
     fetched: &Vec<Vec<u8>>,
 ) -> Result<Vec<Vec<u8>>, CodecError> {

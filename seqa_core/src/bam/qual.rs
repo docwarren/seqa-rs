@@ -44,7 +44,7 @@ impl Qual {
 
 impl FromBytes for Qual {
     type Error = ParsingError;
-    fn from_bytes(bytes: &[u8], _: usize) -> Result<(Self, usize), ParsingError> {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), ParsingError> {
         Ok((Qual {
             bytes: bytes.to_vec()
         }, bytes.len()))

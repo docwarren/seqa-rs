@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use std::fmt::Display;
+use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
 use crate::traits::feature::Feature;
 
@@ -74,28 +75,18 @@ impl Display for BedGraphLine {
 
 impl Feature for BedGraphLine {
 
-    fn get_chromosome(&self) -> String {
-        self.chrom.clone()
-    }
-
-    fn get_begin(&self) -> u32 {
-        self.begin
-    }
-
-    fn get_end(&self) -> u32 {
-        self.end
-    }
-
-    fn get_length(&self) -> u32 {
-        self.end - self.begin
-    }
-
     fn get_id(&self) -> String {
         format!("{}:{}-{}", self.chrom, self.begin, self.end)
     }
 
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::ZeroBasedHalfOpen
+    fn coordinate(&self) -> Coordinate {
+
+        Coordinate {
+            chromosome: self.chrom.clone(),
+            begin: self.begin,
+            end: self.end,
+            system: CoordinateSystem::ZeroBasedHalfOpen
+        }
     }
 }
 

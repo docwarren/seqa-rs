@@ -12,7 +12,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::api::search::{fetch, join_fetched_data};
+use crate::api::search::{fetch, inflate};
 use crate::api::search_error::SearchError;
 use crate::api::search_options::{CigarFormat, SearchOptions};
 use crate::api::search_result::SearchResult;
@@ -27,38 +27,40 @@ use crate::traits::sam_index::SamIndex;
 
 const MAX_BAM_SEARCH_SIZE: usize = 200_000;
 
-/// Converts raw data bytes into a vector of strings, processing each line according to the search options.
-/// # Arguments:
-/// * `data` - A vector of bytes representing the raw data to be processed.
-/// * `options` - A `SearchOptions` struct containing the search parameters such as output format,
-///  whether to include headers, and the range of positions to consider.
-/// # Returns:
-/// * A vector of strings containing the processed lines, which may include headers based on the options.
-pub fn data_to_lines(
-    data: &[u8],
-    coordinate: &Coordinate,
-    cigar_format: &CigarFormat,
-) -> Result<(bool, Vec<String>), SearchError> {
+fn read_lines(data: &[u8], coordinate: &Coordinate, cigar_format: &CigarFormat) -> Result<Vec<String>, SearchError> {
     let mut lines = Vec::new();
     let mut i = 0;
-    let mut end = false;
     let use_merged_cigar = *cigar_format == CigarFormat::Merged;
-    while let Ok(read_line_result) = Read::from_bytes(data, i) {
+    while let Ok(read_line_result) = Read::from_bytes(&data[i..]) {
         let read_line = read_line_result.0;
         let j = read_line_result.1;
         if read_line.pos > coordinate.get_end() as i32 {
-            end = true;
             break; // Stop processing if the position exceeds the end of the search range
         } else if read_line.get_end() < (coordinate.get_begin()) {
-            i = j; // Skip this read if it is before the start of the search range
+            i += j; // Skip this read if it is before the start of the search range
             continue;
         } else {
             lines.push(read_line.to_sam_string(use_merged_cigar));
         }
-        i = j;
+        i += j;
     }
 
-    Ok((end, lines))
+    Ok(lines)
+}
+
+pub fn data_to_lines(
+    data: &[Vec<u8>],
+    coordinate: &[Coordinate],
+    cigar_format: &CigarFormat,
+) -> Result<Vec<String>, SearchError> {
+    let mut lines = Vec::new();
+    for (idx, coord) in coordinate.iter().enumerate() {
+        match read_lines(&data[idx], coord, cigar_format) {
+            Ok(l) => lines.push(l),
+            Err(err) => return Err(err),
+        }
+    }
+    Ok(lines.concat())
 }
 
 /// Searches for data in a bam based on the provided search options.
@@ -102,10 +104,10 @@ pub async fn bam_search(
         Vec::new()
     };
 
-    for coord in &options.coordinates {
+    let mut chunks = Vec::with_capacity(options.coordinates.len());
 
+    for (idx, coord) in options.coordinates.iter().enumerate() {
         let bin_numbers = get_bin_numbers(&coord);
-
         let chr_i = bam_header
             .get_chromosome_index_by_name(&coord.get_chromosome())
             .ok_or_else(|| SearchError::InvalidRequest {
@@ -114,25 +116,26 @@ pub async fn bam_search(
             })?;
 
         let chr_idx = &bai.references[chr_i];
-        let chunks = bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
-
-        let data = fetch(store_service, &options.file_path, &chunks)
-            .await
-            .map_err(|e| SearchError::ReadError {
-                path: options.file_path.to_string(),
-                source: e
-            })?;
-
-        let raw_data = join_fetched_data(&chunks, &data)
-            .await
-            .map_err(|e| SearchError::CodecError {
-                path: options.file_path.to_string(),
-                source: e
-            })?;
-
-        let lines = data_to_lines(&raw_data.concat(), &coord, &options.cigar_format)?;
-        start_lines.extend(lines.1)
+        chunks[idx] = (bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord));
     }
+
+    let flat_chunks = chunks.concat();
+    let compressed = fetch(store_service, &options.file_path, &flat_chunks)
+        .await
+        .map_err(|e| SearchError::ReadError {
+            path: options.file_path.to_string(),
+            source: e
+        })?;
+
+    let raw_data = inflate(&flat_chunks, &compressed)
+        .await
+        .map_err(|e| SearchError::CodecError {
+            path: options.file_path.to_string(),
+            source: e
+        })?;
+
+    let lines = data_to_lines(&raw_data, &options.coordinates, &options.cigar_format)?;
+    start_lines.extend(lines);
     result.lines = start_lines;
     Ok(result)
 }

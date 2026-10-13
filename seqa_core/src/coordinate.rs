@@ -35,10 +35,10 @@ pub fn check_coords_for_length(coords: &Vec<Coordinate>, len: usize) -> Result<(
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Coordinate {
-    chromosome: String,
-    begin: u32,
-    end: u32,
-    system: CoordinateSystem,
+    pub chromosome: String,
+    pub begin: u32,
+    pub end: u32,
+    pub system: CoordinateSystem,
 }
 
 impl Display for Coordinate {
@@ -100,7 +100,7 @@ impl Coordinate {
     ///
     /// Both features are converted to canonical coordinates before comparison,
     /// so VCF/GFF (1-based) and BED/BAM (0-based) features can be compared directly.
-    pub fn overlaps(&self, other: Coordinate) -> bool {
+    pub fn overlaps(&self, other: &Coordinate) -> bool {
         let (begin, end) = self.to_canonical();
         let (other_begin, other_end) = other.to_canonical();
         let chr1 = self.get_chromosome().replace("chr", "");

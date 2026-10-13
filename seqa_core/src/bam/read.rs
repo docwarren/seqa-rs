@@ -12,22 +12,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use crate::bam::cigar::Cigar;
 use crate::bam::header::header::BamHeader;
 use crate::bam::qual::Qual;
 use crate::bam::seq::Seq;
 use crate::bam::tags::Tags;
 use crate::{models::coordinate_system::CoordinateSystem, traits::feature::Feature};
-use serde::{Deserialize, Serialize};
-use std::fmt::Display;
 use crate::api::parsing_error::ParsingError;
+use crate::coordinate::Coordinate;
 use crate::traits::from_bytes::FromBytes;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Read {
     block_size: u32,
-    ref_id: i32,
+    pub ref_id: i32,
     pub pos: i32,
     l_read_name: u8,
     mapq: u8,
@@ -244,7 +244,8 @@ impl Read {
 
 impl FromBytes for Read {
     type Error = ParsingError;
-    fn from_bytes(bytes: &[u8], mut i: usize) -> Result<(Self, usize), ParsingError> {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), ParsingError> {
+        let mut i = 0;
         if bytes.len() < i + 4 {
             return Err(ParsingError::InsufficientBytes);
         }
@@ -294,17 +295,17 @@ impl FromBytes for Read {
         let read_name = bytes[i..i + l_read_name as usize].to_vec();
         i += l_read_name as usize;
 
-        let cigar = Cigar::from_bytes(bytes, i)?.0;
+        let cigar = Cigar::from_bytes(&bytes[i..])?.0;
         i += n_cigar_op as usize * 4;
 
         let seq_end = i + ((l_seq as usize + 1) / 2);
-        let seq = Seq::from_bytes(&bytes[i..seq_end], i)?.0;
+        let seq = Seq::from_bytes(&bytes[i..seq_end])?.0;
         i += (l_seq as usize + 1) / 2;
 
-        let qual = Qual::from_bytes(&bytes[i..i + l_seq as usize], i)?.0;
+        let qual = Qual::from_bytes(&bytes[i..i + l_seq as usize])?.0;
         i += l_seq as usize;
 
-        let tags = Tags::from_bytes(&bytes[i..block_end], i)?.0;
+        let tags = Tags::from_bytes(&bytes[i..block_end])?.0;
         i = block_end;
 
         Ok((
@@ -365,7 +366,7 @@ impl Read {
         self.get_ref_name(bam_header).unwrap_or(format!("chr{}", self.ref_id))
     }
 
-    fn get_begin(&self) -> u32 {
+    pub fn get_begin(&self) -> u32 {
         self.pos as u32
     }
 
@@ -396,7 +397,12 @@ impl Feature for Read {
         String::from_utf8(self.read_name.clone()).unwrap()
     }
 
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::ZeroBasedHalfOpen
+    fn coordinate(&self) -> Coordinate {
+        Coordinate {
+            chromosome: self.ref_id.to_string(),
+            begin: self.get_begin(),
+            end: self.get_end(),
+            system: CoordinateSystem::ZeroBasedHalfOpen
+        }
     }
 }

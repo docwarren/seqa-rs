@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
 
 pub struct GtfLine {
@@ -52,7 +53,7 @@ impl GtfLine {
         let feature = tokens[2].to_string();
 
         let begin = match tokens[3].parse::<u32>() {
-            Ok(b) => b - 1,
+            Ok(b) => b,
             Err(_) => return Err(format!("Invalid begin position in GTF line: {}", line)),
         };
 
@@ -124,7 +125,7 @@ impl std::fmt::Display for GtfLine {
             self.chromosome,
             self.source,
             self.feature,
-            self.begin + 1, // Convert back to position for display
+            self.begin,
             self.end,
             self.score.as_ref().map_or(".".to_string(), |s| s.to_string()),
             self.strand.as_ref().map_or(".".to_string(), |s| s.clone()),
@@ -139,28 +140,18 @@ impl std::fmt::Display for GtfLine {
 }
 
 impl crate::traits::feature::Feature for GtfLine {
-    fn get_chromosome(&self) -> String {
-        self.chromosome.clone()
-    }
-
-    fn get_begin(&self) -> u32 {
-        self.begin
-    }
-
-    fn get_end(&self) -> u32 {
-        self.end
-    }
-
-    fn get_length(&self) -> u32 {
-        self.end - self.begin
-    }
 
     fn get_id(&self) -> String {
         format!("{}:{}-{}", self.chromosome, self.begin, self.end)
     }
 
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::OneBasedClosed
+    fn coordinate(&self) -> Coordinate {
+        Coordinate {
+            chromosome: self.chromosome.clone(),
+            begin: self.begin,
+            end: self.end,
+            system: CoordinateSystem::OneBasedClosed
+        }
     }
 }
 

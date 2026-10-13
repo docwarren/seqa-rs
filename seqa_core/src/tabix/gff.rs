@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
 
 pub struct GffLine {
@@ -128,28 +129,18 @@ impl std::fmt::Display for GffLine {
 }
 
 impl crate::traits::feature::Feature for GffLine {
-    fn get_chromosome(&self) -> String {
-        self.chromosome.clone()
-    }
-
-    fn get_begin(&self) -> u32 {
-        self.begin
-    }
-
-    fn get_end(&self) -> u32 {
-        self.end
-    }
-
-    fn get_length(&self) -> u32 {
-        self.end - self.begin
-    }
 
     fn get_id(&self) -> String {
         format!("{}:{}-{}", self.chromosome, self.begin, self.end)
     }
 
-    fn coordinate_system(&self) -> CoordinateSystem {
-        CoordinateSystem::OneBasedClosed
+    fn coordinate(&self) -> Coordinate {
+        Coordinate {
+            chromosome: self.chromosome.clone(),
+            begin: self.begin,
+            end: self.end,
+            system: CoordinateSystem::OneBasedClosed
+        }
     }
 }
 

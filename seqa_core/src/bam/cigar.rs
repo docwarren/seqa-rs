@@ -47,9 +47,9 @@ impl Cigar {
 impl FromBytes for Cigar {
     type Error = ParsingError;
 
-    fn from_bytes(bytes: &[u8], i: usize) -> Result<(Self, usize), Self::Error> {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), Self::Error> {
         let mut operations = Vec::new();
-        let mut idx = i;
+        let mut idx = 0;
         while idx < bytes.len() {
             let op = u32::from_le_bytes(bytes[idx..idx + 4].try_into()?);
             let cigar_op = CigarOperation::new(op);
@@ -57,7 +57,7 @@ impl FromBytes for Cigar {
             idx += 4;
         }
 
-        Ok((Cigar { operations }, idx - i))
+        Ok((Cigar { operations }, idx))
     }
 }
 
