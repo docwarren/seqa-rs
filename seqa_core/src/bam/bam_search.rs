@@ -136,13 +136,9 @@ pub async fn bam_search(
 
     for coord in &coordinates {
         let bin_numbers = get_bin_numbers(&coord);
-        let chr_i = bam_header
-            .get_chromosome_index_by_name(&coord.get_chromosome())
-            .ok_or_else(|| SearchError::InvalidRequest {
-                requested: coord.get_chromosome().to_string(),
-                reason: "Chromosome not found in index".to_string(),
-            })?;
-
+        let Some(chr_i) = bam_header.get_chromosome_index_by_name(&coord.get_chromosome()) else {
+            continue;
+        };
         let chr_idx = &bai.references[chr_i];
         let chunks_for_coord = bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
         for _ in 0..chunks_for_coord.len() {

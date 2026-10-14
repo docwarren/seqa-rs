@@ -130,12 +130,9 @@ pub async fn tabix_search(
 
     for coord in &options.coordinates {
         let bin_numbers = get_bin_numbers(&coord);
-        let chr_i = tabix
-            .get_chromosome_index_by_name(&coord.get_chromosome())
-            .ok_or(SearchError::InvalidRequest {
-                reason: format!("Chromosome not found in index: {}", coord.get_chromosome()),
-                requested: format!("{}", coord),
-            })?;
+        let Some(chr_i) = tabix.get_chromosome_index_by_name(&coord.get_chromosome()) else {
+            continue;
+        };
         let chr_idx = &tabix.references[chr_i as usize];
         let coord_chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
         for _ in 0..coord_chunks.len() {
@@ -213,7 +210,8 @@ pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> 
 
 #[test]
 fn test_get_header_lines() {
-    let mut options = SearchOptions::new("test.gff.gz", &vec!["chr1:1-10000000".to_string()]).unwrap();
+    let mut options =
+        SearchOptions::new("test.gff.gz", &vec!["chr1:1-10000000".to_string()]).unwrap();
     options.include_header = true;
     options.output_format = OutputFormat::GFF;
     options.index_path = "test.gff.gz.tbi".to_string();
