@@ -23,7 +23,6 @@ use crate::bigwig::index::r_tree::overlaps::Overlaps;
 use crate::bigwig::index::r_tree::r_tree_leaf::RTreeLeaf;
 use crate::bigwig::index::util::get_zoom_strings;
 use crate::bigwig::index::zoom_header::ZoomHeader;
-use crate::bigwig::zoom_data::ZoomData;
 use crate::codecs::codec_error::CodecError;
 use crate::codecs::decompress_auto;
 use crate::coordinate::Coordinate;
@@ -62,29 +61,8 @@ fn data_to_lines(
     chr_tree: &BigwigChrTree,
     coordinate: &Coordinate,
     is_zoom: bool,
-    include_header: bool,
 ) -> Vec<String> {
-    let mut str_array: Vec<String> = if include_header {
-        if is_zoom {
-            vec![
-                ZoomData::COLUMNS
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\t"),
-            ]
-        } else {
-            vec![
-                BigwigData::COLUMNS
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\t"),
-            ]
-        }
-    } else {
-        Vec::new()
-    };
+    let mut str_array = vec![];
 
     for block in bytes {
         let strings = if is_zoom {
@@ -212,7 +190,10 @@ pub async fn bigwig_search(
         decompressed_data.push(decompressed);
     }
 
-    let mut lines: Vec<Vec<String>> = Vec::new();
+    let mut lines: Vec<Vec<String>> = vec![get_header_lines(
+        &BigwigData::COLUMNS,
+        options.include_header,
+    )];
     for (i, coord) in coordinates.iter().enumerate() {
         let is_zoom = zoom_headers[i].is_some();
         let blocks = &decompressed_data[i];
@@ -221,11 +202,24 @@ pub async fn bigwig_search(
             &index.chromosome_tree,
             &coord,
             is_zoom,
-            options.include_header,
         ));
     }
     result.lines = lines.concat();
     Ok(result)
+}
+
+pub fn get_header_lines(columns: &[&str], include_header: bool) -> Vec<String> {
+    if include_header {
+        vec![
+            columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join("\t"),
+        ]
+    } else {
+        Vec::new()
+    }
 }
 
 fn get_index_begin(index: &BigwigIndex, zoom_header: Option<&ZoomHeader>) -> u64 {

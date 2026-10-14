@@ -27,13 +27,13 @@ An AWS Lambda function (HTTP, via API Gateway) that runs `seqa_core` genomic sea
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `path` | yes | URI of the data file; the format and index path are inferred from its extension |
+| `path` | yes | URI of the data file; the format and index path are inferred from its extension unless set below |
 | `coordinates` | yes | One region, 1-based inclusive, e.g. `chr1:1000-2000` |
 | `with_header` | no | Include the file header in the result. Defaults to `false` |
 | `only_header` | no | Return only the header. Defaults to `false` |
-| `genome` | no | Genome build, defaults to `hg38`. Stored but not currently used by the search |
-
-`index_path` and `output_format` are accepted but currently ignored.
+| `genome` | no | Genome build, defaults to `hg38`. Not currently used by the search |
+| `index_path` | no | URI of the index file, if it isn't next to the data file |
+| `output_format` | no | File format (`bam`, `vcf`, `bed`, `bedgraph`, `gff`, `gtf`, `fasta`, `bigwig`, `bigbed`), if it can't be inferred from the extension |
 
 Cloud credentials are read from the Lambda's environment — see [seqa_core/README.md](../seqa_core/README.md#environment-variables).
 

@@ -213,7 +213,7 @@ pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> 
 
 #[test]
 fn test_get_header_lines() {
-    let mut options = SearchOptions::new("test.gff.gz", vec!["chr1:1-10000000"]).unwrap();
+    let mut options = SearchOptions::new("test.gff.gz", &vec!["chr1:1-10000000".to_string()]).unwrap();
     options.include_header = true;
     options.output_format = OutputFormat::GFF;
     options.index_path = "test.gff.gz.tbi".to_string();

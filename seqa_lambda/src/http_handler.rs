@@ -53,11 +53,21 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
     let options: SearchOptions = match event.payload::<SearchRequest>()? {
         Some(request) => {
             let genome = request.genome.unwrap_or("hg38".to_string());
-            SearchOptions::new(&request.path, vec![&request.coordinates])?
-                .set_include_header(request.with_header.unwrap_or(false))
-                .set_header_only(request.only_header.unwrap_or(false))
-                .set_cigar_format(CigarFormat::Standard)
-                .set_genome(&genome)
+            let mut options =
+                SearchOptions::new(&request.path, &vec![request.coordinates.clone()])?
+                    .set_include_header(request.with_header.unwrap_or(false))
+                    .set_header_only(request.only_header.unwrap_or(false))
+                    .set_cigar_format(CigarFormat::Standard)
+                    .set_genome(&genome);
+            match request.index_path {
+                Some(path) => options = options.set_index_path(&path),
+                _ => (),
+            }
+            match request.output_format {
+                Some(of) => options = options.set_output_format(&of),
+                _ => (),
+            }
+            options
         }
         _ => {
             return Ok(Response::builder()
@@ -169,12 +179,14 @@ mod tests {
 
     #[tokio::test]
     async fn bigwig_chr12() {
-        let options =
-            SearchOptions::new("s3://com.gmail.docarw/test_data/density.bw", vec!["chr12"])
-                .unwrap()
-                .set_index_path("-")
-                .set_output_format("bigwig")
-                .set_include_header(false);
+        let options = SearchOptions::new(
+            "s3://com.gmail.docarw/test_data/density.bw",
+            &vec!["chr12".to_string()],
+        )
+        .unwrap()
+        .set_index_path("-")
+        .set_output_format("bigwig")
+        .set_include_header(false);
 
         let response = function_handler(build_request(&options)).await.unwrap();
         assert_eq!(response.status(), 200);
@@ -199,7 +211,7 @@ mod tests {
     async fn bam_chr2_range() {
         let options = SearchOptions::new(
             "s3://com.gmail.docarw/test_data/NA12877.bam",
-            vec!["chr2:50000000-50000100"],
+            &vec!["chr2:50000000-50000100".to_string()],
         )
         .unwrap()
         .set_index_path("s3://com.gmail.docarw/test_data/NA12877.bam.bai")

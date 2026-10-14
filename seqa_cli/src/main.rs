@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
             }
 
             let mut options =
-                SearchOptions::new(&file, vec![&coordinates]).expect("Invalid coordinates");
+                SearchOptions::new(&file, &vec![coordinates]).expect("Invalid coordinates");
 
             // Set genome before coordinates so set_coordinates can use it
             if let Some(ref genome) = reference {
@@ -158,9 +158,7 @@ async fn main() -> Result<()> {
                     let result = print_output(&lines);
                     match result {
                         Ok(_) => Ok(()),
-                        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
-                            bail!("Broken pipe! {:?}", e);
-                        }
+                        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
                         Err(e) => bail!("Error writing output: {:?}", e),
                     }
                 }
@@ -226,7 +224,7 @@ async fn search(
     Ok(search_result.lines)
 }
 
-fn print_output(lines: &Vec<String>) -> io::Result<()> {
+fn print_output(lines: &[String]) -> io::Result<()> {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
 

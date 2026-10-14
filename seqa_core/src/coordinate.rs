@@ -25,7 +25,7 @@ use std::fmt::Display;
 /// # Errors
 ///
 /// Returns [`SearchError::InvalidRequest`] for the first coordinate that is too long.
-pub fn check_coords_for_length(coords: &Vec<Coordinate>, len: usize) -> Result<(), SearchError> {
+pub fn check_coords_for_length(coords: &[Coordinate], len: usize) -> Result<(), SearchError> {
     for coord in coords {
         if coord.get_length() as usize > len {
             return Err(SearchError::InvalidRequest {

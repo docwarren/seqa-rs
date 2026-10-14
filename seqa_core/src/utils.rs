@@ -62,11 +62,11 @@ pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
 /// Positions are returned exactly as written; the caller decides which coordinate
 /// system they are in.  Accepted formats:
 /// - `"chr1"` — whole chromosome; `begin` = 1, `end` = the chromosome's length.
-/// - `"chr1:1000"` — from `begin` to the end of the chromosome; `end` = the chromosome's length.
+/// - `"chr1:1000"` — single base; `end` = `begin`.
 /// - `"chr1:1000-2000"` — explicit range.
 /// - Commas in numbers are stripped (e.g. `"chr1:1,000-2,000"`).
 ///
-/// Chromosome lengths are the longest length across all supported genome builds.
+/// Whole-chromosome lengths are the longest length across all supported genome builds.
 ///
 /// # Errors
 ///
@@ -99,8 +99,7 @@ fn get_begin_end(tokens: &[&str], chr_idx: usize) -> Result<(u32, u32), ParsingE
             Ok((begin, end))
         } else {
             let begin = parts[0].parse::<u32>()?;
-            let end = longest_genome[chr_idx];
-            Ok((begin, end))
+            Ok((begin, begin))
         }
     } else {
         Ok((1, longest_genome[chr_idx]))
@@ -265,12 +264,20 @@ fn test_parse_coordinates() {
 }
 
 #[test]
+fn test_parse_coordinates_single_position() {
+    let (chr, begin, end) = parse_coordinates("chr1:1,000").unwrap();
+    assert_eq!(chr, "chr1");
+    assert_eq!(begin, 1000);
+    assert_eq!(end, 1000);
+}
+
+#[test]
 fn test_get_search_options_local() {
     use crate::api::search_options::SearchOptions;
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     if let Ok(options) = SearchOptions::new(
         "./mock_data/NA12878.gatk.cnv.vcf.gz",
-        vec!["chr1:1000-2000"],
+        &vec!["chr1:1000-2000".to_string()],
     ) {
         assert_eq!(
             options.file_path,
@@ -291,7 +298,10 @@ fn test_get_search_options_local() {
         assert!(false);
     }
 
-    if let Ok(options) = SearchOptions::new("./mock_data/NA12878.gatk.cnv.vcf.gz", vec!["chr1"]) {
+    if let Ok(options) = SearchOptions::new(
+        "./mock_data/NA12878.gatk.cnv.vcf.gz",
+        &vec!["chr1".to_string()],
+    ) {
         assert_eq!(options.coordinates[0].get_chromosome(), "chr1");
         assert_eq!(options.coordinates[0].get_begin(), 1);
         assert_eq!(options.coordinates[0].get_end(), 249_250_621); // Assuming chr1 length from longest_possible_genome

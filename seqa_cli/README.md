@@ -45,18 +45,18 @@ Coordinates are 1-based and inclusive.
 | Format | Example | Description |
 |--------|---------|-------------|
 | Range | `chr1:1000000-2000000` | Records overlapping the range |
-| Begin only | `chr1:1000000` | Records from that position to the end of the chromosome |
+| Single position | `chr1:1000000` | Records overlapping that position |
 | Full chromosome | `chr1` | All records on the chromosome |
 
 Commas are stripped automatically: `chr1:1,000,000-2,000,000` works fine. Chromosome names with or without the `chr` prefix are accepted.
 
-BAM searches are limited to 200,001 bases per query, so whole-chromosome and open-ended BAM queries are rejected. FASTA queries are limited to 250,000,000 bases.
+BAM searches are limited to 200,001 bases per query, so whole-chromosome BAM queries are rejected. FASTA queries are limited to 250,000,000 bases.
 
 ### Search Options
 
 | Flag | Description |
 |------|-------------|
-| `-r, --reference <GENOME>` | Reference genome build: `hg38` or `hg19`. Validated, but not currently used to resolve chromosome lengths |
+| `-r, --reference <GENOME>` | Reference genome build: `hg38` or `hg19`. Not currently used by the search |
 | `-w true` | Include the file header in the output |
 | `-o true` | Output the header only |
 | `--no-cache` | Don't read or write the local index cache |

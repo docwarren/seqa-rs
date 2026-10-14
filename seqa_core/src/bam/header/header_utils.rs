@@ -15,7 +15,7 @@
 
 use std::array::TryFromSliceError;
 
-pub fn read_magic(bytes: &Vec<u8>) -> Result<(String, u32), TryFromSliceError> {
+pub fn read_magic(bytes: &[u8]) -> Result<(String, u32), TryFromSliceError> {
     let magic = String::from_utf8_lossy(&bytes[0..4]).to_string();
     let l_text = u32::from_le_bytes(bytes[4..8].try_into()?);
 

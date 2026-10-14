@@ -32,7 +32,7 @@
 //!     // One or more regions; results come back in the order the regions are given.
 //!     let opts = SearchOptions::new(
 //!         "s3://my-bucket/sample.bam",
-//!         vec!["chr1:100000-200000", "chr2:5000-6000"],
+//!         &vec!["chr1:100000-200000".to_string(), "chr2:5000-6000".to_string()],
 //!     )?;
 //!
 //!     let store_service = StoreService::new();

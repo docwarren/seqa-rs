@@ -48,7 +48,7 @@ pub enum CigarFormat {
 /// ```rust
 /// use seqa_core::api::search_options::SearchOptions;
 ///
-/// let opts = SearchOptions::new("s3://my-bucket/sample.bam", vec!["chr1"])
+/// let opts = SearchOptions::new("s3://my-bucket/sample.bam", &vec!["chr1".to_string()])
 ///     .unwrap()
 ///     .set_index_path("s3://my-bucket/sample.bam.bai")
 ///     .set_output_format("bam");
@@ -63,8 +63,8 @@ pub struct SearchOptions {
     /// Regions to search, in the order results are returned.  Usually one, but may be many.
     pub coordinates: Vec<Coordinate>,
     /// Optional reference genome build (e.g. `"hg38"`, `"hg19"`), stored in lowercase.
-    /// Not currently used by the searches: open-ended coordinates always resolve to the
-    /// longest known chromosome length across all supported builds.
+    /// Not currently used by the searches: whole-chromosome coordinates always resolve to
+    /// the longest known chromosome length across all supported builds.
     pub genome: Option<String>,
     /// File format of [`SearchOptions::file_path`].
     pub output_format: OutputFormat,
@@ -114,7 +114,7 @@ impl SearchOptions {
     /// # Errors
     ///
     /// Returns [`ParsingError::FormatError`] if any coordinate string cannot be parsed.
-    pub fn new(path: &str, coord_strings: Vec<&str>) -> Result<Self, ParsingError> {
+    pub fn new(path: &str, coord_strings: &[String]) -> Result<Self, ParsingError> {
         let system = CoordinateSystem::OneBasedClosed;
         let file_path = crate::utils::format_file_path(path).unwrap_or_else(|_| path.to_string());
         let index_path =
@@ -122,7 +122,7 @@ impl SearchOptions {
         let output_format = get_output_format(&file_path).unwrap_or(OutputFormat::STRING);
         let coordinates = coord_strings
             .iter()
-            .map(|c| Coordinate::new(*c, system))
+            .map(|c| Coordinate::new(c, system))
             .collect::<Result<Vec<Coordinate>, ParsingError>>()?;
 
         Ok(SearchOptions {
