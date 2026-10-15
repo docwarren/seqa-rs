@@ -12,7 +12,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use crate::api::output_format::OutputFormat;
 use crate::api::parsing_error::ParsingError;
 use crate::api::search::{decompress_chunks, fetch};
@@ -28,29 +27,21 @@ use crate::tabix::gff::GffLine;
 use crate::tabix::gtf::GtfLine;
 use crate::tabix::tabix::Tabix;
 use crate::tabix::tabix_header::TabixHeader;
-use crate::tabix::vcf::VcfLine;
+use crate::traits::feature::Feature;
 use crate::traits::sam_index::SamIndex;
+use bstr::ByteSlice;
 
 fn read_lines(
     data: &[u8],
     coordinate: &Coordinate,
     output_format: &OutputFormat,
 ) -> Result<Vec<String>, ParsingError> {
-    let raw_string = String::from_utf8_lossy(data).into_owned();
+    let lines: Vec<&[u8]> = data.lines().collect();
 
-    let line_strings = raw_string
-        .split('\n')
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty())
-        .map(|line| line.to_string())
-        .collect::<Vec<String>>();
-
-    let model_new = output_format.get_model();
-
-    let result = line_strings
+    let result = lines
         .iter()
-        .map(|line| model_new(line).map_err(|e| ParsingError::FormatError(e)))
-        .collect::<Result<Vec<Box<dyn crate::traits::feature::Feature>>, ParsingError>>()?
+        .map(|line| output_format.read_from_bytes(line))
+        .collect::<Result<Vec<Box<dyn Feature>>, ParsingError>>()?
         .into_iter()
         .filter(|feature| feature.coordinate().overlaps(coordinate))
         .map(|feature| feature.to_string())
@@ -168,24 +159,6 @@ pub async fn tabix_search(
     all_lines.extend(lines);
     result.lines = all_lines;
     Ok(result)
-}
-
-/// Runs [`tabix_search`] on a VCF and parses the result lines into [`VcfLine`]s.
-///
-/// Lines that do not parse, including any header lines, are skipped.
-pub async fn tabix_search_vcf(
-    store_service: &StoreService,
-    options: &SearchOptions,
-) -> Result<Vec<VcfLine>, SearchError> {
-    let tabix_result = tabix_search(store_service, options).await?;
-    let mut vcf_lines = Vec::new();
-
-    for line in tabix_result.lines {
-        if let Ok(vcf_line) = VcfLine::from_line(line) {
-            vcf_lines.push(vcf_line);
-        }
-    }
-    Ok(vcf_lines)
 }
 
 /// Returns the header lines to put before the results when `options.include_header` is set.

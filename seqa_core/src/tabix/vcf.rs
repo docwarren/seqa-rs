@@ -13,12 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::api::parsing_error::ParsingError;
+use crate::coordinate::Coordinate;
+use crate::parsing_utils::split_str;
+use crate::tabix::caller::Caller;
+use crate::traits::feature::Feature;
+use crate::traits::from_bytes::FromBytes;
+use bstr::ByteSlice;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Display;
-use crate::coordinate::Coordinate;
-use crate::tabix::caller::Caller;
-use crate::traits::feature::Feature;
 
 use crate::models::coordinate_system::CoordinateSystem;
 use crate::tabix::variant_type::VariantType;
@@ -127,178 +131,7 @@ impl VcfLine {
             .collect();
         val_set.get(key).map(|v| v.to_string())
     }
-    /// Parses a single tab-delimited VCF data line (not a header line) into a [`VcfLine`].
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(String)` when the line has fewer than 8 fields or contains
-    /// an unparseable position or quality value.
-    pub fn from_line(line: String) -> Result<VcfLine, String> {
-        let tokens = line.split('\t').collect::<Vec<&str>>();
-        if tokens.len() < 8 {
-            return Err(format!("Invalid VCF line: {}", line));
-        }
-        let chromosome = tokens[0].to_string();
-        let position = match tokens[1].parse::<u32>() {
-            Ok(pos) => pos,
-            Err(_) => {
-                return Err(format!("Invalid position in VCF line: {}", line));
-            }
-        };
-        let id = tokens[2].to_string();
-        let ref_allele = tokens[3].to_string();
-        let alt_alleles = tokens[4]
-            .split(',')
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>();
 
-        // Parse the quality field
-        let quality = if tokens[5] == "." {
-            None
-        } else {
-            Some(match tokens[5].parse::<f32>() {
-                Ok(q) => q,
-                Err(_) => {
-                    return Err(format!("Invalid quality in VCF line: {}", line));
-                }
-            })
-        };
-
-        // Parse the filter field
-        let filter = if tokens[6] == "." {
-            Vec::new()
-        } else {
-            tokens[6]
-                .split(';')
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-        };
-
-        // Parse the INFO field
-        let info = tokens[7]
-            .split(';')
-            .map(|s| {
-                let parts: Vec<&str> = s.split('=').collect();
-                if parts.len() == 2 {
-                    (parts[0].to_string(), parts[1].to_string())
-                } else {
-                    (parts[0].to_string(), String::new())
-                }
-            })
-            .collect::<Vec<(String, String)>>();
-
-        let mut sample_data = Vec::new();
-
-        // If there are sample data, parse them
-        // The format is expected to be in the 9th column onwards
-        if tokens.len() > 8 {
-            let format_keys = tokens[8].split(':').collect::<Vec<&str>>();
-
-            for sample in tokens[9..].iter() {
-                let sample_values = sample.split(':').collect::<Vec<&str>>();
-                let mut sample_map = Vec::new();
-                for (i, key) in format_keys.iter().enumerate() {
-                    if i < sample_values.len() {
-                        sample_map.push((key.to_string(), sample_values[i].to_string()));
-                    } else {
-                        sample_map.push((key.to_string(), String::new()));
-                    }
-                }
-                sample_data.push(sample_map);
-            }
-        }
-
-        Ok(VcfLine {
-            chromosome,
-            position,
-            id,
-            ref_allele,
-            alt_alleles,
-            quality,
-            filter,
-            info,
-            sample_data,
-        })
-    }
-}
-
-impl Display for VcfLine {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let quality = match self.quality {
-            Some(q) => q.to_string(),
-            None => ".".to_string(),
-        };
-
-        let info = self
-            .info
-            .iter()
-            .map(|(k, v)| {
-                if v.is_empty() {
-                    k.to_string()
-                } else {
-                    format!("{}={}", k, v)
-                }
-            })
-            .collect::<Vec<String>>()
-            .join(";");
-
-        let format = if self.sample_data.is_empty() {
-            String::new()
-        } else {
-            self.sample_data[0]
-                .iter()
-                .map(|(k, _)| k.clone())
-                .collect::<Vec<String>>()
-                .join(":")
-        };
-
-        let mut samples = Vec::new();
-        for sample in &self.sample_data {
-            let sample_values = sample
-                .iter()
-                .map(|(_, v)| v.to_string())
-                .collect::<Vec<String>>()
-                .join(":");
-            samples.push(sample_values);
-        }
-
-        let sample_str = samples.join("\t");
-
-        write!(
-            f,
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-            self.chromosome,
-            self.position,
-            self.id,
-            self.ref_allele,
-            self.alt_alleles.join(","),
-            quality,
-            self.filter.join(";"),
-            info,
-            format,
-            sample_str
-        )
-    }
-}
-
-impl Feature for VcfLine {
-
-
-    fn get_id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn coordinate(&self) -> Coordinate {
-        Coordinate {
-            chromosome: self.get_chromosome(),
-            begin: self.get_begin(),
-            end: self.get_end(),
-            system: CoordinateSystem::OneBasedClosed
-        }
-    }
-}
-
-impl VcfLine {
     /// Attempt to infer the caller from the ID field.
     /// In the case of Canvas and Manta callers - the ID field starts Canvas: and Manta respectively
     /// With bcftools the id field is either . or an rs number
@@ -352,6 +185,7 @@ impl VcfLine {
             }
         }
     }
+
     /// Attempt to infer the variant type from the alt fields
     /// should be ok in a bcftools vcf
     pub fn infer_variant_type_from_alt_length(&self) -> Option<VariantType> {
@@ -385,6 +219,7 @@ impl VcfLine {
             return Err("Unable to get variant type".to_owned());
         }
     }
+
     /// Returns the longest alt allele based on the length difference from the reference allele.
     /// If there are multiple alleles with the same length difference, it returns the first one.
     /// * @return The longest alt allele.
@@ -420,14 +255,162 @@ impl VcfLine {
     }
 }
 
+impl FromBytes for VcfLine {
+    type Error = ParsingError;
+
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), Self::Error> {
+        let tokens = split_str(bytes, "\t", Some(8))?;
+        let chromosome = tokens[0].to_str()?;
+        let position = tokens[1].to_str()?.parse::<u32>()?;
+        let id = tokens[2].to_str()?;
+        let ref_allele = tokens[3].to_str()?;
+        let alts = split_str(tokens[4], ",", Some(1))?;
+        let mut alt_alleles = vec![];
+        for alt in alts {
+            let alt_str = alt.to_str()?;
+            alt_alleles.push(alt_str.to_string());
+        }
+
+        // Parse the quality field
+        let quality = tokens[5].to_str()?.parse::<f32>().ok();
+        let filter_tokens = split_str(tokens[6], ";", None)?;
+        let mut filter = vec![];
+        for f in filter_tokens {
+            filter.push(f.to_str()?.to_string());
+        }
+        // Parse the INFO field
+        let info_tokens = split_str(tokens[7], ";", None)?;
+        let mut info = vec![];
+        for field in info_tokens {
+            let parts: Vec<&[u8]> = split_str(field, "=", None)?;
+            if parts.len() == 2 {
+                info.push((
+                    parts[0].to_str()?.to_string(),
+                    parts[1].to_str()?.to_string(),
+                ));
+            } else {
+                info.push((parts[0].to_str()?.to_string(), "".to_string()));
+            }
+        }
+
+        let mut sample_data = Vec::new();
+
+        // If there are sample data, parse them
+        // The format is expected to be in the 9th column onwards
+        if tokens.len() > 8 {
+            let format_keys = split_str(tokens[8], ":", None)?;
+
+            for sample in tokens[9..].iter() {
+                let sample_values = split_str(sample, ":", None)?;
+                let mut sample_map = vec![];
+                for (i, key) in format_keys.iter().enumerate() {
+                    if i < sample_values.len() {
+                        sample_map.push((
+                            key.to_str()?.to_string(),
+                            sample_values[i].to_str()?.to_string(),
+                        ));
+                    } else {
+                        sample_map.push((key.to_str()?.to_string(), String::new()));
+                    }
+                }
+                sample_data.push(sample_map);
+            }
+        }
+
+        Ok((
+            VcfLine {
+                chromosome: chromosome.to_string(),
+                position,
+                id: id.to_string(),
+                ref_allele: ref_allele.to_string(),
+                alt_alleles,
+                quality,
+                filter,
+                info,
+                sample_data,
+            },
+            bytes.len(),
+        ))
+    }
+}
+
+impl Display for VcfLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let quality = match self.quality {
+            Some(q) => q.to_string(),
+            None => ".".to_string(),
+        };
+
+        let info = self
+            .info
+            .iter()
+            .map(|(k, v)| {
+                if v.is_empty() {
+                    k.to_string()
+                } else {
+                    format!("{}={}", k, v)
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(";");
+
+        let mut fields = vec![
+            self.chromosome.clone(),
+            self.position.to_string(),
+            self.id.clone(),
+            self.ref_allele.clone(),
+            self.alt_alleles.join(","),
+            quality,
+            self.filter.join(";"),
+            info,
+        ];
+
+        // FORMAT and sample columns are only written when there are samples
+        if !self.sample_data.is_empty() {
+            let format = self.sample_data[0]
+                .iter()
+                .map(|(k, _)| k.clone())
+                .collect::<Vec<String>>()
+                .join(":");
+            fields.push(format);
+
+            for sample in &self.sample_data {
+                let sample_values = sample
+                    .iter()
+                    .map(|(_, v)| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(":");
+                fields.push(sample_values);
+            }
+        }
+
+        write!(f, "{}", fields.join("\t"))
+    }
+}
+
+impl Feature for VcfLine {
+    fn get_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn coordinate(&self) -> Coordinate {
+        Coordinate {
+            chromosome: self.get_chromosome(),
+            begin: self.get_begin(),
+            end: self.get_end(),
+            system: CoordinateSystem::OneBasedClosed,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     pub fn should_init_from_string() {
-        let vcf_line = "20\t2\t.\tTCG\tTG,T,TCAG\t.\tPASS\tDP=100".to_string();
-        let vcf_record = VcfLine::from_line(vcf_line).unwrap();
+        let vcf_line = b"20\t2\t.\tTCG\tTG,T,TCAG\t.\tPASS\tDP=100";
+        let vcf_record = VcfLine::from_bytes(vcf_line).unwrap().0;
         assert_eq!(vcf_record.chromosome, "20");
         assert_eq!(vcf_record.position, 2);
         assert_eq!(vcf_record.id, ".");
@@ -448,8 +431,8 @@ mod test {
 
     #[test]
     pub fn should_handle_manta_symbolic_alt() {
-        let line = "1	14110160	MantaDUP:TANDEM:1137:0:1:0:0:0	G	<DUP:TANDEM>	999	PASS	END=14112070;SVTYPE=DUP;SVLEN=1910;SVINSLEN=38;SVINSSEQ=TCAGCGTCAAGTAGGAGCTGTACTAAAAATTTATGTAA	GT:FT:GQ:PL:PR:SR	0/1:PASS:591:999,0,588:24,19:36,31".to_string();
-        let record = VcfLine::from_line(line).unwrap();
+        let line = b"1	14110160	MantaDUP:TANDEM:1137:0:1:0:0:0	G	<DUP:TANDEM>	999	PASS	END=14112070;SVTYPE=DUP;SVLEN=1910;SVINSLEN=38;SVINSSEQ=TCAGCGTCAAGTAGGAGCTGTACTAAAAATTTATGTAA	GT:FT:GQ:PL:PR:SR	0/1:PASS:591:999,0,588:24,19:36,31";
+        let record = VcfLine::from_bytes(line).unwrap().0;
         assert_eq!(record.chromosome, "1");
         assert_eq!(record.position, 14110160);
         assert_eq!(record.id, "MantaDUP:TANDEM:1137:0:1:0:0:0");
@@ -469,8 +452,8 @@ mod test {
 
     #[test]
     pub fn should_handle_canvas_symbolic_alt() {
-        let line = "1	25274839	Canvas:LOSS:1:25274840-25315204	N	<CN0>	36.58	PASS	SVTYPE=CNV;END=25315204;CNVLEN=40365;CIPOS=-671,671;CIEND=-685,685	GT:RC:BC:CN:MCC:MCCQ:QS:FT	0/1:52.33:4:1:1:.:36.58:PASS".to_string();
-        let record = VcfLine::from_line(line).unwrap();
+        let line = b"1	25274839	Canvas:LOSS:1:25274840-25315204	N	<CN0>	36.58	PASS	SVTYPE=CNV;END=25315204;CNVLEN=40365;CIPOS=-671,671;CIEND=-685,685	GT:RC:BC:CN:MCC:MCCQ:QS:FT	0/1:52.33:4:1:1:.:36.58:PASS";
+        let record = VcfLine::from_bytes(line).unwrap().0;
         assert_eq!(record.chromosome, "1");
         assert_eq!(record.position, 25274839);
         assert_eq!(record.id, "Canvas:LOSS:1:25274840-25315204");
@@ -489,5 +472,16 @@ mod test {
         assert_eq!(record.get_begin(), 25_274_839);
         assert_eq!(record.get_end(), 25_315_204);
         assert_eq!(record.get_length(), 40_365);
+    }
+
+    #[test]
+    fn it_should_display_without_sample_columns() {
+        let vcf_line = b"20\t2\t.\tTCG\tTG\t.\tPASS\tDP=100";
+        let expected = "20\t2\t.\tTCG\tTG\t.\tPASS\tDP=100".to_string();
+
+        let vcf_record = VcfLine::from_bytes(vcf_line)
+            .expect("Failed to parse VCF line")
+            .0;
+        assert_eq!(format!("{}", vcf_record), expected);
     }
 }

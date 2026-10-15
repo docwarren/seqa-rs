@@ -72,7 +72,7 @@ impl FromBytes for BedpeLine {
     type Error = ParsingError;
 
     fn from_bytes(bytes: &[u8]) -> Result<(BedpeLine, usize), Self::Error> {
-        let tokens = split_str(bytes, "\t")?;
+        let tokens = split_str(bytes, "\t", Some(6))?;
         let chromosome1 = tokens[0].to_str()?;
         let begin1 = tokens[1].to_str()?.parse::<u32>()?;
         let end1 = tokens[2].to_str()?.parse::<u32>()?;
@@ -106,9 +106,10 @@ impl FromBytes for BedpeLine {
 
         let extra_fields = if tokens.len() > 10 {
             let mut fields = String::new();
-            for (i, byt) in tokens[10..].iter().enumerate() {
+            let extra_tokens = &tokens[10..];
+            for (i, byt) in extra_tokens.iter().enumerate() {
                 fields.push_str(byt.to_str()?);
-                if i < tokens.len() - 1 {
+                if i < extra_tokens.len() - 1 {
                     fields.push_str("\t")
                 }
             }
@@ -139,22 +140,31 @@ impl FromBytes for BedpeLine {
 
 impl Display for BedpeLine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-            self.chromosome1,
-            self.begin1,
-            self.end1,
-            self.chromosome2,
-            self.begin2,
-            self.end2,
-            self.score
-                .map(|f| format!("{}", f))
-                .unwrap_or("".to_string()),
-            self.strand1.clone().unwrap_or("".to_string()),
-            self.strand2.clone().unwrap_or("".to_string()),
-            self.extra_fields.clone().unwrap_or("".to_string())
-        )
+        let mut fields = vec![
+            self.chromosome1.clone(),
+            self.begin1.to_string(),
+            self.end1.to_string(),
+            self.chromosome2.clone(),
+            self.begin2.to_string(),
+            self.end2.to_string(),
+        ];
+
+        if let Some(name) = &self.name {
+            fields.push(name.clone());
+        }
+        if let Some(score) = self.score {
+            fields.push(score.to_string());
+        }
+        if let Some(strand1) = &self.strand1 {
+            fields.push(strand1.clone());
+        }
+        if let Some(strand2) = &self.strand2 {
+            fields.push(strand2.clone());
+        }
+        if let Some(extra) = &self.extra_fields {
+            fields.push(extra.clone());
+        }
+        write!(f, "{}", fields.join("\t"))
     }
 }
 
@@ -182,12 +192,10 @@ mod test {
 
     #[test]
     fn it_should_init_from_bytes() {
-        let test1 = b"chr1  10    20    chr5  50    60    a1     30       +    -  0  1";
-        let test2 = b"chr9  30    40    chr9  80    90    a2     100      +    -  2  1";
-        let expected1 =
-            "chr1  10    20    chr5  50    60    a1     30       +    -  0  1".to_string();
-        let expected2 =
-            "chr9;  30    40    chr9  80    90    a2     100      +    -  2  1".to_string();
+        let test1 = b"chr1\t10\t20\tchr5\t50\t60\ta1\t30\t+\t-\t0\t1";
+        let test2 = b"chr9\t30\t40\tchr9\t80\t90\ta2\t100\t+\t-\t2\t1";
+        let expected1 = "chr1\t10\t20\tchr5\t50\t60\ta1\t30\t+\t-\t0\t1".to_string();
+        let expected2 = "chr9\t30\t40\tchr9\t80\t90\ta2\t100\t+\t-\t2\t1".to_string();
 
         let bed1 = BedpeLine::from_bytes(test1)
             .expect("Failed to parse BED line 1")
@@ -196,6 +204,24 @@ mod test {
 
         let bed2 = BedpeLine::from_bytes(test2)
             .expect("Failed to parse BED line 2")
+            .0;
+        assert_eq!(format!("{}", bed2), expected2);
+    }
+
+    #[test]
+    fn it_should_display_without_optional_fields() {
+        let test1 = b"chr1\t10\t20\tchr5\t50\t60";
+        let test2 = b"chr1\t10\t20\tchr5\t50\t60\ta1\t30";
+        let expected1 = "chr1\t10\t20\tchr5\t50\t60".to_string();
+        let expected2 = "chr1\t10\t20\tchr5\t50\t60\ta1\t30".to_string();
+
+        let bed1 = BedpeLine::from_bytes(test1)
+            .expect("Failed to parse BEDPE line 1")
+            .0;
+        assert_eq!(format!("{}", bed1), expected1);
+
+        let bed2 = BedpeLine::from_bytes(test2)
+            .expect("Failed to parse BEDPE line 2")
             .0;
         assert_eq!(format!("{}", bed2), expected2);
     }

@@ -13,8 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
+use crate::parsing_utils::split_str;
+use crate::traits::from_bytes::FromBytes;
+use bstr::ByteSlice;
 
 pub struct GffLine {
     pub chromosome: String,
@@ -41,72 +45,57 @@ impl GffLine {
         "frame",
         "group"
     ];
+}
 
-    pub fn from_line(line: String) -> Result<GffLine, String> {
-        let tokens = line.split('\t').collect::<Vec<&str>>();
-        if tokens.len() < 9 {
-            return Err(format!("Invalid GFF line: {}", line));
-        }
+impl FromBytes for GffLine {
+    type Error = ParsingError;
 
-        let chromosome = tokens[0].to_string();
-        let source = tokens[1].to_string();
-        let feature = tokens[2].to_string();
+    fn from_bytes(bytes: &[u8]) -> Result<(GffLine, usize), Self::Error> {
+        let tokens = split_str(bytes, "\t", Some(9))?;
+        let chromosome = tokens[0].to_str()?;
+        let source = tokens[1].to_str()?;
+        let feature = tokens[2].to_str()?;
+        let begin = tokens[3].to_str()?.parse::<u32>()?;
+        let end = tokens[4].to_str()?.parse::<u32>()?;
 
-        let begin = match tokens[3]
-            .parse::<u32>()
-        {
-            Ok(b) => b,
-            Err(_) => return Err(format!("Invalid begin position in GFF line: {}", line)),
-        };
-
-        let end = match tokens[4]
-            .parse::<u32>()
-        {
-            Ok(e) => e,
-            Err(_) => return Err(format!("Invalid end position in GFF line: {}", line)),
-        };
-
-        let score = if tokens[5] == "." {
+        let score = if tokens[5] == b"." {
             None
         } else {
-            match tokens[5].parse::<u16>() {
-                Ok(s) => Some(s),
-                Err(_) => return Err(format!("Invalid score in GFF line: {}", line)),
-            }
+            Some(tokens[5].to_str()?.parse::<u16>()?)
         };
 
-        let strand = if tokens[6] == "." {
+        let strand = if tokens[6] == b"." {
             None
         } else {
-            Some(tokens[6].to_string())
+            Some(tokens[6].to_str()?)
         };
 
-        let frame = if tokens[7] == "." {
+        let frame = if tokens[7] == b"." {
             None
         } else {
-            match tokens[7].parse::<u8>() {
-                Ok(f) => Some(f),
-                Err(_) => return Err(format!("Invalid frame in GFF line: {}", line)),
-            }
+            Some(tokens[7].to_str()?.parse::<u8>()?)
         };
 
-        let group = if tokens.len() > 8 && tokens[8] != "." {
-            Some(tokens[8].to_string())
-        } else {
+        let group = if tokens[8] == b"." {
             None
+        } else {
+            Some(tokens[8].to_str()?)
         };
 
-        Ok(GffLine {
-            chromosome,
-            source,
-            feature,
-            begin,
-            end,
-            score,
-            strand,
-            frame,
-            group,
-        })
+        Ok((
+            GffLine {
+                chromosome: chromosome.to_string(),
+                source: source.to_string(),
+                feature: feature.to_string(),
+                begin,
+                end,
+                score,
+                strand: strand.map(|s| s.to_string()),
+                frame,
+                group: group.map(|g| g.to_string()),
+            },
+            bytes.len(),
+        ))
     }
 }
 
@@ -150,16 +139,31 @@ mod test {
 
     #[test]
     fn it_should_init_from_string() {
-        let test_line1 = "chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\ttouch1".to_string();
-        let test_line2 = "chr22\tTeleGene\tpromoter\t10020000\t10025000\t800\t-\t.\ttouch2".to_string();
+        let test_line1 = b"chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\ttouch1";
+        let test_line2 = b"chr22\tTeleGene\tpromoter\t10020000\t10025000\t800\t-\t.\ttouch2";
 
-        let expected_1 = test_line1.clone();
-        let expected_2 = test_line2.clone();
+        let expected_1 = "chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\ttouch1".to_string();
+        let expected_2 = "chr22\tTeleGene\tpromoter\t10020000\t10025000\t800\t-\t.\ttouch2".to_string();
 
-        let bed1 = GffLine::from_line(test_line1).expect("Failed to parse GFF line 1");
-        assert_eq!(format!("{}", bed1), expected_1);
+        let gff1 = GffLine::from_bytes(test_line1)
+            .expect("Failed to parse GFF line 1")
+            .0;
+        assert_eq!(format!("{}", gff1), expected_1);
 
-        let bed2 = GffLine::from_line(test_line2).expect("Failed to parse GFF line 2");
-        assert_eq!(format!("{}", bed2), expected_2);
+        let gff2 = GffLine::from_bytes(test_line2)
+            .expect("Failed to parse GFF line 2")
+            .0;
+        assert_eq!(format!("{}", gff2), expected_2);
+    }
+
+    #[test]
+    fn it_should_display_without_optional_fields() {
+        let test_line = b"chr22\tTeleGene\tenhancer\t10000000\t10001000\t.\t.\t.\t.";
+        let expected = "chr22\tTeleGene\tenhancer\t10000000\t10001000\t.\t.\t.\t.".to_string();
+
+        let gff = GffLine::from_bytes(test_line)
+            .expect("Failed to parse GFF line")
+            .0;
+        assert_eq!(format!("{}", gff), expected);
     }
 }
