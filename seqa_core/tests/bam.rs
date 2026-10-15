@@ -23,7 +23,7 @@ async fn bam_chr12() {
     use seqa_core::api::search::search_features;
     use seqa_core::api::search_options::SearchOptions;
     use seqa_core::stores::StoreService;
-    let options = SearchOptions::new(S3_BAM, vec!["chr12:10000000-10000000"])
+    let options = SearchOptions::new(S3_BAM, &vec!["chr12:10000000-10000000".to_string()])
         .unwrap()
         .set_index_path(S3_BAM_INDEX)
         .set_output_format("bam")
@@ -51,7 +51,7 @@ async fn bam_chr12_more() {
     use seqa_core::bam::bam_search::bam_search;
     use seqa_core::stores::StoreService;
 
-    let options = SearchOptions::new(S3_BAM, vec!["chr12:10000000-10010000"])
+    let options = SearchOptions::new(S3_BAM, &vec!["chr12:10000000-10010000".to_string()])
         .unwrap()
         .set_index_path(S3_BAM_INDEX)
         .set_include_header(false)
@@ -71,7 +71,7 @@ async fn bam_chr1() {
     use seqa_core::bam::bam_search::bam_search;
     use seqa_core::stores::StoreService;
 
-    let options = SearchOptions::new(S3_BAM, vec!["chr1:10000000-10200000"])
+    let options = SearchOptions::new(S3_BAM, &vec!["chr1:10000000-10200000".to_string()])
         .unwrap()
         .set_index_path(S3_BAM_INDEX)
         .set_include_header(false)
@@ -91,7 +91,7 @@ async fn bam_chr_m() {
     use seqa_core::bam::bam_search::bam_search;
     use seqa_core::stores::StoreService;
 
-    let options = SearchOptions::new(S3_BAM, vec!["chrM:1-1"])
+    let options = SearchOptions::new(S3_BAM, &vec!["chrM:1-1".to_string()])
         .unwrap()
         .set_index_path(S3_BAM_INDEX)
         .set_include_header(false)
@@ -121,7 +121,7 @@ async fn bam_multiple_coordinates() {
     use seqa_core::stores::StoreService;
     let options = SearchOptions::new(
         S3_BAM,
-        vec!["chr1:10000000-10000000", "chr12:10000000-10000000"],
+        &vec!["chr1:10000000-10000000".to_string(), "chr12:10000000-10000000".to_string()],
     )
     .unwrap()
     .set_index_path(S3_BAM_INDEX)

@@ -101,33 +101,34 @@ impl FaiIndex {
     /// Returns [`SearchError::InvalidRequest`] if a contig is not in the index, or if
     /// `begin` is 0 or `end` is past the end of the contig.
     pub fn get_offsets(&self, coordinates: &[Coordinate]) -> Result<Vec<Range<u64>>, SearchError> {
-        coordinates
-            .iter()
-            .map(|coord| {
-                let chr = coord.get_chromosome();
-                let begin = coord.get_begin();
-                let end = coord.get_end();
-
-                let contig: &Contig = crate::genome::chromosome_aliases(chr)
-                    .iter()
-                    .find_map(|alias| self.contigs.get(alias))
-                    .ok_or(SearchError::InvalidRequest {
-                        reason: "Contig not found".to_string(),
-                        requested: chr.to_string(),
-                    })?;
-
-                if begin < 1 || end > contig.length as u32 {
-                    return Err(SearchError::InvalidRequest {
-                        reason: "Invalid Coordinates".to_string(),
-                        requested: format!("{}", coord),
-                    });
+        let mut ranges = vec![];
+        coordinates.iter().for_each(|coord| {
+            let chr = coord.get_chromosome();
+            let begin = coord.get_begin();
+            let end = coord.get_end();
+            if let Some(contig) = self.find_contig(chr) {
+                if !FaiIndex::valid_coordinate(begin, end, contig) {
+                    return;
                 }
                 let start = Self::get_offset(begin, contig);
                 let end = Self::get_offset(end, contig) + 1;
 
-                Ok(start..end)
-            })
-            .collect()
+                ranges.push(start..end);
+            } else {
+                return;
+            }
+        });
+        Ok(ranges)
+    }
+
+    fn find_contig(&self, chr: &str) -> Option<&Contig> {
+        crate::genome::chromosome_aliases(chr)
+            .iter()
+            .find_map(|chr| self.contigs.get(chr))
+    }
+
+    fn valid_coordinate(begin: u32, end: u32, contig: &Contig) -> bool {
+        begin >= 1 && end <= contig.length as u32
     }
 
     pub fn get_offset(position: u32, contig: &Contig) -> u64 {

@@ -21,7 +21,7 @@ async fn s3_bigwig() {
 
     let options = SearchOptions::new(
         "s3://com.gmail.docarw/test_data/density.bw",
-        vec!["chr4:120000000-140000000"],
+        &vec!["chr4:120000000-140000000".to_string()],
     )
     .unwrap()
     .set_index_path("-")
@@ -61,7 +61,7 @@ async fn azure_bigwig() {
 
     let options = SearchOptions::new(
         "az://genreblobs/genre-test-data/density.bw",
-        vec!["chr4:120000000-140000000"],
+        &vec!["chr4:120000000-140000000".to_string()],
     )
     .unwrap()
     .set_index_path("-")
@@ -100,7 +100,7 @@ async fn gc_bigwig() {
 
     let options = SearchOptions::new(
         "gs://genre_test_bucket/density.bw",
-        vec!["chr4:120000000-140000000"],
+        &vec!["chr4:120000000-140000000".to_string()],
     )
     .unwrap()
     .set_index_path("-")
@@ -139,7 +139,7 @@ async fn http_bigwig() {
 
     let options = SearchOptions::new(
         "https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test_data/density.bw",
-        vec!["chr4:120000000-140000000"],
+        &vec!["chr4:120000000-140000000".to_string()],
     )
     .unwrap()
     .set_index_path("-")
@@ -178,7 +178,7 @@ async fn bigwig_multiple_coordinates() {
 
     let options = SearchOptions::new(
         "s3://com.gmail.docarw/test_data/density.bw",
-        vec!["chr4:120000000-140000000", "chr5:1-100000000"],
+        &vec!["chr4:120000000-140000000".to_string(), "chr5:1-100000000".to_string()],
     )
     .unwrap()
     .set_index_path("-")

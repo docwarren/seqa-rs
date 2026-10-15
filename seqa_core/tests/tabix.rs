@@ -47,7 +47,7 @@ impl Drop for IndexGuard {
 #[tokio::test]
 async fn vcf_chr1() {
     let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_VCF, vec!["chr1:1-500000"])
+    let options = SearchOptions::new(S3_VCF, &vec!["chr1:1-500000".to_string()])
         .unwrap()
         .set_index_path(S3_VCF_INDEX)
         .set_output_format("vcf")
@@ -71,7 +71,7 @@ async fn vcf_chr1() {
 #[tokio::test]
 async fn vcf_chr12() {
     let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_VCF, vec!["chr12:1-120000"])
+    let options = SearchOptions::new(S3_VCF, &vec!["chr12:1-120000".to_string()])
         .unwrap()
         .set_index_path(S3_VCF_INDEX)
         .set_output_format("vcf")
@@ -95,7 +95,7 @@ async fn vcf_chr12() {
 #[tokio::test]
 async fn vcf_chr_x() {
     let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_VCF, vec!["chrX:154927181-154929412"])
+    let options = SearchOptions::new(S3_VCF, &vec!["chrX:154927181-154929412".to_string()])
         .unwrap()
         .set_index_path(S3_VCF_INDEX)
         .set_output_format("vcf")
@@ -119,7 +119,7 @@ async fn vcf_chr_x() {
 #[tokio::test]
 async fn vcf_chr4() {
     let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_VCF, vec!["chr4:4928400-4928402"])
+    let options = SearchOptions::new(S3_VCF, &vec!["chr4:4928400-4928402".to_string()])
         .unwrap()
         .set_index_path(S3_VCF_INDEX)
         .set_output_format("vcf")
@@ -139,7 +139,7 @@ async fn vcf_chr4() {
 #[tokio::test]
 async fn vcf_multiple_coords() {
     let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_VCF, vec!["chr12:1-120000", "chrX:154927181-154929412"])
+    let options = SearchOptions::new(S3_VCF, &vec!["chr12:1-120000".to_string(), "chrX:154927181-154929412".to_string()])
         .unwrap()
         .set_index_path(S3_VCF_INDEX)
         .set_output_format("vcf")
@@ -163,7 +163,7 @@ async fn vcf_multiple_coords() {
 #[tokio::test]
 async fn vcf_many_lines() {
     let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_VCF, vec!["chr1:100000000-200000000"])
+    let options = SearchOptions::new(S3_VCF, &vec!["chr1:100000000-200000000".to_string()])
         .unwrap()
         .set_index_path(S3_VCF_INDEX)
         .set_output_format("vcf")
@@ -187,7 +187,7 @@ async fn vcf_many_lines() {
 #[tokio::test]
 async fn cnv_vcf_chr_12() {
     let _guard = IndexGuard::new(S3_CNV_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_CNV_VCF, vec!["chr12:1-100000000"])
+    let options = SearchOptions::new(S3_CNV_VCF, &vec!["chr12:1-100000000".to_string()])
         .unwrap()
         .set_index_path(S3_CNV_VCF_INDEX)
         .set_output_format("vcf")
@@ -211,7 +211,7 @@ async fn cnv_vcf_chr_12() {
 #[tokio::test]
 async fn gff_test() {
     let _guard = IndexGuard::new(S3_GTF_INDEX); // Automatically deletes index on scope exit, even on panic!
-    let options = SearchOptions::new(S3_GTF, vec!["chr1:1-50000"])
+    let options = SearchOptions::new(S3_GTF, &vec!["chr1:1-50000".to_string()])
         .unwrap()
         .set_index_path(S3_GTF_INDEX)
         .set_output_format("gff")
@@ -227,7 +227,7 @@ async fn gff_test() {
 #[tokio::test]
 async fn gtf_test() {
     let _guard = IndexGuard::new(S3_GTF_INDEX);
-    let options = SearchOptions::new(S3_GTF, vec!["chr1:1-50000"])
+    let options = SearchOptions::new(S3_GTF, &vec!["chr1:1-50000".to_string()])
         .unwrap()
         .set_index_path(S3_GTF_INDEX)
         .set_output_format("gtf")
@@ -243,7 +243,7 @@ async fn gtf_test() {
 #[tokio::test]
 async fn azure_vcf() {
     let _guard = IndexGuard::new(AZ_VCF_INDEX);
-    let options = SearchOptions::new(AZ_VCF, vec!["chr1:100000000-200000000"])
+    let options = SearchOptions::new(AZ_VCF, &vec!["chr1:100000000-200000000".to_string()])
         .unwrap()
         .set_index_path(AZ_VCF_INDEX)
         .set_output_format("vcf")
@@ -267,7 +267,7 @@ async fn azure_vcf() {
 #[tokio::test]
 async fn gc_vcf() {
     let _guard = IndexGuard::new(GCS_VCF_INDEX);
-    let options = SearchOptions::new(GCS_VCF, vec!["chr1:100000000-200000000"])
+    let options = SearchOptions::new(GCS_VCF, &vec!["chr1:100000000-200000000".to_string()])
         .unwrap()
         .set_index_path(GCS_VCF_INDEX)
         .set_output_format("vcf")
@@ -301,7 +301,7 @@ async fn no_cache_does_not_write_index_file() {
         "Cache file should not exist before search"
     );
 
-    let options = SearchOptions::new(no_cache_file, vec!["chr1:1-100000000"])
+    let options = SearchOptions::new(no_cache_file, &vec!["chr1:1-100000000".to_string()])
         .unwrap()
         .set_index_path(no_cache_index)
         .set_output_format("bedgraph")
@@ -326,7 +326,7 @@ async fn http_vcf() {
     let http_vcf_index =
         "https://s3.us-west-1.amazonaws.com/com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi";
     let _guard = IndexGuard::new(http_vcf_index);
-    let options = SearchOptions::new(http_vcf, vec!["chr1:100000000-200000000"])
+    let options = SearchOptions::new(http_vcf, &vec!["chr1:100000000-200000000".to_string()])
         .unwrap()
         .set_index_path(http_vcf_index)
         .set_output_format("vcf")
@@ -353,7 +353,7 @@ async fn bedgraph_test() {
     let bedgraph = "s3://com.gmail.docarw/test_data/test.bedgraph.gz";
     let bedgraph_index = "s3://com.gmail.docarw/test_data/test.bedgraph.gz.tbi";
     let _guard = IndexGuard::new(bedgraph_index);
-    let options = SearchOptions::new(bedgraph, vec!["chr1:1-100000000"])
+    let options = SearchOptions::new(bedgraph, &vec!["chr1:1-100000000".to_string()])
         .unwrap()
         .set_index_path(bedgraph_index)
         .set_output_format("bedgraph")

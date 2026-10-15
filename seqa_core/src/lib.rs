@@ -32,7 +32,7 @@
 //!     // One or more regions; results come back in the order the regions are given.
 //!     let opts = SearchOptions::new(
 //!         "s3://my-bucket/sample.bam",
-//!         vec!["chr1:100000-200000", "chr2:5000-6000"],
+//!         &vec!["chr1:100000-200000".to_string(), "chr2:5000-6000".to_string()],
 //!     )?;
 //!
 //!     let store_service = StoreService::new();
@@ -74,19 +74,19 @@
 //! - **`sqlite`** — Enables the `sqlite` module for gene-symbol and cytoband queries via SQLite.
 
 pub mod api;
+pub mod bam;
+pub mod bigwig;
 pub mod codecs;
+pub mod coordinate;
+pub mod fasta;
 pub mod genome;
 pub mod indexes;
 pub mod models;
+pub mod parsing_utils;
 pub mod services;
-pub mod stores;
-pub mod traits;
-pub mod utils;
-
-pub mod bam;
-pub mod bigwig;
-pub mod coordinate;
-pub mod fasta;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
+pub mod stores;
 pub mod tabix;
+pub mod traits;
+pub mod utils;

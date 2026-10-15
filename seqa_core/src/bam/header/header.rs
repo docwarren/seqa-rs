@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Deserialize, Serialize};
+use crate::api::parsing_error::ParsingError;
+use crate::api::search_error::SearchError;
 use crate::bam::header::header_line::HeaderLine;
 use crate::bam::header::header_utils::read_magic;
 use crate::bam::header::reference::BamReference;
@@ -21,9 +22,8 @@ use crate::codecs::bgzip;
 use crate::indexes::constants::MAX_BLOCK_SIZE;
 use crate::indexes::virtual_offset::VirtualOffset;
 use crate::stores::StoreService;
+use serde::{Deserialize, Serialize};
 use std::ops::Range;
-use crate::api::parsing_error::ParsingError;
-use crate::api::search_error::SearchError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BamHeader {
@@ -31,7 +31,7 @@ pub struct BamHeader {
     pub references: Vec<BamReference>,
 }
 
-fn parse_header_lines(bytes: &Vec<u8>) -> Result<BamHeader, ParsingError> {
+fn parse_header_lines(bytes: &[u8]) -> Result<BamHeader, ParsingError> {
     let mut i = 0;
 
     let (_, l_text) = read_magic(bytes)?;
@@ -40,13 +40,13 @@ fn parse_header_lines(bytes: &Vec<u8>) -> Result<BamHeader, ParsingError> {
     let header_lines = BamHeader::text_header_from_bytes(bytes[i..i + l_text as usize].to_vec())?;
 
     i += l_text as usize;
-    let n_ref = u32::from_le_bytes(bytes[i..i+4].try_into()?);
+    let n_ref = u32::from_le_bytes(bytes[i..i + 4].try_into()?);
     i += 4;
 
     let mut references = Vec::with_capacity(n_ref as usize);
 
     for _ in 0..n_ref {
-        let l_name = u32::from_le_bytes(bytes[i..i+4].try_into()?);
+        let l_name = u32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
         let ref_name_bytes = &bytes[i..i + l_name as usize];
@@ -54,7 +54,7 @@ fn parse_header_lines(bytes: &Vec<u8>) -> Result<BamHeader, ParsingError> {
         ref_name = ref_name.trim_end_matches('\0').to_string();
 
         i += l_name as usize;
-        let ref_length = u32::from_le_bytes(bytes[i..i+4].try_into()?);
+        let ref_length = u32::from_le_bytes(bytes[i..i + 4].try_into()?);
         i += 4;
 
         references.push(BamReference {
@@ -64,7 +64,7 @@ fn parse_header_lines(bytes: &Vec<u8>) -> Result<BamHeader, ParsingError> {
     }
     Ok(BamHeader {
         header_lines,
-        references
+        references,
     })
 }
 
@@ -82,35 +82,37 @@ impl BamHeader {
         first_vp: VirtualOffset,
     ) -> Result<Self, SearchError> {
         let compressed_bytes = store
-            .get_range(file_path, Range {
-                start: 0u64,
-                end: first_vp.block_offset as u64 + MAX_BLOCK_SIZE,
-            })
+            .get_range(
+                file_path,
+                Range {
+                    start: 0u64,
+                    end: first_vp.block_offset as u64 + MAX_BLOCK_SIZE,
+                },
+            )
             .await
             .map_err(|e| SearchError::ReadError {
                 path: file_path.to_string(),
-                source: e
+                source: e,
             })?;
 
-        let block_sizes = bgzip::from_bytes(&compressed_bytes)
-            .map_err(|e| SearchError::CodecError {
+        let block_sizes =
+            bgzip::from_bytes(&compressed_bytes).map_err(|e| SearchError::CodecError {
                 path: file_path.to_string(),
-                source: e
+                source: e,
             })?;
 
-        let bytes = bgzip::decompress(&block_sizes, &compressed_bytes)
-            .map_err(|e| SearchError::CodecError {
+        let bytes = bgzip::decompress(&block_sizes, &compressed_bytes).map_err(|e| {
+            SearchError::CodecError {
                 path: file_path.to_string(),
-                source: e
-            })?;
+                source: e,
+            }
+        })?;
 
         parse_header_lines(&bytes).map_err(|e| SearchError::ParseError {
             path: file_path.to_string(),
-            source: e
+            source: e,
         })
     }
-
-
 
     pub fn text_header_from_bytes(bytes: Vec<u8>) -> Result<Vec<HeaderLine>, ParsingError> {
         let header_str = String::from_utf8_lossy(&bytes);

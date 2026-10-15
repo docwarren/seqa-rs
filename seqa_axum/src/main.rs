@@ -118,7 +118,7 @@ async fn feature_search(
         return Err(ApiError::BadRequest("Empty coordinate string".to_string()));
     }
 
-    let mut search_options = SearchOptions::new(&request.path, vec![&request.coordinates])
+    let mut search_options = SearchOptions::new(&request.path, &vec![request.coordinates])
         .map_err(|e| ApiError::BadRequest(format!("Invalid coordinates: {}", e)))?;
 
     populate_from_cache(&state.cache, &mut search_options).await;

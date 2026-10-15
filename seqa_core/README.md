@@ -11,7 +11,7 @@ use seqa_core::stores::StoreService;
 
 let options = SearchOptions::new(
     "s3://my-bucket/sample.bam",
-    vec!["chr1:100000-200000", "chr2:5000-6000"],
+    &vec!["chr1:100000-200000".to_string(), "chr2:5000-6000".to_string()],
 )?
 .set_include_header(false);
 
@@ -31,10 +31,10 @@ for line in &result.lines {
 | Format | Example | Meaning |
 |--------|---------|---------|
 | Range | `chr1:1000000-2000000` | `begin` to `end`, inclusive |
-| Begin only | `chr1:1000000` | `begin` to the end of the chromosome |
+| Single position | `chr1:1000000` | That one base |
 | Chromosome | `chr1` | The whole chromosome |
 
-Commas are stripped (`chr1:1,000,000-2,000,000`). Chromosome names with or without the `chr` prefix are accepted. Open-ended coordinates use the longest length of that chromosome across hg19/hg38/GRCh37/GRCh38.
+Commas are stripped (`chr1:1,000,000-2,000,000`). Chromosome names with or without the `chr` prefix are accepted. Whole-chromosome queries use the longest length of that chromosome across hg19/hg38/GRCh37/GRCh38.
 
 ### Query size limits
 

@@ -13,14 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Deserialize, Serialize};
-
 use crate::tabix::bed::BedLine;
+use crate::tabix::bed_pe::BedpeLine;
 use crate::tabix::bedgraph::BedGraphLine;
 use crate::tabix::gff::GffLine;
 use crate::tabix::gtf::GtfLine;
 use crate::tabix::vcf::VcfLine;
 use crate::traits::feature::Feature;
+use crate::{api::parsing_error::ParsingError, traits::from_bytes::FromBytes};
+use serde::{Deserialize, Serialize};
 
 /// The genomic file format being queried.
 ///
@@ -35,6 +36,8 @@ pub enum OutputFormat {
     FASTA,
     /// Variant Call Format (bgzipped + tabix-indexed `.vcf.gz`).
     VCF,
+    /// Browser Extensible Data Paired End (bgzipped + tabix-indexed `.bed.gz`).
+    BEDPE,
     /// Browser Extensible Data (bgzipped + tabix-indexed `.bed.gz`).
     BED,
     /// BedGraph signal track (bgzipped + tabix-indexed `.bedgraph.gz`).
@@ -48,7 +51,7 @@ pub enum OutputFormat {
     /// Gene Transfer Format (bgzipped + tabix-indexed `.gtf.gz`).
     GTF,
     /// Raw string output; no format-specific parsing is applied.
-    STRING
+    STRING,
 }
 
 impl OutputFormat {
@@ -73,6 +76,7 @@ impl OutputFormat {
             "fasta" => Ok(OutputFormat::FASTA),
             "vcf" => Ok(OutputFormat::VCF),
             "bed" => Ok(OutputFormat::BED),
+            "bedpe" => Ok(OutputFormat::BEDPE),
             "bedgraph" => Ok(OutputFormat::BEDGRAPH),
             "bigwig" => Ok(OutputFormat::BIGWIG),
             "bigbed" => Ok(OutputFormat::BIGBED),
@@ -89,55 +93,19 @@ impl OutputFormat {
     /// boxed [`crate::traits::feature::Feature`].  Only text-based tabix formats
     /// (VCF, BED, BedGraph, GFF, GTF) are supported; all other variants return a
     /// function that always errors with "Unsupported output format".
-    pub fn get_model(&self) -> fn(&str) -> Result<Box<dyn Feature>, String> {
+    pub fn read_from_bytes(&self, line: &[u8]) -> Result<Box<dyn Feature>, ParsingError> {
         match self {
-            OutputFormat::VCF => vcf_from_line,
-            OutputFormat::BED => bed_from_line,
-            OutputFormat::BEDGRAPH => bedgraph_from_line,
-            OutputFormat::GFF => gff_from_line,
-            OutputFormat::GTF => gtf_from_line,
-            _ => unsupported_format,
+            OutputFormat::VCF => Ok(Box::new(VcfLine::from_bytes(line)?.0)),
+            OutputFormat::BED => Ok(Box::new(BedLine::from_bytes(line)?.0)),
+            OutputFormat::BEDGRAPH => Ok(Box::new(BedGraphLine::from_bytes(line)?.0)),
+            OutputFormat::BEDPE => Ok(Box::new(BedpeLine::from_bytes(line)?.0)),
+            OutputFormat::GFF => Ok(Box::new(GffLine::from_bytes(line)?.0)),
+            OutputFormat::GTF => Ok(Box::new(GtfLine::from_bytes(line)?.0)),
+            _ => Err(ParsingError::FormatError(
+                "Unsupported output format".to_string(),
+            )),
         }
     }
-}
-
-fn vcf_from_line(line: &str) -> Result<Box<dyn Feature>, String> {
-    match VcfLine::from_line(line.to_string()) {
-        Ok(line) => Ok(Box::new(line)),
-        Err(err) => Err(err),
-    }
-}
-
-fn bed_from_line(line: &str) -> Result<Box<dyn Feature>, String> {
-    match BedLine::from_line(line.to_string()) {
-        Ok(line) => Ok(Box::new(line)),
-        Err(err) => Err(err),
-    }
-}
-
-fn bedgraph_from_line(line: &str) -> Result<Box<dyn Feature>, String> {
-    match BedGraphLine::from_line(line.to_string()) {
-        Ok(line) => Ok(Box::new(line)),
-        Err(err) => Err(err),
-    }
-}
-
-fn gff_from_line(line: &str) -> Result<Box<dyn Feature>, String> {
-    match GffLine::from_line(line.to_string()) {
-        Ok(line) => Ok(Box::new(line)),
-        Err(err) => Err(err),
-    }
-}
-
-fn gtf_from_line(line: &str) -> Result<Box<dyn Feature>, String> {
-    match GtfLine::from_line(line.to_string()) {
-        Ok(line) => Ok(Box::new(line)),
-        Err(err) => Err(err),
-    }
-}
-
-fn unsupported_format(_: &str) -> Result<Box<dyn Feature>, String> {
-    Err("Unsupported output format".to_string())
 }
 
 impl std::fmt::Display for OutputFormat {
@@ -147,6 +115,7 @@ impl std::fmt::Display for OutputFormat {
             OutputFormat::FASTA => write!(f, "FASTA"),
             OutputFormat::VCF => write!(f, "VCF"),
             OutputFormat::BED => write!(f, "BED"),
+            OutputFormat::BEDPE => write!(f, "BEDPE"),
             OutputFormat::BEDGRAPH => write!(f, "BEDGRAPH"),
             OutputFormat::BIGWIG => write!(f, "BIGWIG"),
             OutputFormat::BIGBED => write!(f, "BIGBED"),

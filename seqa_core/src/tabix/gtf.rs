@@ -13,8 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
+use crate::parsing_utils::split_str;
+use crate::traits::from_bytes::FromBytes;
+use bstr::ByteSlice;
 
 pub struct GtfLine {
     pub chromosome: String,
@@ -41,79 +45,66 @@ impl GtfLine {
         "frame",
         "attributes"
     ];
+}
 
-    pub fn from_line(line: String) -> Result<GtfLine, String> {
-        let tokens = line.split('\t').collect::<Vec<&str>>();
-        if tokens.len() < 9 {
-            return Err(format!("Invalid GTF line: {}", line));
+impl FromBytes for GtfLine {
+    type Error = ParsingError;
+
+    fn from_bytes(bytes: &[u8]) -> Result<(GtfLine, usize), Self::Error> {
+        let tokens = split_str(bytes, "\t", Some(9))?;
+        let chromosome = tokens[0].to_str()?;
+        let source = tokens[1].to_str()?;
+        let feature = tokens[2].to_str()?;
+        let begin = tokens[3].to_str()?.parse::<u32>()?;
+        let end = tokens[4].to_str()?.parse::<u32>()?;
+
+        let score = if tokens[5] == b"." {
+            None
+        } else {
+            Some(tokens[5].to_str()?.parse::<u16>()?)
+        };
+
+        let strand = if tokens[6] == b"." {
+            None
+        } else {
+            Some(tokens[6].to_str()?)
+        };
+
+        let frame = if tokens[7] == b"." {
+            None
+        } else {
+            Some(tokens[7].to_str()?.parse::<u8>()?)
+        };
+
+        // Attributes are `key value` pairs separated by `;`
+        let mut attributes = vec![];
+        if tokens[8] != b"." {
+            let attribute_tokens = split_str(tokens[8], ";", None)?;
+            for attribute in attribute_tokens {
+                let parts = split_str(attribute.trim(), " ", None)?;
+                if parts.len() == 2 {
+                    attributes.push((
+                        parts[0].trim().to_str()?.to_string(),
+                        parts[1].trim().to_str()?.to_string(),
+                    ));
+                }
+            }
         }
 
-        let chromosome = tokens[0].to_string();
-        let source = tokens[1].to_string();
-        let feature = tokens[2].to_string();
-
-        let begin = match tokens[3].parse::<u32>() {
-            Ok(b) => b,
-            Err(_) => return Err(format!("Invalid begin position in GTF line: {}", line)),
-        };
-
-        let end = match tokens[4].parse::<u32>() {
-            Ok(e) => e,
-            Err(_) => return Err(format!("Invalid end position in GTF line: {}", line)),
-        };
-
-        let score = if tokens[5] == "." {
-            None
-        } else {
-            match tokens[5].parse::<u16>() {
-                Ok(s) => Some(s),
-                Err(_) => return Err(format!("Invalid score in GTF line: {}", line)),
-            }
-        };
-
-        let strand = if tokens[6] == "." {
-            None
-        } else {
-            Some(tokens[6].to_string())
-        };
-
-        let frame = if tokens[7] == "." {
-            None
-        } else {
-            match tokens[7].parse::<u8>() {
-                Ok(f) => Some(f),
-                Err(_) => return Err(format!("Invalid frame in GTF line: {}", line)),
-            }
-        };
-
-        let attributes = if tokens.len() > 8 && tokens[8] != "." {
-            tokens[8]
-                .split(';')
-                .filter_map(|attr| {
-                    let attr = attr.trim();
-                    let parts: Vec<&str> = attr.split(' ').collect();
-                    if parts.len() == 2 {
-                        Some((parts[0].trim().to_string(), parts[1].trim().to_string()))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-
-        Ok(GtfLine {
-            chromosome,
-            source,
-            feature,
-            begin,
-            end,
-            score,
-            strand,
-            frame,
-            attributes,
-        })
+        Ok((
+            GtfLine {
+                chromosome: chromosome.to_string(),
+                source: source.to_string(),
+                feature: feature.to_string(),
+                begin,
+                end,
+                score,
+                strand: strand.map(|s| s.to_string()),
+                frame,
+                attributes,
+            },
+            bytes.len(),
+        ))
     }
 }
 
@@ -130,11 +121,15 @@ impl std::fmt::Display for GtfLine {
             self.score.as_ref().map_or(".".to_string(), |s| s.to_string()),
             self.strand.as_ref().map_or(".".to_string(), |s| s.clone()),
             self.frame.as_ref().map_or(".".to_string(), |f| f.to_string()),
-            self.attributes
-                .iter()
-                .map(|(k, v)| format!("{} {}", k, v))
-                .collect::<Vec<String>>()
-                .join(";")
+            if self.attributes.is_empty() {
+                ".".to_string()
+            } else {
+                self.attributes
+                    .iter()
+                    .map(|(k, v)| format!("{} {}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(";")
+            }
         )
     }
 }
@@ -161,16 +156,31 @@ mod test {
 
     #[test]
     fn it_should_init_gtf_from_string() {
-        let test_line1 = "chr12\trefGene\texon\t14477\t14944\t.\t-\t.\tgene_id \"WASH8P\";transcript_id \"NR_130745\";exon_number \"1\";exon_id \"NR_130745.1\";gene_name \"WASH8P\"".to_string();
-        let test_line2 = "chr12\trefGene\texon\t18373\t18484\t.\t-\t.\tgene_id \"WASH8P\";transcript_id \"NR_130745\";exon_number \"9\";exon_id \"NR_130745.9\";gene_name \"WASH8P\"".to_string();
+        let test_line1 = b"chr12\trefGene\texon\t14477\t14944\t.\t-\t.\tgene_id \"WASH8P\";transcript_id \"NR_130745\";exon_number \"1\";exon_id \"NR_130745.1\";gene_name \"WASH8P\"";
+        let test_line2 = b"chr12\trefGene\texon\t18373\t18484\t.\t-\t.\tgene_id \"WASH8P\";transcript_id \"NR_130745\";exon_number \"9\";exon_id \"NR_130745.9\";gene_name \"WASH8P\"";
 
-        let expected_1 = test_line1.clone();
-        let expected_2 = test_line2.clone();
+        let expected_1 = test_line1.to_str().unwrap().to_string();
+        let expected_2 = test_line2.to_str().unwrap().to_string();
 
-        let bed1 = GtfLine::from_line(test_line1).expect("Failed to parse GTF line 1");
-        assert_eq!(format!("{}", bed1), expected_1);
+        let gtf1 = GtfLine::from_bytes(test_line1)
+            .expect("Failed to parse GTF line 1")
+            .0;
+        assert_eq!(format!("{}", gtf1), expected_1);
 
-        let bed2 = GtfLine::from_line(test_line2).expect("Failed to parse GTF line 2");
-        assert_eq!(format!("{}", bed2), expected_2);
+        let gtf2 = GtfLine::from_bytes(test_line2)
+            .expect("Failed to parse GTF line 2")
+            .0;
+        assert_eq!(format!("{}", gtf2), expected_2);
+    }
+
+    #[test]
+    fn it_should_display_without_optional_fields() {
+        let test_line = b"chr12\trefGene\texon\t14477\t14944\t.\t.\t.\t.";
+        let expected = "chr12\trefGene\texon\t14477\t14944\t.\t.\t.\t.".to_string();
+
+        let gtf = GtfLine::from_bytes(test_line)
+            .expect("Failed to parse GTF line")
+            .0;
+        assert_eq!(format!("{}", gtf), expected);
     }
 }

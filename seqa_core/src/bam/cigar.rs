@@ -41,7 +41,7 @@ impl Cigar {
         self.operations.iter().map(|op| op.get_read_length()).sum()
     }
 
-    pub fn get_operations(&self) -> &Vec<CigarOperation> {
+    pub fn get_operations(&self) -> &[CigarOperation] {
         &self.operations
     }
 }

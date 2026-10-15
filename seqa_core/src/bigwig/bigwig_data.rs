@@ -28,7 +28,7 @@ pub struct BigwigData {
     pub reserved: u8,
     pub item_count: u16,
     pub data: Vec<DataPoint>,
-    pub size: usize
+    pub size: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -41,9 +41,21 @@ pub struct DataPoint {
 }
 
 pub fn read_type_1_data(bytes: &[u8], chr_id: u32) -> Result<(DataPoint, usize), String> {
-    let begin = u32::from_le_bytes(bytes[0..4].try_into().map_err(|e| format!("Invalid begin: {}", e))?);
-    let end = u32::from_le_bytes(bytes[4..8].try_into().map_err(|e| format!("Invalid end: {}", e))?);
-    let value = f32::from_le_bytes(bytes[8..12].try_into().map_err(|e| format!("Invalid value: {}", e))?);
+    let begin = u32::from_le_bytes(
+        bytes[0..4]
+            .try_into()
+            .map_err(|e| format!("Invalid begin: {}", e))?,
+    );
+    let end = u32::from_le_bytes(
+        bytes[4..8]
+            .try_into()
+            .map_err(|e| format!("Invalid end: {}", e))?,
+    );
+    let value = f32::from_le_bytes(
+        bytes[8..12]
+            .try_into()
+            .map_err(|e| format!("Invalid value: {}", e))?,
+    );
     Ok((
         DataPoint {
             chr_id,
@@ -56,10 +68,22 @@ pub fn read_type_1_data(bytes: &[u8], chr_id: u32) -> Result<(DataPoint, usize),
     ))
 }
 
-pub fn read_type_2_data(bytes: &[u8], chr_id: u32, span: u32) -> Result<(DataPoint, usize), String> {
-    let begin = u32::from_le_bytes(bytes[0..4].try_into().map_err(|e| format!("Invalid begin: {}", e))?);
+pub fn read_type_2_data(
+    bytes: &[u8],
+    chr_id: u32,
+    span: u32,
+) -> Result<(DataPoint, usize), String> {
+    let begin = u32::from_le_bytes(
+        bytes[0..4]
+            .try_into()
+            .map_err(|e| format!("Invalid begin: {}", e))?,
+    );
     let end = begin + span;
-    let value = f32::from_le_bytes(bytes[4..8].try_into().map_err(|e| format!("Invalid value: {}", e))?);
+    let value = f32::from_le_bytes(
+        bytes[4..8]
+            .try_into()
+            .map_err(|e| format!("Invalid value: {}", e))?,
+    );
     Ok((
         DataPoint {
             chr_id,
@@ -72,9 +96,18 @@ pub fn read_type_2_data(bytes: &[u8], chr_id: u32, span: u32) -> Result<(DataPoi
     ))
 }
 
-pub fn read_type_3_data(bytes: &[u8], chr_id: u32, begin: u32, span: u32) -> Result<(DataPoint, usize), String> {
+pub fn read_type_3_data(
+    bytes: &[u8],
+    chr_id: u32,
+    begin: u32,
+    span: u32,
+) -> Result<(DataPoint, usize), String> {
     let end = begin + span;
-    let value = f32::from_le_bytes(bytes[0..4].try_into().map_err(|e| format!("Invalid value: {}", e))?);
+    let value = f32::from_le_bytes(
+        bytes[0..4]
+            .try_into()
+            .map_err(|e| format!("Invalid value: {}", e))?,
+    );
     Ok((
         DataPoint {
             chr_id,
@@ -88,14 +121,17 @@ pub fn read_type_3_data(bytes: &[u8], chr_id: u32, begin: u32, span: u32) -> Res
 }
 
 impl BigwigData {
-
     pub const SIZE: usize = 24; // Size of the BigwigData without its datapoints.
 
-    pub const COLUMNS: [&str; 4] = [
+    pub const COLUMNS: [&str; 8] = [
         "chromosome",
         "begin",
         "end",
-        "value",
+        "valid_count/value",
+        "min?",
+        "max?",
+        "sum?",
+        "sum_squares?",
     ];
 
     pub fn new() -> Self {
@@ -109,7 +145,7 @@ impl BigwigData {
             reserved: 0,
             item_count: 0,
             data: Vec::new(),
-            size: 0
+            size: 0,
         }
     }
 
@@ -117,15 +153,42 @@ impl BigwigData {
         if bytes.len() < 32 {
             return Err("Not enough bytes for a complete BigwigData".into());
         }
-        let chromosome_id = u32::from_le_bytes(bytes[0..4].try_into().map_err(|e| format!("Invalid chromosome_id: {}", e))?);
-        let name = chr_tree.get_chromosome_name(chromosome_id).ok_or(format!("Chromosome ID {} not found in ChrTree", chromosome_id))?;
-        let begin = u32::from_le_bytes(bytes[4..8].try_into().map_err(|e| format!("Invalid begin: {}", e))?);
-        let end = u32::from_le_bytes(bytes[8..12].try_into().map_err(|e| format!("Invalid end: {}", e))?);
-        let step = u32::from_le_bytes(bytes[12..16].try_into().map_err(|e| format!("Invalid step: {}", e))?);
-        let span = u32::from_le_bytes(bytes[16..20].try_into().map_err(|e| format!("Invalid span: {}", e))?);
+        let chromosome_id = u32::from_le_bytes(
+            bytes[0..4]
+                .try_into()
+                .map_err(|e| format!("Invalid chromosome_id: {}", e))?,
+        );
+        let name = chr_tree.get_chromosome_name(chromosome_id).ok_or(format!(
+            "Chromosome ID {} not found in ChrTree",
+            chromosome_id
+        ))?;
+        let begin = u32::from_le_bytes(
+            bytes[4..8]
+                .try_into()
+                .map_err(|e| format!("Invalid begin: {}", e))?,
+        );
+        let end = u32::from_le_bytes(
+            bytes[8..12]
+                .try_into()
+                .map_err(|e| format!("Invalid end: {}", e))?,
+        );
+        let step = u32::from_le_bytes(
+            bytes[12..16]
+                .try_into()
+                .map_err(|e| format!("Invalid step: {}", e))?,
+        );
+        let span = u32::from_le_bytes(
+            bytes[16..20]
+                .try_into()
+                .map_err(|e| format!("Invalid span: {}", e))?,
+        );
         let type_code = bytes[20];
         let reserved = bytes[21];
-        let item_count = u16::from_le_bytes(bytes[22..24].try_into().map_err(|e| format!("Invalid item_count: {}", e))?);
+        let item_count = u16::from_le_bytes(
+            bytes[22..24]
+                .try_into()
+                .map_err(|e| format!("Invalid item_count: {}", e))?,
+        );
 
         let mut offset = BigwigData::SIZE; // Start after the header
         let mut data = Vec::new();
@@ -155,7 +218,7 @@ impl BigwigData {
             reserved,
             item_count,
             data,
-            size: offset
+            size: offset,
         })
     }
 }
@@ -184,14 +247,18 @@ impl DataPoint {
 
 impl Display for DataPoint {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\t{}\t{}\t{}", self.chr_name, self.begin, self.end, self.value)
+        write!(
+            f,
+            "{}\t{}\t{}\t{}",
+            self.chr_name, self.begin, self.end, self.value
+        )
     }
 }
 
 impl Overlaps for DataPoint {
-    fn overlaps(&self, chrom_id1: u32, chrom_id2: u32,start: u32, end: u32) -> bool {
-        ((chrom_id2 > self.chr_id) || (chrom_id2 == self.chr_id && end >= self.begin)) &&
-        ((chrom_id1 < self.chr_id) || (chrom_id1 == self.chr_id && start <= self.end))
+    fn overlaps(&self, chrom_id1: u32, chrom_id2: u32, start: u32, end: u32) -> bool {
+        ((chrom_id2 > self.chr_id) || (chrom_id2 == self.chr_id && end >= self.begin))
+            && ((chrom_id1 < self.chr_id) || (chrom_id1 == self.chr_id && start <= self.end))
     }
 }
 

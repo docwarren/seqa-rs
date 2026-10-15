@@ -1,4 +1,5 @@
 pub mod bed;
+pub mod bed_pe;
 pub mod bedgraph;
 pub mod caller;
 pub mod gff;

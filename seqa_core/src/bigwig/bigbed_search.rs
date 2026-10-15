@@ -16,7 +16,9 @@ use crate::api::search_error::SearchError;
 use crate::api::search_options::SearchOptions;
 use crate::api::search_result::SearchResult;
 use crate::bigwig::bigbed_data::BigbedData;
-use crate::bigwig::bigwig_search::{decompress_data, get_bw_chromosome_id, get_range_from_leaves};
+use crate::bigwig::bigwig_search::{
+    decompress_data, get_bw_chromosome_id, get_header_lines, get_range_from_leaves,
+};
 use crate::bigwig::index::bigwig_index::BigwigIndex;
 use crate::bigwig::index::chr_tree::BigwigChrTree;
 use crate::bigwig::index::r_tree::RTree;
@@ -24,7 +26,6 @@ use crate::bigwig::index::r_tree::overlaps::Overlaps;
 use crate::bigwig::index::r_tree::r_tree_leaf::RTreeLeaf;
 use crate::bigwig::index::util::get_zoom_strings;
 use crate::bigwig::index::zoom_header::ZoomHeader;
-use crate::bigwig::zoom_data::ZoomData;
 use crate::coordinate::Coordinate;
 use crate::stores::StoreService;
 use std::ops::Range;
@@ -65,29 +66,8 @@ fn data_to_lines(
     chr_tree: &BigwigChrTree,
     coordinate: &Coordinate,
     is_zoom: bool,
-    include_header: bool,
 ) -> Vec<String> {
-    let mut str_array: Vec<String> = if include_header {
-        if is_zoom {
-            vec![
-                ZoomData::COLUMNS
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\t"),
-            ]
-        } else {
-            vec![
-                BigbedData::COLUMNS
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\t"),
-            ]
-        }
-    } else {
-        Vec::new()
-    };
+    let mut str_array: Vec<String> = vec![];
 
     for block in bytes {
         let strings = if is_zoom {
@@ -165,7 +145,10 @@ pub async fn bigbed_search(
             })?;
         decompressed_data.push(decompressed);
     }
-    let mut lines: Vec<Vec<String>> = Vec::new();
+    let mut lines: Vec<Vec<String>> = vec![get_header_lines(
+        &BigbedData::COLUMNS,
+        options.include_header,
+    )];
     for (i, coord) in coordinates.iter().enumerate() {
         let is_zoom = zoom_headers[i].is_some();
         let blocks = &decompressed_data[i];
@@ -174,7 +157,6 @@ pub async fn bigbed_search(
             &index.chromosome_tree,
             &coord,
             is_zoom,
-            options.include_header,
         ));
     }
     result.lines = lines.concat();

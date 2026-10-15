@@ -23,7 +23,7 @@ async fn fasta_chr1() {
     use seqa_core::api::search_options::SearchOptions;
     use seqa_core::stores::StoreService;
 
-    let options = SearchOptions::new(S3_FASTA, vec!["chr1:10001-10100"])
+    let options = SearchOptions::new(S3_FASTA, &vec!["chr1:10001-10100".to_string()])
         .unwrap()
         .set_index_path(S3_FASTA_INDEX)
         .set_output_format("fasta")
@@ -41,7 +41,7 @@ async fn fasta_chr2() {
     use seqa_core::api::search_options::SearchOptions;
     use seqa_core::stores::StoreService;
 
-    let options = SearchOptions::new(S3_FASTA, vec!["chr2:10001-10100"])
+    let options = SearchOptions::new(S3_FASTA, &vec!["chr2:10001-10100".to_string()])
         .unwrap()
         .set_index_path(S3_FASTA_INDEX)
         .set_output_format("fasta")
@@ -59,7 +59,7 @@ async fn fasta_multiple_coordinates() {
     use seqa_core::api::search_options::SearchOptions;
     use seqa_core::stores::StoreService;
 
-    let options = SearchOptions::new(S3_FASTA, vec!["chr1:10001-10100", "chr2:10001-10100"])
+    let options = SearchOptions::new(S3_FASTA, &vec!["chr1:10001-10100".to_string(), "chr2:10001-10100".to_string()])
         .unwrap()
         .set_index_path(S3_FASTA_INDEX)
         .set_output_format("fasta")
