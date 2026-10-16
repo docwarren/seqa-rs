@@ -12,10 +12,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
-use crate::parsing_utils::split_str;
 use crate::tabix::caller::Caller;
 use crate::traits::feature::Feature;
 use crate::traits::from_bytes::FromBytes;
@@ -259,37 +257,34 @@ impl FromBytes for VcfLine {
     type Error = ParsingError;
 
     fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), Self::Error> {
-        let tokens = split_str(bytes, "\t", Some(8))?;
-        let chromosome = tokens[0].to_str()?;
-        let position = tokens[1].to_str()?.parse::<u32>()?;
-        let id = tokens[2].to_str()?;
-        let ref_allele = tokens[3].to_str()?;
-        let alts = split_str(tokens[4], ",", Some(1))?;
+        let tokens = bytes.to_str()?.split("\t").collect::<Vec<&str>>();
+        let chromosome = tokens[0];
+        let position = tokens[1].parse::<u32>()?;
+        let id = tokens[2];
+        let ref_allele = tokens[3];
+        let alts = tokens[4].split(",").collect::<Vec<&str>>();
         let mut alt_alleles = vec![];
         for alt in alts {
-            let alt_str = alt.to_str()?;
+            let alt_str = alt;
             alt_alleles.push(alt_str.to_string());
         }
 
         // Parse the quality field
-        let quality = tokens[5].to_str()?.parse::<f32>().ok();
-        let filter_tokens = split_str(tokens[6], ";", None)?;
+        let quality = tokens[5].parse::<f32>().ok();
+        let filter_tokens = tokens[6].split(";").collect::<Vec<&str>>();
         let mut filter = vec![];
         for f in filter_tokens {
-            filter.push(f.to_str()?.to_string());
+            filter.push(f.to_string());
         }
         // Parse the INFO field
-        let info_tokens = split_str(tokens[7], ";", None)?;
+        let info_tokens = tokens[7].split(";").collect::<Vec<&str>>();
         let mut info = vec![];
         for field in info_tokens {
-            let parts: Vec<&[u8]> = split_str(field, "=", None)?;
+            let parts = field.split("=").collect::<Vec<&str>>();
             if parts.len() == 2 {
-                info.push((
-                    parts[0].to_str()?.to_string(),
-                    parts[1].to_str()?.to_string(),
-                ));
+                info.push((parts[0].to_string(), parts[1].to_string()));
             } else {
-                info.push((parts[0].to_str()?.to_string(), "".to_string()));
+                info.push((parts[0].to_string(), "".to_string()));
             }
         }
 
@@ -298,19 +293,16 @@ impl FromBytes for VcfLine {
         // If there are sample data, parse them
         // The format is expected to be in the 9th column onwards
         if tokens.len() > 8 {
-            let format_keys = split_str(tokens[8], ":", None)?;
+            let format_keys = tokens[8].split(":").collect::<Vec<&str>>();
 
             for sample in tokens[9..].iter() {
-                let sample_values = split_str(sample, ":", None)?;
+                let sample_values = sample.split(":").collect::<Vec<&str>>();
                 let mut sample_map = vec![];
                 for (i, key) in format_keys.iter().enumerate() {
                     if i < sample_values.len() {
-                        sample_map.push((
-                            key.to_str()?.to_string(),
-                            sample_values[i].to_str()?.to_string(),
-                        ));
+                        sample_map.push((key.to_string(), sample_values[i].to_string()));
                     } else {
-                        sample_map.push((key.to_str()?.to_string(), String::new()));
+                        sample_map.push((key.to_string(), String::new()));
                     }
                 }
                 sample_data.push(sample_map);

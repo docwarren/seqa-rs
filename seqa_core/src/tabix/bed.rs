@@ -16,7 +16,6 @@
 use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
-use crate::parsing_utils::split_str;
 use crate::traits::feature::Feature;
 use crate::traits::from_bytes::FromBytes;
 use bstr::ByteSlice;
@@ -75,14 +74,14 @@ impl BedLine {
         "block_begins",
     ];
 
-    pub fn read_block_values(bytes: &[u8]) -> Result<Vec<u32>, ParsingError> {
-        let tokens = split_str(bytes, ",", None)?;
+    pub fn read_block_values(vals: &str) -> Result<Vec<u32>, ParsingError> {
+        let tokens: Vec<&str> = vals.split(",").collect();
         let mut result = vec![];
         for token in tokens.iter() {
             if token.is_empty() {
                 continue;
             }
-            let num = token.to_str()?.parse::<u32>()?;
+            let num = token.parse::<u32>()?;
             result.push(num);
         }
         Ok(result)
@@ -93,49 +92,50 @@ impl FromBytes for BedLine {
     type Error = ParsingError;
 
     fn from_bytes(bytes: &[u8]) -> Result<(BedLine, usize), Self::Error> {
-        let tokens = split_str(bytes, "\t", Some(3))?;
-        let chromosome = tokens[0].to_str()?;
+        let line = bytes.to_str()?;
+        let tokens: Vec<&str> = line.split("\t").collect();
 
-        let begin = tokens[1].to_str()?.parse::<u32>()?;
-        let end = tokens[2].to_str()?.parse::<u32>()?;
+        let chromosome = tokens[0];
+        let begin = tokens[1].parse::<u32>()?;
+        let end = tokens[2].parse::<u32>()?;
 
         let name = if tokens.len() > 3 {
-            Some(tokens[3].to_str()?)
+            Some(tokens[3])
         } else {
             None
         };
 
         let score = if tokens.len() > 4 {
-            tokens[4].to_str()?.parse::<u16>().ok()
+            tokens[4].parse::<u16>().ok()
         } else {
             None
         };
 
         let strand = if tokens.len() > 5 {
-            Some(tokens[5].to_str()?)
+            Some(tokens[5])
         } else {
             None
         };
 
         let thick_begin = if tokens.len() > 6 {
-            tokens[6].to_str()?.parse::<u32>().ok()
+            tokens[6].parse::<u32>().ok()
         } else {
             None
         };
 
         let thick_end = if tokens.len() > 7 {
-            tokens[7].to_str()?.parse::<u32>().ok()
+            tokens[7].parse::<u32>().ok()
         } else {
             None
         };
         let item_rgb = if tokens.len() > 8 {
-            Some(tokens[8].to_str()?)
+            Some(tokens[8])
         } else {
             None
         };
 
         let block_count = if tokens.len() > 9 {
-            tokens[9].to_str()?.parse::<u32>().ok()
+            tokens[9].parse::<u32>().ok()
         } else {
             None
         };
@@ -159,9 +159,8 @@ impl FromBytes for BedLine {
                 if i > 0 {
                     fields.push_str("\t");
                 }
-                fields.push_str(byt.to_str()?);
+                fields.push_str(byt);
             }
-
             Some(fields)
         } else {
             None
