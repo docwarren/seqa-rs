@@ -14,7 +14,6 @@ use crate::api::parsing_error::ParsingError;
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::models::coordinate_system::CoordinateSystem;
-use crate::parsing_utils::split_str;
 use crate::traits::feature::Feature;
 use crate::{coordinate::Coordinate, traits::from_bytes::FromBytes};
 use bstr::ByteSlice;
@@ -72,34 +71,33 @@ impl FromBytes for BedpeLine {
     type Error = ParsingError;
 
     fn from_bytes(bytes: &[u8]) -> Result<(BedpeLine, usize), Self::Error> {
-        let tokens = split_str(bytes, "\t", Some(6))?;
-        let chromosome1 = tokens[0].to_str()?;
-        let begin1 = tokens[1].to_str()?.parse::<u32>()?;
-        let end1 = tokens[2].to_str()?.parse::<u32>()?;
-        let chromosome2 = tokens[3].to_str()?;
-        let begin2 = tokens[4].to_str()?.parse::<u32>()?;
-        let end2 = tokens[5].to_str()?.parse::<u32>()?;
+        let tokens: Vec<&str> = bytes.to_str()?.split("\t").collect();
+        let chromosome1 = tokens[0];
+        let begin1 = tokens[1].parse::<u32>()?;
+        let end1 = tokens[2].parse::<u32>()?;
+        let chromosome2 = tokens[3];
+        let begin2 = tokens[4].parse::<u32>()?;
+        let end2 = tokens[5].parse::<u32>()?;
 
         let name = if tokens.len() > 6 {
-            tokens[6].to_str().ok()
+            Some(tokens[6])
         } else {
             None
         };
 
         let score = if tokens.len() > 7 {
-            tokens[7].to_str()?.parse::<f32>().ok()
+            tokens[7].parse::<f32>().ok()
         } else {
             None
         };
 
         let strand1 = if tokens.len() > 8 {
-            tokens[8].to_str().ok()
+            Some(tokens[8])
         } else {
             None
         };
-
         let strand2 = if tokens.len() > 9 {
-            tokens[9].to_str().ok()
+            Some(tokens[9])
         } else {
             None
         };
@@ -108,7 +106,7 @@ impl FromBytes for BedpeLine {
             let mut fields = String::new();
             let extra_tokens = &tokens[10..];
             for (i, byt) in extra_tokens.iter().enumerate() {
-                fields.push_str(byt.to_str()?);
+                fields.push_str(byt);
                 if i < extra_tokens.len() - 1 {
                     fields.push_str("\t")
                 }
