@@ -16,7 +16,6 @@
 use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
-use crate::parsing_utils::split_str;
 use crate::traits::from_bytes::FromBytes;
 use bstr::ByteSlice;
 
@@ -33,7 +32,6 @@ pub struct GffLine {
 }
 
 impl GffLine {
-
     pub const COLUMNS: [&str; 9] = [
         "chromosome",
         "source",
@@ -43,7 +41,7 @@ impl GffLine {
         "score",
         "strand",
         "frame",
-        "group"
+        "group",
     ];
 }
 
@@ -51,35 +49,35 @@ impl FromBytes for GffLine {
     type Error = ParsingError;
 
     fn from_bytes(bytes: &[u8]) -> Result<(GffLine, usize), Self::Error> {
-        let tokens = split_str(bytes, "\t", Some(9))?;
-        let chromosome = tokens[0].to_str()?;
-        let source = tokens[1].to_str()?;
-        let feature = tokens[2].to_str()?;
-        let begin = tokens[3].to_str()?.parse::<u32>()?;
-        let end = tokens[4].to_str()?.parse::<u32>()?;
+        let tokens = bytes.to_str()?.split("\t").collect::<Vec<&str>>();
+        let chromosome = tokens[0];
+        let source = tokens[1];
+        let feature = tokens[2];
+        let begin = tokens[3].parse::<u32>()?;
+        let end = tokens[4].parse::<u32>()?;
 
-        let score = if tokens[5] == b"." {
+        let score = if tokens[5] == "." {
             None
         } else {
-            Some(tokens[5].to_str()?.parse::<u16>()?)
+            Some(tokens[5].parse::<u16>()?)
         };
 
-        let strand = if tokens[6] == b"." {
+        let strand = if tokens[6] == "." {
             None
         } else {
-            Some(tokens[6].to_str()?)
+            Some(tokens[6])
         };
 
-        let frame = if tokens[7] == b"." {
+        let frame = if tokens[7] == "." {
             None
         } else {
-            Some(tokens[7].to_str()?.parse::<u8>()?)
+            Some(tokens[7].parse::<u8>()?)
         };
 
-        let group = if tokens[8] == b"." {
+        let group = if tokens[8] == "." {
             None
         } else {
-            Some(tokens[8].to_str()?)
+            Some(tokens[8])
         };
 
         Ok((
@@ -109,16 +107,19 @@ impl std::fmt::Display for GffLine {
             self.feature,
             self.begin,
             self.end,
-            self.score.as_ref().map_or(".".to_string(), |s| s.to_string()),
+            self.score
+                .as_ref()
+                .map_or(".".to_string(), |s| s.to_string()),
             self.strand.as_ref().map_or(".".to_string(), |s| s.clone()),
-            self.frame.as_ref().map_or(".".to_string(), |f| f.to_string()),
+            self.frame
+                .as_ref()
+                .map_or(".".to_string(), |f| f.to_string()),
             self.group.as_ref().map_or(".".to_string(), |g| g.clone())
         )
     }
 }
 
 impl crate::traits::feature::Feature for GffLine {
-
     fn get_id(&self) -> String {
         format!("{}:{}-{}", self.chromosome, self.begin, self.end)
     }
@@ -128,7 +129,7 @@ impl crate::traits::feature::Feature for GffLine {
             chromosome: self.chromosome.clone(),
             begin: self.begin,
             end: self.end,
-            system: CoordinateSystem::OneBasedClosed
+            system: CoordinateSystem::OneBasedClosed,
         }
     }
 }
@@ -142,8 +143,10 @@ mod test {
         let test_line1 = b"chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\ttouch1";
         let test_line2 = b"chr22\tTeleGene\tpromoter\t10020000\t10025000\t800\t-\t.\ttouch2";
 
-        let expected_1 = "chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\ttouch1".to_string();
-        let expected_2 = "chr22\tTeleGene\tpromoter\t10020000\t10025000\t800\t-\t.\ttouch2".to_string();
+        let expected_1 =
+            "chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\ttouch1".to_string();
+        let expected_2 =
+            "chr22\tTeleGene\tpromoter\t10020000\t10025000\t800\t-\t.\ttouch2".to_string();
 
         let gff1 = GffLine::from_bytes(test_line1)
             .expect("Failed to parse GFF line 1")

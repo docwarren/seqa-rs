@@ -16,7 +16,6 @@
 use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
-use crate::parsing_utils::split_str;
 use crate::traits::from_bytes::FromBytes;
 use bstr::ByteSlice;
 
@@ -33,7 +32,6 @@ pub struct GtfLine {
 }
 
 impl GtfLine {
-
     pub const COLUMNS: [&str; 9] = [
         "chromosome",
         "source",
@@ -43,7 +41,7 @@ impl GtfLine {
         "score",
         "strand",
         "frame",
-        "attributes"
+        "attributes",
     ];
 }
 
@@ -51,42 +49,39 @@ impl FromBytes for GtfLine {
     type Error = ParsingError;
 
     fn from_bytes(bytes: &[u8]) -> Result<(GtfLine, usize), Self::Error> {
-        let tokens = split_str(bytes, "\t", Some(9))?;
-        let chromosome = tokens[0].to_str()?;
-        let source = tokens[1].to_str()?;
-        let feature = tokens[2].to_str()?;
-        let begin = tokens[3].to_str()?.parse::<u32>()?;
-        let end = tokens[4].to_str()?.parse::<u32>()?;
+        let tokens = bytes.to_str()?.split("\t").collect::<Vec<&str>>();
+        let chromosome = tokens[0];
+        let source = tokens[1];
+        let feature = tokens[2];
+        let begin = tokens[3].parse::<u32>()?;
+        let end = tokens[4].parse::<u32>()?;
 
-        let score = if tokens[5] == b"." {
+        let score = if tokens[5] == "." {
             None
         } else {
-            Some(tokens[5].to_str()?.parse::<u16>()?)
+            Some(tokens[5].parse::<u16>()?)
         };
 
-        let strand = if tokens[6] == b"." {
+        let strand = if tokens[6] == "." {
             None
         } else {
-            Some(tokens[6].to_str()?)
+            Some(tokens[6])
         };
 
-        let frame = if tokens[7] == b"." {
+        let frame = if tokens[7] == "." {
             None
         } else {
-            Some(tokens[7].to_str()?.parse::<u8>()?)
+            Some(tokens[7].parse::<u8>()?)
         };
 
         // Attributes are `key value` pairs separated by `;`
         let mut attributes = vec![];
-        if tokens[8] != b"." {
-            let attribute_tokens = split_str(tokens[8], ";", None)?;
+        if tokens[8] != "." {
+            let attribute_tokens = tokens[8].split(";").collect::<Vec<&str>>();
             for attribute in attribute_tokens {
-                let parts = split_str(attribute.trim(), " ", None)?;
+                let parts = attribute.split(" ").collect::<Vec<&str>>();
                 if parts.len() == 2 {
-                    attributes.push((
-                        parts[0].trim().to_str()?.to_string(),
-                        parts[1].trim().to_str()?.to_string(),
-                    ));
+                    attributes.push((parts[0].trim().to_string(), parts[1].trim().to_string()));
                 }
             }
         }
@@ -118,9 +113,13 @@ impl std::fmt::Display for GtfLine {
             self.feature,
             self.begin,
             self.end,
-            self.score.as_ref().map_or(".".to_string(), |s| s.to_string()),
+            self.score
+                .as_ref()
+                .map_or(".".to_string(), |s| s.to_string()),
             self.strand.as_ref().map_or(".".to_string(), |s| s.clone()),
-            self.frame.as_ref().map_or(".".to_string(), |f| f.to_string()),
+            self.frame
+                .as_ref()
+                .map_or(".".to_string(), |f| f.to_string()),
             if self.attributes.is_empty() {
                 ".".to_string()
             } else {
@@ -135,7 +134,6 @@ impl std::fmt::Display for GtfLine {
 }
 
 impl crate::traits::feature::Feature for GtfLine {
-
     fn get_id(&self) -> String {
         format!("{}:{}-{}", self.chromosome, self.begin, self.end)
     }
@@ -145,7 +143,7 @@ impl crate::traits::feature::Feature for GtfLine {
             chromosome: self.chromosome.clone(),
             begin: self.begin,
             end: self.end,
-            system: CoordinateSystem::OneBasedClosed
+            system: CoordinateSystem::OneBasedClosed,
         }
     }
 }

@@ -18,7 +18,6 @@ use bstr::ByteSlice;
 use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
 use crate::models::coordinate_system::CoordinateSystem;
-use crate::parsing_utils::split_str;
 use crate::traits::feature::Feature;
 use crate::traits::from_bytes::FromBytes;
 use std::fmt::Display;
@@ -38,11 +37,11 @@ impl FromBytes for BedGraphLine {
     type Error = ParsingError;
 
     fn from_bytes(bytes: &[u8]) -> Result<(BedGraphLine, usize), Self::Error> {
-        let tokens = split_str(bytes, "\t", Some(4))?;
-        let chrom = tokens[0].to_str()?;
-        let begin = tokens[1].to_str()?.parse::<u32>()?;
-        let end = tokens[2].to_str()?.parse::<u32>()?;
-        let value = tokens[3].to_str()?.parse::<f64>()?;
+        let tokens: Vec<&str> = bytes.to_str()?.split("\t").collect();
+        let chrom = tokens[0];
+        let begin = tokens[1].parse::<u32>()?;
+        let end = tokens[2].parse::<u32>()?;
+        let value = tokens[3].parse::<f64>()?;
 
         Ok((
             BedGraphLine {
