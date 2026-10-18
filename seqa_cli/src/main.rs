@@ -177,18 +177,24 @@ fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
     match command {
         GeneCommands::Coordinates { gene, reference } => {
             let conn = sqlite::connect_genes(&reference)?;
-            let coord = genes::get_gene_coordinates(&conn, &gene)?;
-            println!(
-                "{}\t{}\t{}\t{}",
-                coord.gene, coord.chr, coord.begin, coord.end
-            );
+            let gene_entries = genes::get_gene_symbols(&conn)?;
+            let gene_result = gene_entries.iter().find(|g| g.gene == gene);
+            match gene_result {
+                Some(entry) => {
+                    println!(
+                        "{}\t{}\t{}\t{}",
+                        entry.gene, entry.chr, entry.begin, entry.end
+                    );
+                }
+                None => (),
+            }
         }
         GeneCommands::Symbols { reference } => {
             let conn = sqlite::connect_genes(&reference)?;
             let stdout = io::stdout();
             let mut handle = stdout.lock();
             for symbol in genes::get_gene_symbols(&conn)? {
-                if writeln!(handle, "{}", symbol).is_err() {
+                if writeln!(handle, "{}", symbol.gene).is_err() {
                     break;
                 }
             }

@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sqlite::establish_connection;
-use crate::sqlite::genes::{ get_gene_coordinates, get_gene_symbols, GeneError };
 use crate::models::gene_coordinate::GeneCoordinate;
+use crate::sqlite::establish_connection;
+use crate::sqlite::genes::{GeneError, get_gene_symbols};
 use rusqlite::Connection;
 
 // const GENES_DB: &str = "/home/drew/.ghr/genes.db";
@@ -33,15 +33,14 @@ impl Default for GeneCoordinateService {
 
 impl GeneCoordinateService {
     pub fn new() -> Self {
-        let genes_coordinates_conn = establish_connection(GENE_COORDINATES_DB).expect("Failed to establish connection to gene coordinates database");
-        GeneCoordinateService { genes_coordinates_conn }
+        let genes_coordinates_conn = establish_connection(GENE_COORDINATES_DB)
+            .expect("Failed to establish connection to gene coordinates database");
+        GeneCoordinateService {
+            genes_coordinates_conn,
+        }
     }
 
-    pub fn gene_coordinates(&self, gene: &str) -> Result<GeneCoordinate, GeneError> {
-        get_gene_coordinates(&self.genes_coordinates_conn, gene)
-    }
-
-    pub fn gene_symbols(&self) -> Result<Vec<String>, GeneError> {
+    pub fn gene_symbols(&self) -> Result<Vec<GeneCoordinate>, GeneError> {
         get_gene_symbols(&self.genes_coordinates_conn)
     }
 }

@@ -39,7 +39,6 @@ pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, E
 
     match (&method, segments.as_slice()) {
         (&Method::GET, ["genes", "symbols", genome]) => gene_symbols(genome),
-        (&Method::GET, ["genes", "coordinates", genome, gene]) => gene_coordinates(genome, gene),
         (&Method::GET, ["genes", "cytobands", genome, chromosome]) => cytobands(genome, chromosome),
         (&Method::POST, _) => search_handler(event).await,
         _ => Ok(Response::builder()
@@ -96,17 +95,6 @@ fn gene_symbols(genome: &str) -> Result<Response<Body>, Error> {
     match genes::get_gene_symbols(&conn) {
         Ok(symbols) => json_response(200, &symbols),
         Err(e) => error_response(500, &format!("{}", e)),
-    }
-}
-
-fn gene_coordinates(genome: &str, gene: &str) -> Result<Response<Body>, Error> {
-    let conn = match sqlite::connect_genes(genome) {
-        Ok(c) => c,
-        Err(e) => return error_response(500, &format!("{}", e)),
-    };
-    match genes::get_gene_coordinates(&conn, gene) {
-        Ok(coord) => json_response(200, &coord),
-        Err(e) => error_response(404, &format!("{}", e)),
     }
 }
 
@@ -232,12 +220,19 @@ mod tests {
 
     #[tokio::test]
     async fn gene_coordinates_brca2_grch38() {
-        let response = function_handler(get_request("/genes/coordinates/grch38/BRCA2"))
+        let response = function_handler(get_request("/genes/symbols/grch38"))
             .await
             .unwrap();
         assert_eq!(response.status(), 200);
-        let body: serde_json::Value = serde_json::from_slice(&response.body().to_vec()).unwrap();
-        assert_eq!(body["gene"], "BRCA2");
+        let genes: serde_json::Value = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        let gene_arr = genes.as_array().unwrap();
+        let brca2 = gene_arr.iter().find(|g| {
+            g.as_object().unwrap().get("gene").unwrap().to_owned() == "BRCA2".to_string()
+        });
+        assert!(!brca2.is_none());
+        if let Some(b) = brca2 {
+            assert_eq!(b.as_object().unwrap().get("gene").unwrap(), "BRCA2");
+        }
     }
 
     #[tokio::test]

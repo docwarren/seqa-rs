@@ -38,29 +38,15 @@ pub fn establish_connection(db_path: String) -> Result<Connection, GeneError> {
     Ok(conn)
 }
 
-pub fn get_gene_coordinates(conn: &Connection, symbol: &str) -> Result<GeneCoordinate, GeneError> {
-    let mut stmt = conn
-        .prepare("SELECT * FROM coordinates WHERE gene = ?1")
-        .map_err(GeneError::DatabaseError)?;
+pub fn get_gene_symbols(conn: &Connection) -> Result<Vec<GeneCoordinate>, GeneError> {
+    let mut stmt = conn.prepare("SELECT * FROM coordinates")?;
 
-    let gene = stmt
-        .query_row(params![symbol], |row| {
+    let genes_iter = stmt
+        .query_map([], |row| {
             let begin_str = row.get::<_, String>(2)?;
             let end_str = row.get::<_, String>(3)?;
-            let begin = begin_str.parse::<u32>().map_err(|_| {
-                rusqlite::Error::InvalidColumnType(
-                    32,
-                    "begin".to_string(),
-                    rusqlite::types::Type::Integer,
-                )
-            })?;
-            let end = end_str.parse::<u32>().map_err(|_| {
-                rusqlite::Error::InvalidColumnType(
-                    32,
-                    "end".to_string(),
-                    rusqlite::types::Type::Integer,
-                )
-            })?;
+            let begin = begin_str.parse::<u32>().unwrap();
+            let end = end_str.parse::<u32>().unwrap();
 
             Ok(GeneCoordinate {
                 gene: row.get(0)?,
@@ -70,23 +56,15 @@ pub fn get_gene_coordinates(conn: &Connection, symbol: &str) -> Result<GeneCoord
             })
         })
         .map_err(|e| GeneError::UnknownError(format!("Failed to query gene coordinates: {}", e)))?;
-    Ok(gene)
-}
-
-pub fn get_gene_symbols(conn: &Connection) -> Result<Vec<String>, GeneError> {
-
-    let mut stmt = conn.prepare("SELECT gene FROM coordinates")?;
-    let gene_result = stmt.query_map([],|row| row.get(0))?;
     let mut genes = Vec::new();
-    for gene in gene_result {
+    for gene in genes_iter {
         genes.push(gene?);
     }
     Ok(genes)
 }
 
 pub fn get_cytobands(conn: &Connection, chromosome: &str) -> Result<Vec<Cytoband>, GeneError> {
-    let mut statement = conn
-        .prepare("SELECT * FROM cytobands where chromosome = ?1")?;
+    let mut statement = conn.prepare("SELECT * FROM cytobands where chromosome = ?1")?;
 
     let cytoband_iter = statement.query_map(params![format!("{}", chromosome)], |row| {
         Ok(Cytoband {
