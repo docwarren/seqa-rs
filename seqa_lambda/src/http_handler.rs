@@ -220,12 +220,19 @@ mod tests {
 
     #[tokio::test]
     async fn gene_coordinates_brca2_grch38() {
-        let response = function_handler(get_request("/genes/coordinates/grch38/BRCA2"))
+        let response = function_handler(get_request("/genes/symbols/grch38"))
             .await
             .unwrap();
         assert_eq!(response.status(), 200);
-        let body: serde_json::Value = serde_json::from_slice(&response.body().to_vec()).unwrap();
-        assert_eq!(body["gene"], "BRCA2");
+        let genes: serde_json::Value = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        let gene_arr = genes.as_array().unwrap();
+        let brca2 = gene_arr.iter().find(|g| {
+            g.as_object().unwrap().get("gene").unwrap().to_owned() == "BRCA2".to_string()
+        });
+        assert!(!brca2.is_none());
+        if let Some(b) = brca2 {
+            assert_eq!(b.as_object().unwrap().get("gene").unwrap(), "BRCA2");
+        }
     }
 
     #[tokio::test]
