@@ -39,11 +39,7 @@ pub fn normalize_genome(genome: &str) -> &'static str {
 }
 
 fn materialize(name: &str, bytes: &[u8]) -> io::Result<PathBuf> {
-    let path = std::env::temp_dir().join(format!(
-        "seqa-{}-{}",
-        env!("CARGO_PKG_VERSION"),
-        name
-    ));
+    let path = std::env::temp_dir().join(format!("seqa-{}-{}", env!("CARGO_PKG_VERSION"), name));
     let needs_write = match path.metadata() {
         Ok(m) => m.len() as usize != bytes.len(),
         Err(_) => true,
@@ -85,17 +81,21 @@ mod tests {
     #[test]
     fn embedded_genes_grch38_has_brca2() {
         let conn = connect_genes("grch38").unwrap();
-        let coord = genes::get_gene_coordinates(&conn, "BRCA2").unwrap();
-        assert_eq!(coord.gene, "BRCA2");
-        assert!(!coord.chr.is_empty());
-        assert!(coord.end > coord.begin);
+        let genes = genes::get_gene_symbols(&conn).unwrap();
+        let brca2 = genes.iter().find(|gene| gene.gene == "BRCA2").unwrap();
+        assert_eq!(brca2.gene, "BRCA2");
+        assert!(!brca2.chr.is_empty());
+        assert!(brca2.end > brca2.begin);
     }
 
     #[test]
     fn embedded_genes_grch37_has_brca2() {
         let conn = connect_genes("hg19").unwrap();
-        let coord = genes::get_gene_coordinates(&conn, "BRCA2").unwrap();
-        assert_eq!(coord.gene, "BRCA2");
+        let genes = genes::get_gene_symbols(&conn).unwrap();
+        let brca2 = genes.iter().find(|gene| gene.gene == "BRCA2").unwrap();
+        assert_eq!(brca2.gene, "BRCA2");
+        assert!(!brca2.chr.is_empty());
+        assert!(brca2.end > brca2.begin);
     }
 
     #[test]

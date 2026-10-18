@@ -39,7 +39,6 @@ pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, E
 
     match (&method, segments.as_slice()) {
         (&Method::GET, ["genes", "symbols", genome]) => gene_symbols(genome),
-        (&Method::GET, ["genes", "coordinates", genome, gene]) => gene_coordinates(genome, gene),
         (&Method::GET, ["genes", "cytobands", genome, chromosome]) => cytobands(genome, chromosome),
         (&Method::POST, _) => search_handler(event).await,
         _ => Ok(Response::builder()
@@ -96,17 +95,6 @@ fn gene_symbols(genome: &str) -> Result<Response<Body>, Error> {
     match genes::get_gene_symbols(&conn) {
         Ok(symbols) => json_response(200, &symbols),
         Err(e) => error_response(500, &format!("{}", e)),
-    }
-}
-
-fn gene_coordinates(genome: &str, gene: &str) -> Result<Response<Body>, Error> {
-    let conn = match sqlite::connect_genes(genome) {
-        Ok(c) => c,
-        Err(e) => return error_response(500, &format!("{}", e)),
-    };
-    match genes::get_gene_coordinates(&conn, gene) {
-        Ok(coord) => json_response(200, &coord),
-        Err(e) => error_response(404, &format!("{}", e)),
     }
 }
 

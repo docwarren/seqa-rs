@@ -15,7 +15,7 @@
 
 #![cfg(feature = "sqlite")]
 
-use seqa_core::sqlite::{connect_genes, genes::{get_gene_coordinates, get_gene_symbols}};
+use seqa_core::sqlite::{connect_genes, genes::get_gene_symbols};
 
 #[test]
 fn test_get_gene_coordinates() {
