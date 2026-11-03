@@ -25,9 +25,9 @@ def main(genome, source):
             info = tokens[8].split(';')
 
             if source == "refseq":
-                gene_val = next((item for item in info if "gene_id" in item), None)
+                gene_val = next((item.strip() for item in info if "gene_id" in item), None)
             else:
-                gene_val = next((item for item in info if "gene_name" in item), None)
+                gene_val = next((item.strip() for item in info if "gene_name" in item), None)
 
             if gene_val is None:
                 print(f"Invalid gene entry found: {line}")

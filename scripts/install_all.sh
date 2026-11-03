@@ -14,26 +14,26 @@
 # Run this script from a directory where you are happy to store lots of data
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
-CORE_DATA_DIR="$SCRIPT_PATH/../../seqa-rs/seqa_core/data/"
+CORE_DATA_DIR="$SCRIPT_PATH/../seqa_core/data/"
 mkdir -p "${CORE_DATA_DIR}"
 
 # Download latest gene information
 echo "=============================================================================================================="
 echo "Running get_transcript_data.sh"
 echo "=============================================================================================================="
-echo "${SCRIPT_PATH}"/get_transcript_data.sh
+"${SCRIPT_PATH}"/get_transcript_data.sh
 
 # Create gene_coordinates dbs
 echo "=============================================================================================================="
 echo "Running create_gene_coordinates_db.sh"
 echo "=============================================================================================================="
-echo "${SCRIPT_PATH}"/create_gene_coordinates_db.sh
+"${SCRIPT_PATH}"/create_gene_coordinates_db.sh
 
 # Download cytobands
 echo "=============================================================================================================="
 echo "Running download_cytobands.sh"
 echo "=============================================================================================================="
-echo "${SCRIPT_PATH}"/download_cytobands.sh
+"${SCRIPT_PATH}"/download_cytobands.sh
 
 # Copy to data dir
 DBS=("./hg38/hg38.cytobands.db" "./hg19/hg19.cytobands.db" "./hg38/hg38.refseq.gene.db" "./hg19/hg19.refseq.gene.db" "./hg38/hg38.gencode.gene.db" "./hg19/hg19.gencode.gene.db")
