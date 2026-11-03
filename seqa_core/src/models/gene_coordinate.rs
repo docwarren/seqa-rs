@@ -17,8 +17,8 @@ use serde::Serialize;
 
 #[derive(Serialize, Clone)]
 pub struct GeneCoordinate {
-    pub gene: String,
-    pub chr: String,
+    pub chromosome: String,
     pub begin: u32,
     pub end: u32,
+    pub symbol: String,
 }

@@ -10,7 +10,7 @@ repository = "https://github.com/docwarren/soma-rs"
 homepage = "https://www.seqa23.com"
 
 [features]
-default = []
+default = ["sqlite"]
 sqlite = ["dep:rusqlite"]
 
 [dependencies]

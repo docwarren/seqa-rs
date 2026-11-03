@@ -43,16 +43,12 @@ pub fn get_gene_symbols(conn: &Connection) -> Result<Vec<GeneCoordinate>, GeneEr
 
     let genes_iter = stmt
         .query_map([], |row| {
-            let begin_str = row.get::<_, String>(2)?;
-            let end_str = row.get::<_, String>(3)?;
-            let begin = begin_str.parse::<u32>().unwrap();
-            let end = end_str.parse::<u32>().unwrap();
 
             Ok(GeneCoordinate {
-                gene: row.get(0)?,
-                chr: row.get(1)?,
-                begin,
-                end,
+                chromosome: row.get(0)?,
+                begin: row.get(1)?,
+                end: row.get(2)?,
+                symbol: row.get(3)?,
             })
         })
         .map_err(|e| GeneError::UnknownError(format!("Failed to query gene coordinates: {}", e)))?;
@@ -69,8 +65,8 @@ pub fn get_cytobands(conn: &Connection, chromosome: &str) -> Result<Vec<Cytoband
     let cytoband_iter = statement.query_map(params![format!("{}", chromosome)], |row| {
         Ok(Cytoband {
             chromosome: row.get(0)?,
-            begin: (row.get::<_, String>(1)?).parse::<u32>().unwrap(),
-            end: (row.get::<_, String>(2)?).parse::<u32>().unwrap(),
+            begin: row.get(1)?,
+            end: row.get(2)?,
             name: row.get(3)?,
             stain: row.get(4)?,
         })
