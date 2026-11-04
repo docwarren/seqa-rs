@@ -12,9 +12,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use futures::TryStreamExt;
-use object_store::ObjectStore;
-
 use crate::api::output_format::OutputFormat;
 use crate::api::search_error::SearchError;
 use crate::api::search_options::SearchOptions;
@@ -29,29 +26,6 @@ use crate::indexes::chunk::Chunk;
 use crate::stores::StoreService;
 use crate::stores::error::StoreError;
 use crate::tabix::tabix_search::tabix_search;
-
-/// Opens a streaming download of the compressed byte range covered by `chunk`.
-pub async fn chunk_to_stream(
-    chunk: &Chunk,
-    store: &dyn ObjectStore,
-    path: &object_store::path::Path,
-) -> Result<impl futures::Stream<Item = Result<Vec<u8>, object_store::Error>>, object_store::Error>
-{
-    let range = chunk.to_range();
-
-    let get_opts = object_store::GetOptions {
-        range: Some(object_store::GetRange::Bounded(range.clone())),
-        ..Default::default()
-    };
-
-    let stream = store
-        .get_opts(path, get_opts)
-        .await?
-        .into_stream()
-        .map_ok(|bytes| bytes.to_vec());
-
-    Ok(stream.map_ok(|get_result| get_result.to_vec()))
-}
 
 /// Fetches the compressed byte range for every chunk in a single
 /// [`StoreService::get_ranges`] call.
@@ -106,7 +80,7 @@ pub async fn search_features(
     store: &StoreService,
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
-    let result = match options.output_format {
+    match options.output_format {
         OutputFormat::BAM => bam_search(store, options).await,
         OutputFormat::BIGWIG => bigwig_search(store, options).await,
         OutputFormat::BIGBED => bigbed_search(store, options).await,
@@ -119,7 +93,5 @@ pub async fn search_features(
         _ => Err(SearchError::UnsupportedFileFormat(
             options.file_path.to_string(),
         )),
-    };
-
-    result
+    }
 }

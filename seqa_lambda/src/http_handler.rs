@@ -53,18 +53,17 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
         Some(request) => {
             let genome = request.genome.unwrap_or("hg38".to_string());
             let mut options =
-                SearchOptions::new(&request.path, &vec![request.coordinates.clone()])?
+                SearchOptions::new(&request.path, std::slice::from_ref(&request.coordinates))?
                     .set_include_header(request.with_header.unwrap_or(false))
                     .set_header_only(request.only_header.unwrap_or(false))
                     .set_cigar_format(CigarFormat::Standard)
                     .set_genome(&genome);
-            match request.index_path {
-                Some(path) => options = options.set_index_path(&path),
-                _ => (),
+
+            if let Some(path) = request.index_path {
+                options = options.set_index_path(&path);
             }
-            match request.output_format {
-                Some(of) => options = options.set_output_format(&of),
-                _ => (),
+            if let Some(of) = request.output_format {
+                options = options.set_output_format(&of);
             }
             options
         }

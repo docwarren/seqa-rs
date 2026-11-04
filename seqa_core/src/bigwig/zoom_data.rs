@@ -17,7 +17,7 @@ use crate::bigwig::index::chr_tree::BigwigChrTree;
 use crate::bigwig::index::r_tree::overlaps::Overlaps;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ZoomData {
     pub chrom_id: u32,
     pub chrom_name: String,

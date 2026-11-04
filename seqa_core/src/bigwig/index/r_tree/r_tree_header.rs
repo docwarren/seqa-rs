@@ -15,7 +15,7 @@
 
 use crate::api::parsing_error::ParsingError;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RTreeHeader {
     pub magic: u32,
     pub block_size: u32,

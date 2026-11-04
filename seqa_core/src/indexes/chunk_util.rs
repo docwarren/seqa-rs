@@ -28,7 +28,7 @@ pub fn optimize(chunks: Vec<Chunk>) -> Vec<Chunk> {
 
     // Merge overlapping chunks
     let mut optimized_chunks = Vec::new();
-    let mut current_chunk = sorted_chunks[0].clone();
+    let mut current_chunk = sorted_chunks[0];
 
     for chunk in &sorted_chunks[1..] {
         if chunk.begin_vp.block_offset <= current_chunk.end_vp.block_offset + MAX_BLOCK_SIZE {
@@ -37,7 +37,7 @@ pub fn optimize(chunks: Vec<Chunk>) -> Vec<Chunk> {
         } else {
             // No overlap, push the current chunk and start a new one
             optimized_chunks.push(current_chunk);
-            current_chunk = chunk.clone();
+            current_chunk = *chunk;
         }
     }
     optimized_chunks.push(current_chunk); // Push the last chunk

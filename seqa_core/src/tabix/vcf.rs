@@ -14,7 +14,6 @@
 // limitations under the License.
 use crate::api::parsing_error::ParsingError;
 use crate::coordinate::Coordinate;
-use crate::tabix::caller::Caller;
 use crate::traits::feature::Feature;
 use crate::traits::from_bytes::FromBytes;
 use bstr::ByteSlice;
@@ -130,38 +129,25 @@ impl VcfLine {
         val_set.get(key).map(|v| v.to_string())
     }
 
-    /// Attempt to infer the caller from the ID field.
-    /// In the case of Canvas and Manta callers - the ID field starts Canvas: and Manta respectively
-    /// With bcftools the id field is either . or an rs number
-    pub fn infer_caller(id: &str) -> Caller {
-        if id.starts_with("Canvas") {
-            Caller::Canvas
-        } else if id.starts_with("Manta") {
-            Caller::Manta
-        } else {
-            Caller::Unknown
-        }
-    }
-
     /// Get the variant type from the INFO:SVTYPE field
     /// In Canvas this will only return CNV
     /// In Manta this will return either DEL, INS or DUP
     /// In bcftools this will fail
     pub fn get_variant_type_from_info(&self) -> Option<VariantType> {
-        if let Some(svtype) = self.get_info_val("SVTYPE") {
-            match &svtype[..] {
-                "DEL" => return Some(VariantType::SvDel),
-                "INS" => return Some(VariantType::SvIns),
-                "DUP" => return Some(VariantType::SvDup),
-                "INV" => return Some(VariantType::SvInv),
-                "ROH" => return Some(VariantType::Roh),
-                "BND" => return Some(VariantType::SvBnd),
-                "CTX" => return Some(VariantType::SvCtx),
-                "CPX" => return Some(VariantType::SvCpx),
-                _ => return None,
+        if let Some(sv_type) = self.get_info_val("SVTYPE") {
+            match &sv_type[..] {
+                "DEL" => Some(VariantType::SvDel),
+                "INS" => Some(VariantType::SvIns),
+                "DUP" => Some(VariantType::SvDup),
+                "INV" => Some(VariantType::SvInv),
+                "ROH" => Some(VariantType::Roh),
+                "BND" => Some(VariantType::SvBnd),
+                "CTX" => Some(VariantType::SvCtx),
+                "CPX" => Some(VariantType::SvCpx),
+                _ => None,
             }
         } else {
-            return None;
+            None
         }
     }
 
@@ -202,19 +188,20 @@ impl VcfLine {
 
     /// Returns the type of the longest alt allele
     /// * @return The type of the variant (insertion, deletion, or substitution).
-    /// The type is determined based on the length of the longest alt allele compared to the reference allele.
-    /// If the longest alt allele is longer than the reference allele, it is an insertion.
-    /// If the longest alt allele is shorter than the reference allele, it is a deletion.
-    /// If the longest alt allele is the same length as the reference allele, it is a substitution.
+    ///
+    ///   The type is determined based on the length of the longest alt allele compared to the reference allele.
+    ///   If the longest alt allele is longer than the reference allele, it is an insertion.
+    ///   If the longest alt allele is shorter than the reference allele, it is a deletion.
+    ///   If the longest alt allele is the same length as the reference allele, it is a substitution.
     pub fn get_variant_type(&self) -> Result<VariantType, String> {
         if let Some(v_type) = self.get_variant_type_from_info() {
-            return Ok(v_type);
+            Ok(v_type)
         } else if let Some(v_type) = self.get_variant_type_from_canvas_id() {
-            return Ok(v_type);
+            Ok(v_type)
         } else if let Some(v_type) = self.infer_variant_type_from_alt_length() {
-            return Ok(v_type);
+            Ok(v_type)
         } else {
-            return Err("Unable to get variant type".to_owned());
+            Err("Unable to get variant type".to_owned())
         }
     }
 

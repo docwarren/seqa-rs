@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
             }
 
             let mut options =
-                SearchOptions::new(&file, &vec![coordinates]).expect("Invalid coordinates");
+                SearchOptions::new(&file, &[coordinates]).expect("Invalid coordinates");
 
             // Set genome before coordinates so set_coordinates can use it
             if let Some(ref genome) = reference {
@@ -187,14 +187,11 @@ fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
             let conn = sqlite::connect_genes(&reference, &source)?;
             let gene_entries = genes::get_gene_symbols(&conn)?;
             let gene_result = gene_entries.iter().find(|g| g.symbol == gene);
-            match gene_result {
-                Some(entry) => {
-                    println!(
-                        "{}\t{}\t{}\t{}",
-                        entry.symbol, entry.chromosome, entry.begin, entry.end
-                    );
-                }
-                None => (),
+            if let Some(entry) = gene_result {
+                println!(
+                    "{}\t{}\t{}\t{}",
+                    entry.symbol, entry.chromosome, entry.begin, entry.end
+                );
             }
         }
         GeneCommands::Symbols { reference, source } => {

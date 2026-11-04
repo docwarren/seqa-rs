@@ -21,11 +21,6 @@ use std::path::PathBuf;
 
 use crate::sqlite::genes::GeneError;
 
-pub fn establish_connection(db_name: &str) -> Result<Connection> {
-    let conn = Connection::open(db_name)?;
-    Ok(conn)
-}
-
 const HG38_REFSEQ_GENES: &[u8] = include_bytes!("../../data/hg38.refseq.gene.db");
 const HG19_REFSEQ_GENES: &[u8] = include_bytes!("../../data/hg19.refseq.gene.db");
 const HG38_GENCODE_GENES: &[u8] = include_bytes!("../../data/hg38.gencode.gene.db");

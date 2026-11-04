@@ -183,7 +183,7 @@ impl Tabix {
 
                     // Update first_feature_offset if this chunk's begin_vp is less than the current first_feature_offset
                     if chunk.begin_vp.virtual_pointer < tabix.first_feature_offset.virtual_pointer {
-                        tabix.first_feature_offset = chunk.begin_vp.clone();
+                        tabix.first_feature_offset = chunk.begin_vp;
                     }
                 }
 

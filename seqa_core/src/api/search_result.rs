@@ -25,6 +25,7 @@ use crate::tabix::tabix_header::TabixHeader;
 /// Each format-specific search function populates the relevant index/header fields
 /// so that callers can cache the parsed index across subsequent queries without
 /// re-downloading it.  The actual data lines are always in [`SearchResult::lines`].
+#[derive(Default)]
 pub struct SearchResult {
     /// Parsed BigWig index; present after a [`crate::bigwig::bigwig_search::bigwig_search`] call.
     pub bigwig_index: Option<BigwigIndex>,

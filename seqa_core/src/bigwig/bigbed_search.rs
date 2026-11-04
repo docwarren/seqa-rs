@@ -71,9 +71,9 @@ fn data_to_lines(
 
     for block in bytes {
         let strings = if is_zoom {
-            get_zoom_strings(&block, chr_tree, coordinate)
+            get_zoom_strings(block, chr_tree, coordinate)
         } else {
-            get_data_strings(&block, chr_tree, coordinate)
+            get_data_strings(block, chr_tree, coordinate)
         };
         str_array.extend(strings);
     }
@@ -114,13 +114,13 @@ pub async fn bigbed_search(
     let mut zoom_headers: Vec<Option<&ZoomHeader>> = Vec::with_capacity(coordinates.len());
 
     for coord in &coordinates {
-        let zoom_header = index.get_zoom_header(&coord);
-        let chr_id = get_bw_chromosome_id(&index, &coord)?;
+        let zoom_header = index.get_zoom_header(coord);
+        let chr_id = get_bw_chromosome_id(index, coord)?;
         let index_offset = get_index_begin(index, zoom_header);
         let index_end = get_index_end(store_service, index, zoom_header).await?;
         let r_tree =
             RTree::from_file(store_service, &options.file_path, index_offset..index_end).await?;
-        let leaves_instance = r_tree.get_overlapping_leaves(chr_id, &coord);
+        let leaves_instance = r_tree.get_overlapping_leaves(chr_id, coord);
         let range = get_range_from_leaves(&leaves_instance);
         ranges.push(range);
         leaves.push(leaves_instance);
@@ -153,9 +153,9 @@ pub async fn bigbed_search(
         let is_zoom = zoom_headers[i].is_some();
         let blocks = &decompressed_data[i];
         lines.push(data_to_lines(
-            &blocks,
+            blocks,
             &index.chromosome_tree,
-            &coord,
+            coord,
             is_zoom,
         ));
     }

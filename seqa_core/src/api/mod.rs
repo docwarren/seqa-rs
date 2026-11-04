@@ -16,7 +16,6 @@
 pub mod search_options;
 pub mod output_format;
 pub mod search;
-pub mod constants;
 pub mod search_result;
 pub mod search_error;
 pub mod parsing_error;

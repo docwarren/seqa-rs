@@ -32,3 +32,9 @@ impl ChrIdx {
         }
     }
 }
+
+impl Default for ChrIdx {
+    fn default() -> Self {
+        Self::new()
+    }
+}

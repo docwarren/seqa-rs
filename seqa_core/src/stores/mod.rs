@@ -46,9 +46,11 @@ use error::StoreError;
 ///
 /// let svc = StoreService::new();
 /// ```
+type StoreMap = HashMap<String, Arc<dyn ObjectStore>>;
+
 #[derive(Debug, Default)]
 pub struct StoreService {
-    stores: Mutex<HashMap<String, Arc<dyn ObjectStore>>>,
+    stores: Mutex<StoreMap>,
 }
 
 /// One entry in a directory listing — a file or a folder-like prefix.
@@ -138,7 +140,7 @@ impl StoreService {
         }
     }
 
-    fn get_store_cache(&'_ self) -> Result<MutexGuard<'_, HashMap<String, Arc<dyn ObjectStore>>>, StoreError> {
+    fn get_store_cache(&'_ self) -> Result<MutexGuard<'_, StoreMap>, StoreError> {
         match self.stores.lock() {
             Ok(cache) => Ok(cache),
             Err(_) => Err(StoreError::ValidationError(

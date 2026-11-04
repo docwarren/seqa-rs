@@ -55,13 +55,6 @@ impl CigarOperation {
             _ => 0,
         }
     }
-
-    pub fn get_read_length(&self) -> u32 {
-        match self.get_op() {
-            0 | 1 | 4 | 6 | 7 | 8 => self.get_length(),
-            _ => 0,
-        }
-    }
 }
 
 impl Display for CigarOperation {

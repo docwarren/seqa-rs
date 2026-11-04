@@ -22,7 +22,7 @@ pub enum RTreeNodeType {
     NonLeaf(RTreeNonLeaf),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RTreeNode {
     pub is_leaf: bool,
     pub reserved: u8,

@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct VirtualOffset {
     pub virtual_pointer: u64,
     pub block_offset: u64,
@@ -30,12 +30,6 @@ impl VirtualOffset {
             block_offset,
             decompressed_offset
         }
-    }
-
-    pub fn split(&self) -> (u64, u64) {
-        let c_offset = self.virtual_pointer >> 16;
-        let d_offset = self.virtual_pointer & 0xFFFF;
-        (c_offset, d_offset)
     }
 }
 

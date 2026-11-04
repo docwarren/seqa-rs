@@ -29,6 +29,7 @@ pub mod r_tree_leaf;
 pub mod r_tree_node;
 pub mod r_tree_non_leaf;
 
+#[derive(Default)]
 pub struct RTree {
     pub header: RTreeHeader,
     pub offset: u64,
@@ -54,7 +55,7 @@ impl RTree {
         let tree_range = range.start..range.end;
         let tree_bytes =
             store
-                .get_range(&file_path, tree_range)
+                .get_range(file_path, tree_range)
                 .await
                 .map_err(|e| SearchError::ReadError {
                     path: file_path.to_string(),
@@ -83,8 +84,7 @@ impl RTree {
     }
 
     pub fn get_overlapping_leaves(&self, chr_id: u32, coordinate: &Coordinate) -> Vec<RTreeLeaf> {
-        let leaves = get_overlapping_leaves(&self.root, chr_id, coordinate);
-        leaves
+        get_overlapping_leaves(&self.root, chr_id, coordinate)
     }
 }
 

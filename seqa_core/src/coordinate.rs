@@ -103,11 +103,6 @@ impl Coordinate {
             CoordinateSystem::ZeroBasedHalfOpen => self.end - self.begin,
         }
     }
-    /// Returns the coordinate system used by this coordinate.
-    pub fn coordinate_system(&self) -> CoordinateSystem {
-        self.system
-    }
-
     /// Converts begin/end to **0-based half-open** canonical coordinates.
     pub fn to_canonical(&self) -> (u32, u32) {
         self.system.to_canonical(self.begin, self.end)
