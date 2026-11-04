@@ -1,6 +1,6 @@
 [package]
 name = "seqa_core"
-version = "7.0.0"
+version = "7.0.1"
 edition = "2024"
 authors = ["Andrew Warren"]
 rust-version = "1.94.0"
@@ -30,7 +30,7 @@ http = "1"
 bstr = "1.13.1"
 
 [dev-dependencies]
-serial_test = "3.2.0"
+serial_test = "3.4.0"
 
 [profile.release]
 debug = true
