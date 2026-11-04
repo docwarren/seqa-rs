@@ -1874,7 +1874,7 @@ checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "seqa"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1886,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_axum"
-version = "3.0.1"
+version = "3.0.2"
 dependencies = [
  "axum",
  "http-body-util",
@@ -1901,7 +1901,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_core"
-version = "7.0.1"
+version = "7.0.2"
 dependencies = [
  "bstr",
  "flate2",
@@ -1922,7 +1922,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_lambda"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "lambda_http",
  "seqa_core",
