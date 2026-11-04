@@ -2,3 +2,4 @@
 .idea
 .idea/*
 **/*.db
+!seqa_core/data/*.db
