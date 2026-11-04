@@ -214,8 +214,9 @@ async fn list_dir(
 
 async fn get_gene_symbols(
     Path(genome): Path<String>,
+    Path(source): Path<String>
 ) -> Result<Json<Vec<GeneCoordinate>>, ApiError> {
-    let connection = sqlite::connect_genes(&genome)
+    let connection = sqlite::connect_genes(&genome, &source)
         .map_err(|e| ApiError::InternalError(format!("Error connecting to DB: {}", e)))?;
     let symbols = genes::get_gene_symbols(&connection)
         .map_err(|e| ApiError::InternalError(format!("Error fetching symbols from DB: {}", e)))?;
@@ -317,7 +318,7 @@ pub fn app() -> Router {
         .route("/files/list", post(list_directory))
         .route("/files/buckets/{backend}", get(list_buckets))
         .route("/files/formats", get(get_file_formats))
-        .route("/genes/symbols/{genome}", get(get_gene_symbols))
+        .route("/genes/symbols/{genome}/{source}/", get(get_gene_symbols))
         .route("/cytobands/{genome}/{chromosome}", get(get_cytobands))
         .fallback(not_found_fallback)
         .layer(cors)

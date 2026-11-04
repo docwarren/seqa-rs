@@ -38,7 +38,7 @@ pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, E
     let segments: Vec<&str> = path.trim_matches('/').split('/').collect();
 
     match (&method, segments.as_slice()) {
-        (&Method::GET, ["genes", "symbols", genome]) => gene_symbols(genome),
+        (&Method::GET, ["genes", "symbols", genome, source]) => gene_symbols(genome, source),
         (&Method::GET, ["genes", "cytobands", genome, chromosome]) => cytobands(genome, chromosome),
         (&Method::POST, _) => search_handler(event).await,
         _ => Ok(Response::builder()
@@ -87,8 +87,8 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
         .map_err(Box::new)?)
 }
 
-fn gene_symbols(genome: &str) -> Result<Response<Body>, Error> {
-    let conn = match sqlite::connect_genes(genome) {
+fn gene_symbols(genome: &str, source: &str) -> Result<Response<Body>, Error> {
+    let conn = match sqlite::connect_genes(genome, source) {
         Ok(c) => c,
         Err(e) => return error_response(500, &format!("{}", e)),
     };
@@ -220,18 +220,18 @@ mod tests {
 
     #[tokio::test]
     async fn gene_coordinates_brca2_grch38() {
-        let response = function_handler(get_request("/genes/symbols/grch38"))
+        let response = function_handler(get_request("/genes/symbols/grch38/refseq"))
             .await
             .unwrap();
         assert_eq!(response.status(), 200);
         let genes: serde_json::Value = serde_json::from_slice(&response.body().to_vec()).unwrap();
         let gene_arr = genes.as_array().unwrap();
         let brca2 = gene_arr.iter().find(|g| {
-            g.as_object().unwrap().get("gene").unwrap().to_owned() == "BRCA2".to_string()
+            g.as_object().unwrap().get("symbol").unwrap().to_owned() == "BRCA2".to_string()
         });
         assert!(!brca2.is_none());
         if let Some(b) = brca2 {
-            assert_eq!(b.as_object().unwrap().get("gene").unwrap(), "BRCA2");
+            assert_eq!(b.as_object().unwrap().get("symbol").unwrap(), "BRCA2");
         }
     }
 

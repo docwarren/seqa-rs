@@ -19,13 +19,13 @@ use seqa_core::sqlite::{connect_genes, genes::get_gene_symbols};
 
 #[test]
 fn test_get_gene_coordinates() {
-    let conn = connect_genes("grch38").unwrap();
+    let conn = connect_genes("grch38", "refseq").unwrap();
     let genes = get_gene_symbols(&conn).unwrap();
-    let brca1 = genes.iter().find(|gene| gene.gene == "BRCA1");
+    let brca1 = genes.iter().find(|gene| gene.symbol == "BRCA1");
     assert!(!brca1.is_none());
     if let Some(brca) = brca1 {
-        assert_eq!(brca.gene, "BRCA1");
-        assert_eq!(brca.chr, "chr17");
+        assert_eq!(brca.symbol, "BRCA1");
+        assert_eq!(brca.chromosome, "chr17");
         assert_eq!(brca.begin, 43044295);
         assert_eq!(brca.end, 43170327);
     }
@@ -33,7 +33,7 @@ fn test_get_gene_coordinates() {
 
 #[test]
 fn test_get_gene() {
-    let conn = connect_genes("grch38").unwrap();
+    let conn = connect_genes("grch38", "refseq").unwrap();
     let genes = get_gene_symbols(&conn).unwrap();
-    assert_eq!(genes.len(), 29818);
+    assert_eq!(genes.len(), 59009);
 }

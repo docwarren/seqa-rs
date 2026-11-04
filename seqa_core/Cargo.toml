@@ -1,12 +1,12 @@
 [package]
 name = "seqa_core"
-version = "6.0.0"
+version = "7.0.0"
 edition = "2024"
 authors = ["Andrew Warren"]
 rust-version = "1.94.0"
 description = "Object store support for vcf, bam, fasta, bigwig, bigbed, gff, bed, bedgraph, gtf"
 license = "Apache-2.0"
-repository = "https://github.com/docwarren/soma-rs"
+repository = "https://github.com/docwarren/seqa-rs"
 homepage = "https://www.seqa23.com"
 
 [features]
