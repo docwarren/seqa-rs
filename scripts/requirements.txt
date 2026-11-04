@@ -1,0 +1,7 @@
+bgzip
+tabix
+wget
+sqlite3
+awk
+sed
+zcat

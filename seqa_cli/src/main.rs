@@ -82,15 +82,23 @@ enum GeneCommands {
         gene: String,
 
         /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
-        #[arg(short = 'r', long, default_value = "grch38")]
+        #[arg(short = 'r', long, default_value = "hg38")]
         reference: String,
+
+        /// Source (refseq / gencode)
+        #[arg(short = 's', long, default_value = "refseq")]
+        source: String
     },
 
     /// Print every gene symbol in the database, one per line.
     Symbols {
         /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
-        #[arg(short = 'r', long, default_value = "grch38")]
+        #[arg(short = 'r', long, default_value = "hg38")]
         reference: String,
+
+        /// Source (refseq / gencode)
+        #[arg(short = 's', long, default_value = "refseq")]
+        source: String
     },
 
     /// Print cytobands for a chromosome.
@@ -175,26 +183,26 @@ async fn main() -> Result<()> {
 
 fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
     match command {
-        GeneCommands::Coordinates { gene, reference } => {
-            let conn = sqlite::connect_genes(&reference)?;
+        GeneCommands::Coordinates { gene, reference, source } => {
+            let conn = sqlite::connect_genes(&reference, &source)?;
             let gene_entries = genes::get_gene_symbols(&conn)?;
-            let gene_result = gene_entries.iter().find(|g| g.gene == gene);
+            let gene_result = gene_entries.iter().find(|g| g.symbol == gene);
             match gene_result {
                 Some(entry) => {
                     println!(
                         "{}\t{}\t{}\t{}",
-                        entry.gene, entry.chr, entry.begin, entry.end
+                        entry.symbol, entry.chromosome, entry.begin, entry.end
                     );
                 }
                 None => (),
             }
         }
-        GeneCommands::Symbols { reference } => {
-            let conn = sqlite::connect_genes(&reference)?;
+        GeneCommands::Symbols { reference, source } => {
+            let conn = sqlite::connect_genes(&reference, &source)?;
             let stdout = io::stdout();
             let mut handle = stdout.lock();
             for symbol in genes::get_gene_symbols(&conn)? {
-                if writeln!(handle, "{}", symbol.gene).is_err() {
+                if writeln!(handle, "{}", symbol.symbol).is_err() {
                     break;
                 }
             }

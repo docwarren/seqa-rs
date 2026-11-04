@@ -26,15 +26,17 @@ pub fn establish_connection(db_name: &str) -> Result<Connection> {
     Ok(conn)
 }
 
-const GRCH38_GENES: &[u8] = include_bytes!("../../data/grch38-genes.db");
-const GRCH37_GENES: &[u8] = include_bytes!("../../data/grch37-genes.db");
-const GRCH38_CYTOBANDS: &[u8] = include_bytes!("../../data/grch38-cytobands.db");
-const GRCH37_CYTOBANDS: &[u8] = include_bytes!("../../data/grch37-cytobands.db");
+const HG38_REFSEQ_GENES: &[u8] = include_bytes!("../../data/hg38.refseq.gene.db");
+const HG19_REFSEQ_GENES: &[u8] = include_bytes!("../../data/hg19.refseq.gene.db");
+const HG38_GENCODE_GENES: &[u8] = include_bytes!("../../data/hg38.gencode.gene.db");
+const HG19_GENCODE_GENES: &[u8] = include_bytes!("../../data/hg19.gencode.gene.db");
+const HG38_CYTOBANDS: &[u8] = include_bytes!("../../data/hg38.cytobands.db");
+const HG19_CYTOBANDS: &[u8] = include_bytes!("../../data/hg19.cytobands.db");
 
 pub fn normalize_genome(genome: &str) -> &'static str {
     match genome.to_ascii_lowercase().as_str() {
-        "grch37" | "hg19" | "ch37" => "grch37",
-        _ => "grch38",
+        "grch37" | "hg19" | "ch37" => "hg19",
+        _ => "hg38",
     }
 }
 
@@ -58,20 +60,27 @@ fn open_embedded(name: &str, bytes: &[u8]) -> Result<Connection, GeneError> {
     Connection::open_with_flags(&path, flags).map_err(GeneError::DatabaseError)
 }
 
-pub fn connect_genes(genome: &str) -> Result<Connection, GeneError> {
-    let (name, bytes) = match normalize_genome(genome) {
-        "grch37" => ("grch37-genes.db", GRCH37_GENES),
-        _ => ("grch38-genes.db", GRCH38_GENES),
+pub fn connect_genes(genome: &str, source: &str) -> Result<Connection, GeneError> {
+    let name: &str = normalize_genome(genome);
+    let key = format!("genes_{}_{}", name, source);
+    let bytes = match (name, source) {
+        ("hg38", "gencode") => HG38_GENCODE_GENES,
+        ("hg19", "gencode") => HG19_GENCODE_GENES,
+        ("hg38", "refseq") => HG38_REFSEQ_GENES,
+        ("hg19", "refseq") => HG19_REFSEQ_GENES,
+        _ => HG38_REFSEQ_GENES,
     };
-    open_embedded(name, bytes)
+    open_embedded(&key, bytes)
 }
 
 pub fn connect_cytobands(genome: &str) -> Result<Connection, GeneError> {
-    let (name, bytes) = match normalize_genome(genome) {
-        "grch37" => ("grch37-cytobands.db", GRCH37_CYTOBANDS),
-        _ => ("grch38-cytobands.db", GRCH38_CYTOBANDS),
+    let name: &str = normalize_genome(genome);
+    let key = format!("cytobands_{}", name);
+    let bytes = match name {
+        "hg38" => HG38_CYTOBANDS,
+        _ => HG19_CYTOBANDS
     };
-    open_embedded(name, bytes)
+    open_embedded(&key, bytes)
 }
 
 #[cfg(test)]
@@ -80,27 +89,54 @@ mod tests {
 
     #[test]
     fn embedded_genes_grch38_has_brca2() {
-        let conn = connect_genes("grch38").unwrap();
+        let conn = connect_genes("grch38", "refseq").unwrap();
         let genes = genes::get_gene_symbols(&conn).unwrap();
-        let brca2 = genes.iter().find(|gene| gene.gene == "BRCA2").unwrap();
-        assert_eq!(brca2.gene, "BRCA2");
-        assert!(!brca2.chr.is_empty());
+        let brca2 = genes.iter().find(|gene| gene.symbol == "BRCA2").unwrap();
+        assert_eq!(brca2.symbol, "BRCA2");
+        assert!(!brca2.chromosome.is_empty());
         assert!(brca2.end > brca2.begin);
     }
 
     #[test]
     fn embedded_genes_grch37_has_brca2() {
-        let conn = connect_genes("hg19").unwrap();
+        let conn = connect_genes("hg19", "refseq").unwrap();
         let genes = genes::get_gene_symbols(&conn).unwrap();
-        let brca2 = genes.iter().find(|gene| gene.gene == "BRCA2").unwrap();
-        assert_eq!(brca2.gene, "BRCA2");
-        assert!(!brca2.chr.is_empty());
+        let brca2 = genes.iter().find(|gene| gene.symbol == "BRCA2").unwrap();
+        assert_eq!(brca2.symbol, "BRCA2");
+        assert!(!brca2.chromosome.is_empty());
         assert!(brca2.end > brca2.begin);
     }
 
     #[test]
     fn embedded_cytobands_grch38_chr1() {
         let conn = connect_cytobands("grch38").unwrap();
+        let bands = genes::get_cytobands(&conn, "chr1").unwrap();
+        assert!(!bands.is_empty());
+    }
+
+    #[test]
+    fn gencode_hg38_has_brca2() {
+        let conn = connect_genes("grch38", "gencode").unwrap();
+        let genes = genes::get_gene_symbols(&conn).unwrap();
+        let brca2 = genes.iter().find(|gene| gene.symbol == "BRCA2").unwrap();
+        assert_eq!(brca2.symbol, "BRCA2");
+        assert!(!brca2.chromosome.is_empty());
+        assert!(brca2.end > brca2.begin);
+    }
+
+    #[test]
+    fn gencode_hg19_has_brca2() {
+        let conn = connect_genes("hg19", "gencode").unwrap();
+        let genes = genes::get_gene_symbols(&conn).unwrap();
+        let brca2 = genes.iter().find(|gene| gene.symbol == "BRCA2").unwrap();
+        assert_eq!(brca2.symbol, "BRCA2");
+        assert!(!brca2.chromosome.is_empty());
+        assert!(brca2.end > brca2.begin);
+    }
+
+    #[test]
+    fn embedded_cytobands_hg19_chr1() {
+        let conn = connect_cytobands("hg19").unwrap();
         let bands = genes::get_cytobands(&conn, "chr1").unwrap();
         assert!(!bands.is_empty());
     }
