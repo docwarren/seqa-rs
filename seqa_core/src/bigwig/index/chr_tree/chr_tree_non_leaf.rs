@@ -15,7 +15,7 @@
 use crate::api::parsing_error::ParsingError;
 use crate::bigwig::index::chr_tree::chr_tree_node::ChrTreeNode;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ChrTreeNonLeaf {
     pub key: String,
     pub child_offset: u64,
@@ -49,7 +49,7 @@ impl ChrTreeNonLeaf {
             .cloned()
             .collect::<Vec<u8>>();
         
-        let key = String::from_utf8_lossy(&key_bytes).to_string();
+        let key = String::from_utf8_lossy(key_bytes).to_string();
         let range = offset + key_size as usize..offset + key_size as usize + 8;
         let child_offset = u64::from_le_bytes(bytes[range].try_into()?);
         let (child, _) = ChrTreeNode::from_bytes(bytes, child_offset as usize, key_size)?;

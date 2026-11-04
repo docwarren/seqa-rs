@@ -44,7 +44,7 @@ fn read_lines(
             break; // Stop processing if the position exceeds the end of the search range
         } else if !read_line
             .coordinate()
-            .overlaps_ignore_chromosome(&coordinate)
+            .overlaps_ignore_chromosome(coordinate)
         {
             i += j; // Skip this read if it is before the start of the search range
             continue;
@@ -98,9 +98,7 @@ pub async fn bam_search(
 ) -> Result<SearchResult, SearchError> {
     let coordinates = options.coordinates.clone();
 
-    if let Err(e) = check_coords_for_length(&coordinates, MAX_BAM_SEARCH_SIZE) {
-        return Err(e);
-    }
+    check_coords_for_length(&coordinates, MAX_BAM_SEARCH_SIZE)?;
 
     let mut result = SearchResult::new();
 
@@ -135,12 +133,12 @@ pub async fn bam_search(
     let mut flat_coords = Vec::new();
 
     for coord in &coordinates {
-        let bin_numbers = get_bin_numbers(&coord);
-        let Some(chr_i) = bam_header.get_chromosome_index_by_name(&coord.get_chromosome()) else {
+        let bin_numbers = get_bin_numbers(coord);
+        let Some(chr_i) = bam_header.get_chromosome_index_by_name(coord.get_chromosome()) else {
             continue;
         };
         let chr_idx = &bai.references[chr_i];
-        let chunks_for_coord = bai.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
+        let chunks_for_coord = bai.get_optimized_chunks(chr_idx, bin_numbers, coord);
         for _ in 0..chunks_for_coord.len() {
             flat_coords.push(coord.clone());
         }
@@ -162,7 +160,7 @@ pub async fn bam_search(
             source: e,
         })?;
 
-    let lines = data_to_lines(&raw_data, &flat_coords, &options.cigar_format, &bam_header)?;
+    let lines = data_to_lines(&raw_data, &flat_coords, &options.cigar_format, bam_header)?;
     start_lines.extend(lines);
     result.lines = start_lines;
     Ok(result)

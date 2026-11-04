@@ -64,7 +64,7 @@ pub fn data_to_lines(
 ) -> Result<Vec<String>, ParsingError> {
     let mut lines = Vec::new();
     for (idx, coord) in coordinates.iter().enumerate() {
-        match read_lines(&data[idx], &coord, output_format) {
+        match read_lines(&data[idx], coord, output_format) {
             Ok(l) => lines.push(l),
             Err(e) => return Err(e),
         }
@@ -103,7 +103,7 @@ pub async fn tabix_search(
     let tabix_header = match &options.tabix_header {
         Some(header) => header,
         None => {
-            let first_feature_offset = tabix.first_feature_offset.clone();
+            let first_feature_offset = tabix.first_feature_offset;
             &TabixHeader::from_file(store_service, &options.file_path, first_feature_offset).await?
         }
     };
@@ -120,12 +120,12 @@ pub async fn tabix_search(
     let mut flat_coords = Vec::new();
 
     for coord in &options.coordinates {
-        let bin_numbers = get_bin_numbers(&coord);
-        let Some(chr_i) = tabix.get_chromosome_index_by_name(&coord.get_chromosome()) else {
+        let bin_numbers = get_bin_numbers(coord);
+        let Some(chr_i) = tabix.get_chromosome_index_by_name(coord.get_chromosome()) else {
             continue;
         };
-        let chr_idx = &tabix.references[chr_i as usize];
-        let coord_chunks = tabix.get_optimized_chunks(&chr_idx, bin_numbers, &coord);
+        let chr_idx = &tabix.references[chr_i];
+        let coord_chunks = tabix.get_optimized_chunks(chr_idx, bin_numbers, coord);
         for _ in 0..coord_chunks.len() {
             flat_coords.push(coord.clone());
         }
@@ -155,7 +155,7 @@ pub async fn tabix_search(
         }
     })?;
 
-    let mut all_lines = get_header_lines(options, &tabix_header);
+    let mut all_lines = get_header_lines(options, tabix_header);
     all_lines.extend(lines);
     result.lines = all_lines;
     Ok(result)

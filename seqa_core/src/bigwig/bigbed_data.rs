@@ -19,7 +19,7 @@ use std::fmt::{Display, Formatter};
 
 /// Binary BED data record from BigBed file
 /// Format: chromId (4), chromStart (4), chromEnd (4), rest (zero-terminated string)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BigbedData {
     pub chrom_id: u32,
     pub chrom_name: String,
@@ -92,15 +92,6 @@ impl BigbedData {
             rest,
             size,
         })
-    }
-
-    /// Get field count (3 base fields + extra fields in rest)
-    pub fn field_count(&self) -> usize {
-        if self.rest.is_empty() {
-            3
-        } else {
-            3 + self.rest.split('\t').count()
-        }
     }
 }
 

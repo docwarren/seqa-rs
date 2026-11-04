@@ -66,15 +66,6 @@ impl CloudBackend {
             ))),
         }
     }
-
-    /// URI scheme this backend's buckets should be addressed with.
-    pub fn uri_scheme(&self) -> &'static str {
-        match self {
-            Self::AmazonS3 => "s3",
-            Self::GoogleCloudStorage => "gs",
-            Self::MicrosoftAzure => "az",
-        }
-    }
 }
 
 /// Lists every bucket (Azure: container) visible to the configured credentials,
@@ -307,14 +298,12 @@ async fn list_gcs_buckets() -> Result<Vec<String>, StoreError> {
 
 /// Resolves the GCP project ID, which `object_store` does not carry anywhere —
 /// `ServiceAccountKey` is only an RSA keypair wrapper, and the bucket-listing
-/// endpoint requires a project.  It is read from the service-account JSON that
-/// [`super::store::get_gc_store`] already relies on.
+/// endpoint requires a project.
 fn google_project_id() -> Result<String, StoreError> {
-    if let Ok(project) = std::env::var("GOOGLE_PROJECT_ID") {
-        if !project.is_empty() {
+    if let Ok(project) = std::env::var("GOOGLE_PROJECT_ID")
+        && !project.is_empty() {
             return Ok(project);
         }
-    }
 
     let service_account_json = match std::env::var("GOOGLE_SERVICE_ACCOUNT_KEY") {
         Ok(inline) if !inline.is_empty() => inline,
@@ -362,13 +351,6 @@ mod tests {
         // Local has no buckets and must not be routed here.
         assert!(CloudBackend::from_id("local").is_err());
         assert!(CloudBackend::from_id("nonsense").is_err());
-    }
-
-    #[test]
-    fn test_uri_scheme() {
-        assert_eq!(CloudBackend::AmazonS3.uri_scheme(), "s3");
-        assert_eq!(CloudBackend::GoogleCloudStorage.uri_scheme(), "gs");
-        assert_eq!(CloudBackend::MicrosoftAzure.uri_scheme(), "az");
     }
 
     #[test]

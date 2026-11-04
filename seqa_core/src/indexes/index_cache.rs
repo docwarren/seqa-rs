@@ -40,7 +40,7 @@ pub fn get_local_index_path(index_path: &str) -> PathBuf {
     if is_remote {
         let filename = index_path
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("index");
 
         PathBuf::from(format!("./{}", filename))
@@ -78,12 +78,11 @@ pub async fn get_or_download_index(
     let bytes = store_service.get_object(index_path).await?;
 
     // Try to cache the downloaded index locally (skip when no_cache is set)
-    if !no_cache {
-        if let Err(e) = cache_index_locally(&local_path, &bytes).await {
+    if !no_cache
+        && let Err(e) = cache_index_locally(&local_path, &bytes).await {
             error!("Warning: Failed to cache index locally at {}: {}",
                 local_path.display(), e);
         }
-    }
 
     Ok(bytes)
 }
@@ -119,11 +118,10 @@ async fn cache_index_locally(local_path: &Path, bytes: &[u8]) -> Result<(), std:
 /// * `index_path` - Path to the index file (same value passed to `get_or_download_index`)
 pub fn delete_local_index(index_path: &str) {
     let local_path = get_local_index_path(index_path);
-    if local_path.exists() {
-        if let Err(e) = std::fs::remove_file(&local_path) {
+    if local_path.exists()
+        && let Err(e) = std::fs::remove_file(&local_path) {
             debug!("Warning: Failed to delete cached index {}: {}", local_path.display(), e);
         }
-    }
 }
 
 #[cfg(test)]

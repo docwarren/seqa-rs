@@ -28,7 +28,7 @@ pub enum RTreeNonLeafError {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RTreeNonLeaf {
     pub start_chrom_idx: u32,
     pub start_base: u32,

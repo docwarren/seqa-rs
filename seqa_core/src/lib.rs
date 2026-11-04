@@ -82,8 +82,6 @@ pub mod fasta;
 pub mod genome;
 pub mod indexes;
 pub mod models;
-pub mod parsing_utils;
-pub mod services;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 pub mod stores;

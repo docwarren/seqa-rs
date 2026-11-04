@@ -34,7 +34,7 @@ pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordina
     let mut str_array = Vec::new();
     let mut offset = 0;
     let chrom_id = chr_tree
-        .get_chromosome_id(&coord.get_chromosome())
+        .get_chromosome_id(coord.get_chromosome())
         .unwrap_or(0);
 
     while offset < bytes.len() + BigwigData::SIZE {
@@ -66,9 +66,9 @@ fn data_to_lines(
 
     for block in bytes {
         let strings = if is_zoom {
-            get_zoom_strings(&block, chr_tree, coordinate)
+            get_zoom_strings(block, chr_tree, coordinate)
         } else {
-            get_data_strings(&block, chr_tree, coordinate)
+            get_data_strings(block, chr_tree, coordinate)
         };
         str_array.extend(strings);
     }
@@ -112,14 +112,14 @@ pub fn get_bw_chromosome_id(
 ) -> Result<u32, SearchError> {
     match index
         .chromosome_tree
-        .get_chromosome_id(&coordinate.get_chromosome())
+        .get_chromosome_id(coordinate.get_chromosome())
     {
         Some(id) => Ok(id),
         _ => {
-            return Err(SearchError::InvalidRequest {
+            Err(SearchError::InvalidRequest {
                 reason: "Chromosome not found".to_string(),
                 requested: coordinate.get_chromosome().to_string(),
-            });
+            })
         }
     }
 }
@@ -157,13 +157,13 @@ pub async fn bigwig_search(
     let mut zoom_headers: Vec<Option<&ZoomHeader>> = Vec::with_capacity(coordinates.len());
 
     for coord in &coordinates {
-        let zoom_header = index.get_zoom_header(&coord);
-        let chr_id = get_bw_chromosome_id(&index, &coord)?;
+        let zoom_header = index.get_zoom_header(coord);
+        let chr_id = get_bw_chromosome_id(index, coord)?;
         let index_offset = get_index_begin(index, zoom_header);
         let index_end = get_index_end(store_service, index, zoom_header).await?;
         let r_tree =
             RTree::from_file(store_service, &options.file_path, index_offset..index_end).await?;
-        let leaves_instance = r_tree.get_overlapping_leaves(chr_id, &coord);
+        let leaves_instance = r_tree.get_overlapping_leaves(chr_id, coord);
         let range = get_range_from_leaves(&leaves_instance);
 
         ranges.push(range);
@@ -200,7 +200,7 @@ pub async fn bigwig_search(
         lines.push(data_to_lines(
             blocks,
             &index.chromosome_tree,
-            &coord,
+            coord,
             is_zoom,
         ));
     }

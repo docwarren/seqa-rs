@@ -25,7 +25,7 @@ use crate::stores::StoreService;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BamHeader {
     pub header_lines: Vec<HeaderLine>,
     pub references: Vec<BamReference>,
@@ -86,7 +86,7 @@ impl BamHeader {
                 file_path,
                 Range {
                     start: 0u64,
-                    end: first_vp.block_offset as u64 + MAX_BLOCK_SIZE,
+                    end: first_vp.block_offset + MAX_BLOCK_SIZE,
                 },
             )
             .await

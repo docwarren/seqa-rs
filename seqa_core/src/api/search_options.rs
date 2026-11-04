@@ -196,9 +196,9 @@ impl SearchOptions {
 impl Display for SearchOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for c in self.coordinates.iter() {
-            write!(
+            writeln!(
                 f,
-                "{}:{}-{}\n",
+                "{}:{}-{}",
                 c.get_chromosome(),
                 c.get_begin(),
                 c.get_end()

@@ -12,8 +12,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-pub mod test_data;
 pub mod bin_util;
 pub mod chunk;
 pub mod chunk_util;

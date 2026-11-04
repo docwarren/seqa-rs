@@ -43,9 +43,7 @@ pub async fn fasta_search(
 ) -> Result<SearchResult, SearchError> {
     let mut result = SearchResult::new();
 
-    if let Err(e) = check_coords_for_length(&options.coordinates, MAX_FASTA_SEARCH_SIZE) {
-        return Err(e);
-    }
+    check_coords_for_length(&options.coordinates, MAX_FASTA_SEARCH_SIZE)?;
 
     let index = match &options.fasta_index {
         Some(index) => index,

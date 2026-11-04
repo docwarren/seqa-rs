@@ -40,7 +40,7 @@ fn read_leaf_nodes(
     
     for _ in 0..count {
 
-        let (item, next_bytes_read) = ChrTreeLeaf::from_bytes(&bytes, offset, key_size)?;
+        let (item, next_bytes_read) = ChrTreeLeaf::from_bytes(bytes, offset, key_size)?;
         nodes.push(ChrTreeChild::Leaf(item));
         offset += next_bytes_read;
         bytes_read += next_bytes_read;

@@ -157,7 +157,7 @@ impl FromBytes for BedLine {
             let mut fields = String::new();
             for (i, byt) in tokens[12..].iter().enumerate() {
                 if i > 0 {
-                    fields.push_str("\t");
+                    fields.push('\t');
                 }
                 fields.push_str(byt);
             }

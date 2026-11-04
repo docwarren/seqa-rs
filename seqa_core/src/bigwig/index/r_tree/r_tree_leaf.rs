@@ -15,7 +15,7 @@ use crate::api::parsing_error::ParsingError;
 // limitations under the License.
 use super::overlaps::Overlaps;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RTreeLeaf {
     pub start_chrom_idx: u32,
     pub start_base: u32,

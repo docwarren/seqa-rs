@@ -163,7 +163,7 @@ impl Read {
             // Determine operation type
             let operation = match (ref_char, rd_char) {
                 (Some(_), Some('-')) => Some('D'),
-                (Some(r), _) if matches!(r, 'A' | 'C' | 'G' | 'T') => Some('X'),
+                (Some('A' | 'C' | 'G' | 'T'), _) => Some('X'),
                 (Some(r), _) => Some(r),
                 _ => None,
             };
@@ -298,9 +298,9 @@ impl FromBytes for Read {
         let cigar = Cigar::from_bytes(&bytes[i..cigar_end])?.0;
         i += n_cigar_op as usize * 4;
 
-        let seq_end = i + ((l_seq as usize + 1) / 2);
+        let seq_end = i + ((l_seq as usize).div_ceil(2));
         let seq = Seq::from_bytes(&bytes[i..seq_end])?.0;
-        i += (l_seq as usize + 1) / 2;
+        i += (l_seq as usize).div_ceil(2);
 
         let qual = Qual::from_bytes(&bytes[i..i + l_seq as usize])?.0;
         i += l_seq as usize;

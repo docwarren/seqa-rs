@@ -108,7 +108,7 @@ impl FromBytes for BedpeLine {
             for (i, byt) in extra_tokens.iter().enumerate() {
                 fields.push_str(byt);
                 if i < extra_tokens.len() - 1 {
-                    fields.push_str("\t")
+                    fields.push('\t')
                 }
             }
 

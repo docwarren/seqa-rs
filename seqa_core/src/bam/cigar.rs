@@ -37,10 +37,6 @@ impl Cigar {
             .sum()
     }
 
-    pub fn get_read_length(&self) -> u32 {
-        self.operations.iter().map(|op| op.get_read_length()).sum()
-    }
-
     pub fn get_operations(&self) -> &[CigarOperation] {
         &self.operations
     }

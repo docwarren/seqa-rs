@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BaiIndex {
     pub magic: [u8; 4],
     pub n_ref: u32,
@@ -106,7 +106,7 @@ impl BaiIndex {
 
                     // Update first_feature_offset if this chunk's begin_vp is less than the current first_feature_offset
                     if chunk.begin_vp.virtual_pointer < bai_index.first_feature_offset.virtual_pointer {
-                        bai_index.first_feature_offset = chunk.begin_vp.clone();
+                        bai_index.first_feature_offset = chunk.begin_vp;
                     }
                 }
 

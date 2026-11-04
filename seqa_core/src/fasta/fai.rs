@@ -31,7 +31,7 @@ pub struct Contig {
     pub qual_offset: u64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct FaiIndex {
     pub contigs: HashMap<String, Contig>,
 }
@@ -112,10 +112,7 @@ impl FaiIndex {
                 }
                 let start = Self::get_offset(begin, contig);
                 let end = Self::get_offset(end, contig) + 1;
-
                 ranges.push(start..end);
-            } else {
-                return;
             }
         });
         Ok(ranges)

@@ -33,11 +33,6 @@ pub enum GeneError {
     UnknownError(String),
 }
 
-pub fn establish_connection(db_path: String) -> Result<Connection, GeneError> {
-    let conn = Connection::open(db_path).map_err(GeneError::DatabaseError)?;
-    Ok(conn)
-}
-
 pub fn get_gene_symbols(conn: &Connection) -> Result<Vec<GeneCoordinate>, GeneError> {
     let mut stmt = conn.prepare("SELECT * FROM coordinates")?;
 
