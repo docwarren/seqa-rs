@@ -28,7 +28,7 @@ pub struct GtfLine {
     pub score: Option<u16>,
     pub strand: Option<String>,
     pub frame: Option<u8>,
-    pub attributes: Vec<(String, String)>,
+    pub attributes: String,
 }
 
 impl GtfLine {
@@ -74,18 +74,6 @@ impl FromBytes for GtfLine {
             Some(tokens[7].parse::<u8>()?)
         };
 
-        // Attributes are `key value` pairs separated by `;`
-        let mut attributes = vec![];
-        if tokens[8] != "." {
-            let attribute_tokens = tokens[8].split(";").collect::<Vec<&str>>();
-            for attribute in attribute_tokens {
-                let parts = attribute.split(" ").collect::<Vec<&str>>();
-                if parts.len() == 2 {
-                    attributes.push((parts[0].trim().to_string(), parts[1].trim().to_string()));
-                }
-            }
-        }
-
         Ok((
             GtfLine {
                 chromosome: chromosome.to_string(),
@@ -96,7 +84,7 @@ impl FromBytes for GtfLine {
                 score,
                 strand: strand.map(|s| s.to_string()),
                 frame,
-                attributes,
+                attributes: tokens[8].to_string()
             },
             bytes.len(),
         ))
@@ -120,15 +108,7 @@ impl std::fmt::Display for GtfLine {
             self.frame
                 .as_ref()
                 .map_or(".".to_string(), |f| f.to_string()),
-            if self.attributes.is_empty() {
-                ".".to_string()
-            } else {
-                self.attributes
-                    .iter()
-                    .map(|(k, v)| format!("{} {}", k, v))
-                    .collect::<Vec<String>>()
-                    .join(";")
-            }
+            self.attributes
         )
     }
 }
@@ -181,4 +161,19 @@ mod test {
             .0;
         assert_eq!(format!("{}", gtf), expected);
     }
+
+    #[test]
+    fn it_should_parse_attributes_separated_by_semicolon_and_space() {
+        let test_line = b"chr12\trefGene\texon\t14477\t14944\t.\t-\t.\tgene_id \"WASH8P\"; transcript_id \"NR_130745\"; exon_number \"1\"";
+
+        let gtf = GtfLine::from_bytes(test_line)
+            .expect("Failed to parse GTF line")
+            .0;
+
+        let display = format!("{}", gtf);
+        assert!(display.contains("gene_id \"WASH8P\""));
+        assert!(display.contains("transcript_id \"NR_130745\""));
+        assert!(display.contains("exon_number \"1\""));
+    }
+
 }
