@@ -169,4 +169,15 @@ mod test {
             .0;
         assert_eq!(format!("{}", gff), expected);
     }
+
+    #[test]
+    fn it_should_keep_group_separated_by_semicolon_and_space() {
+        let test_line = b"chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\tgene_id \"touch1\"; note \"two words\"; ";
+        let expected = "chr22\tTeleGene\tenhancer\t10000000\t10001000\t500\t+\t.\tgene_id \"touch1\"; note \"two words\"; ".to_string();
+
+        let gff = GffLine::from_bytes(test_line)
+            .expect("Failed to parse GFF line")
+            .0;
+        assert_eq!(format!("{}", gff), expected);
+    }
 }
