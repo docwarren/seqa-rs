@@ -103,9 +103,8 @@ cargo test -p seqa_axum
 ## Development
 
 ```bash
-# Run unit tests (no credentials needed)
+# Run unit tests (a few read from S3 and Azure, so they need credentials)
 cargo test -p seqa_core --lib
-cargo test -p seqa_core --test read
 
 # Run cloud integration tests (requires credentials)
 cargo test -p seqa_core --test bam

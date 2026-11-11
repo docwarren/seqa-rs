@@ -117,7 +117,7 @@ seqa_core = "9"
 ## Testing
 
 ```bash
-# Unit tests (no cloud credentials needed)
+# Unit tests (a few read from S3 and Azure, so they need the credentials above)
 cargo test -p seqa_core --lib
 
 # Everything, including the integration tests in tests/ (requires credentials above)
