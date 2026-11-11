@@ -14,7 +14,7 @@
 // limitations under the License.
 use crate::api::parsing_error::ParsingError;
 use crate::bam::cigar::Cigar;
-use crate::bam::header::header::BamHeader;
+use crate::bam::bam_header::header::BamHeader;
 use crate::bam::qual::Qual;
 use crate::bam::seq::Seq;
 use crate::bam::tags::Tags;

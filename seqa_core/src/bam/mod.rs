@@ -7,4 +7,4 @@ pub mod tags;
 pub mod seq;
 pub mod cigar_op;
 pub mod read_utils;
-pub mod header;
+pub mod bam_header;

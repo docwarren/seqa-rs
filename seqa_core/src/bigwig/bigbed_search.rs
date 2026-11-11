@@ -17,7 +17,7 @@ use crate::api::search_options::SearchOptions;
 use crate::api::search_result::SearchResult;
 use crate::bigwig::bigbed_data::BigbedData;
 use crate::bigwig::bigwig_search::{
-    decompress_data, get_bw_chromosome_id, get_header_lines, get_range_from_leaves,
+    decompress_data, get_bw_chromosome_id, get_range_from_leaves,
 };
 use crate::bigwig::index::bigwig_index::BigwigIndex;
 use crate::bigwig::index::chr_tree::BigwigChrTree;
@@ -29,6 +29,7 @@ use crate::bigwig::index::zoom_header::ZoomHeader;
 use crate::coordinate::Coordinate;
 use crate::stores::StoreService;
 use std::ops::Range;
+use crate::bigwig::bigbed_header::BigBedHeader;
 
 /// Parses a decompressed BigBed data block and formats each record that overlaps `coord`.
 pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
@@ -99,6 +100,8 @@ pub async fn bigbed_search(
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
     let mut result = SearchResult::new();
+    result.header = Some(Box::new(BigBedHeader{}));
+    result.coordinates = options.coordinates.iter().map(|c| c.to_string()).collect();
     let coordinates = options.coordinates.clone();
 
     // Reuse BigwigIndex since the index structure is identical
@@ -145,10 +148,8 @@ pub async fn bigbed_search(
             })?;
         decompressed_data.push(decompressed);
     }
-    let mut lines: Vec<Vec<String>> = vec![get_header_lines(
-        &BigbedData::COLUMNS,
-        options.include_header,
-    )];
+
+    let mut lines = Vec::new();
     for (i, coord) in coordinates.iter().enumerate() {
         let is_zoom = zoom_headers[i].is_some();
         let blocks = &decompressed_data[i];
@@ -159,7 +160,7 @@ pub async fn bigbed_search(
             is_zoom,
         ));
     }
-    result.lines = lines.concat();
+    result.lines = lines;
     Ok(result)
 }
 

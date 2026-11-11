@@ -61,10 +61,7 @@ impl BaiIndex {
             idx_path,
             no_cache
         ).await.map_err(|e| SearchError::ReadError { path: idx_path.to_string(), source: e })?;
-        BaiIndex::from_bytes(bytes).map_err(|e| SearchError::ParseError {
-            path: idx_path.to_string(),
-            source: e
-        })
+        Ok(BaiIndex::from_bytes(bytes)?)
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ParsingError> {

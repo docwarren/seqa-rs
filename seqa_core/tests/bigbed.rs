@@ -52,17 +52,17 @@ async fn bigbed_search_matches_tabix() {
         .expect("Failed to search BED");
 
     assert_eq!(
-        bb_result.lines.len(),
-        bed_result.lines.len(),
+        bb_result.lines[0].len(),
+        bed_result.lines[0].len(),
         "BigBed returned {} lines, BED returned {} lines",
-        bb_result.lines.len(),
-        bed_result.lines.len()
+        bb_result.lines[0].len(),
+        bed_result.lines[0].len()
     );
 
     for (i, (bb_line, bed_line)) in bb_result
-        .lines
+        .lines[0]
         .iter()
-        .zip(bed_result.lines.iter())
+        .zip(bed_result.lines[0].iter())
         .enumerate()
     {
         assert_eq!(
@@ -100,9 +100,9 @@ async fn bigbed_search_chr1_small_region() {
         .await
         .expect("Failed to search BED");
 
-    assert_eq!(bb_result.lines.len(), bed_result.lines.len());
+    assert_eq!(bb_result.lines[0].len(), bed_result.lines[0].len());
 
-    for (bb_line, bed_line) in bb_result.lines.iter().zip(bed_result.lines.iter()) {
+    for (bb_line, bed_line) in bb_result.lines[0].iter().zip(bed_result.lines[0].iter()) {
         assert_eq!(bb_line, bed_line);
     }
     cleanup_bed_index();
@@ -134,9 +134,9 @@ async fn bigbed_search_different_chromosome() {
         .await
         .expect("Failed to search BED");
 
-    assert_eq!(bb_result.lines.len(), bed_result.lines.len());
+    assert_eq!(bb_result.lines[0].len(), bed_result.lines[0].len());
 
-    for (bb_line, bed_line) in bb_result.lines.iter().zip(bed_result.lines.iter()) {
+    for (bb_line, bed_line) in bb_result.lines[0].iter().zip(bed_result.lines[0].iter()) {
         assert_eq!(bb_line, bed_line);
     }
     cleanup_bed_index();
@@ -157,7 +157,7 @@ async fn bigbed_returns_correct_coordinates() {
         .await
         .expect("Failed to search BigBed");
 
-    for line in &result.lines {
+    for line in &result.lines[0] {
         let fields: Vec<&str> = line.split('\t').collect();
         let begin: u32 = fields[1].parse().expect("Failed to parse begin");
         let end: u32 = fields[2].parse().expect("Failed to parse end");

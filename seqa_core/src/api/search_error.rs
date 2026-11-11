@@ -43,11 +43,8 @@ pub enum SearchError {
         source: StoreError
     },
 
-    #[error("Error parsing file {path}")]
-    ParseError{
-        path: String,
-        source: ParsingError
-    },
+    #[error("Error parsing file")]
+    ParseError(#[from] ParsingError),
 
     #[error("Error decompressing {path}")]
     CodecError {

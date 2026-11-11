@@ -59,10 +59,7 @@ pub async fn get_bigwig_header(
                 path: path_str.to_string(),
                 source: e,
             })?;
-    BigwigHeader::from_bytes(&header_bytes).map_err(|e| SearchError::ParseError {
-        path: path_str.to_string(),
-        source: e,
-    })
+    Ok(BigwigHeader::from_bytes(&header_bytes)?)
 }
 
 pub async fn get_bigwig_detail_bytes(

@@ -20,6 +20,7 @@ use crate::codecs::bgzip;
 use crate::indexes::constants::MAX_BLOCK_SIZE;
 use crate::indexes::virtual_offset::VirtualOffset;
 use crate::stores::StoreService;
+use crate::traits::to_lines::ToLines;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TabixHeader {
@@ -75,8 +76,10 @@ impl TabixHeader {
 
         Ok(TabixHeader { lines })
     }
+}
 
-    pub fn to_lines(&self) -> Vec<String> {
+impl ToLines for TabixHeader {
+    fn to_lines(&self) -> Vec<String> {
         self.lines.clone()
     }
 }

@@ -32,21 +32,21 @@ async fn s3_bigwig() {
     let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search BigWig for chr4");
-    let begin = result.lines[0].split('\t').collect::<Vec<&str>>()[1]
+    let begin = result.lines[0][0].split('\t').collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let last_begin = result.lines[result.lines.len() - 1]
+    let last_begin = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let end = result.lines[result.lines.len() - 1]
+    let end = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[2]
         .parse::<u32>()
         .unwrap();
 
-    assert!(result.lines.len() < 5000);
+    assert!(result.lines[0].len() < 5000);
     assert!(begin < end);
     assert!(begin > 120000000);
     assert!(end > last_begin);
@@ -71,21 +71,21 @@ async fn azure_bigwig() {
     let result = bigwig_search(&store_service, &options)
         .await
         .expect("Failed to search BigWig for chr4");
-    let begin = result.lines[0].split('\t').collect::<Vec<&str>>()[1]
+    let begin = result.lines[0][0].split('\t').collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let last_begin = result.lines[result.lines.len() - 1]
+    let last_begin = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let end = result.lines[result.lines.len() - 1]
+    let end = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[2]
         .parse::<u32>()
         .unwrap();
 
-    assert!(result.lines.len() < 5000);
+    assert!(result.lines[0].len() < 5000);
     assert!(begin < end);
     assert!(begin > 120000000);
     assert!(end > last_begin);
@@ -110,21 +110,21 @@ async fn gc_bigwig() {
     let result = bigwig_search(&store_service, &options)
         .await
         .expect("Failed to search BigWig for chr4");
-    let begin = result.lines[0].split('\t').collect::<Vec<&str>>()[1]
+    let begin = result.lines[0][0].split('\t').collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let last_begin = result.lines[result.lines.len() - 1]
+    let last_begin = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let end = result.lines[result.lines.len() - 1]
+    let end = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[2]
         .parse::<u32>()
         .unwrap();
 
-    assert!(result.lines.len() < 5000);
+    assert!(result.lines[0].len() < 5000);
     assert!(begin < end);
     assert!(begin > 120000000);
     assert!(end > last_begin);
@@ -149,21 +149,21 @@ async fn http_bigwig() {
     let result = bigwig_search(&store_service, &options)
         .await
         .expect("Failed to search BigWig for chr4");
-    let begin = result.lines[0].split('\t').collect::<Vec<&str>>()[1]
+    let begin = result.lines[0][0].split('\t').collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let last_begin = result.lines[result.lines.len() - 1]
+    let last_begin = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[1]
         .parse::<u32>()
         .unwrap();
-    let end = result.lines[result.lines.len() - 1]
+    let end = result.lines[0][result.lines[0].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>()[2]
         .parse::<u32>()
         .unwrap();
 
-    assert!(result.lines.len() < 5000);
+    assert!(result.lines[0].len() < 5000);
     assert!(begin < end);
     assert!(begin > 120000000);
     assert!(end > last_begin);
@@ -190,11 +190,13 @@ async fn bigwig_multiple_coordinates() {
         .await
         .expect("Failed to search BigWig for chr4");
 
-    let first = result.lines[0].split('\t').collect::<Vec<&str>>();
+    assert_eq!(result.coordinates.len(), 2);
+    assert_eq!(result.lines.len(), 2);
+    let first = result.lines[0][0].split('\t').collect::<Vec<&str>>();
     let begin = first[1].parse::<u32>().unwrap();
     let chr1 = first[0];
 
-    let last = result.lines[result.lines.len() - 1]
+    let last = result.lines[1][result.lines[1].len() - 1]
         .split('\t')
         .collect::<Vec<&str>>();
 

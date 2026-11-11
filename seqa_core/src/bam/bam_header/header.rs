@@ -12,18 +12,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use crate::api::parsing_error::ParsingError;
 use crate::api::search_error::SearchError;
-use crate::bam::header::header_line::HeaderLine;
-use crate::bam::header::header_utils::read_magic;
-use crate::bam::header::reference::BamReference;
+use crate::bam::bam_header::header_line::HeaderLine;
+use crate::bam::bam_header::header_utils::read_magic;
+use crate::bam::bam_header::reference::BamReference;
 use crate::codecs::bgzip;
 use crate::indexes::constants::MAX_BLOCK_SIZE;
 use crate::indexes::virtual_offset::VirtualOffset;
 use crate::stores::StoreService;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
+use crate::traits;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BamHeader {
@@ -108,10 +108,7 @@ impl BamHeader {
             }
         })?;
 
-        parse_header_lines(&bytes).map_err(|e| SearchError::ParseError {
-            path: file_path.to_string(),
-            source: e,
-        })
+        Ok(parse_header_lines(&bytes)?)
     }
 
     pub fn text_header_from_bytes(bytes: Vec<u8>) -> Result<Vec<HeaderLine>, ParsingError> {
@@ -141,8 +138,10 @@ impl BamHeader {
             None
         }
     }
+}
 
-    pub fn to_lines(&self) -> Vec<String> {
+impl traits::to_lines::ToLines for BamHeader {
+    fn to_lines(&self) -> Vec<String> {
         let mut lines = Vec::new();
         for header_line in &self.header_lines {
             lines.push(format!("{}", header_line));

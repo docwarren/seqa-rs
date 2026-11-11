@@ -25,10 +25,11 @@ use crate::tabix::bed::BedLine;
 use crate::tabix::bedgraph::BedGraphLine;
 use crate::tabix::gff::GffLine;
 use crate::tabix::gtf::GtfLine;
-use crate::tabix::tabix::Tabix;
+use crate::tabix::tabix_index::TabixIndex;
 use crate::tabix::tabix_header::TabixHeader;
 use crate::traits::feature::Feature;
 use crate::traits::sam_index::SamIndex;
+use crate::traits::to_lines::ToLines;
 use bstr::ByteSlice;
 
 fn read_lines(
@@ -58,18 +59,11 @@ fn read_lines(
 ///
 /// Returns [`ParsingError::FormatError`] if a line cannot be parsed as `output_format`.
 pub fn data_to_lines(
-    data: &[Vec<u8>],
-    coordinates: &[Coordinate],
+    data: &[u8],
+    coordinate: &Coordinate,
     output_format: &OutputFormat,
 ) -> Result<Vec<String>, ParsingError> {
-    let mut lines = Vec::new();
-    for (idx, coord) in coordinates.iter().enumerate() {
-        match read_lines(&data[idx], coord, output_format) {
-            Ok(l) => lines.push(l),
-            Err(e) => return Err(e),
-        }
-    }
-    Ok(lines.concat())
+    read_lines(data, coordinate, output_format)
 }
 
 /// Searches a bgzipped, tabix-indexed file (VCF, BED, BedGraph, GFF, GTF) for records
@@ -92,11 +86,12 @@ pub async fn tabix_search(
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
     let mut result = SearchResult::new();
+    result.coordinates = options.coordinates.iter().map(|c| c.to_string()).collect();
 
     let tabix = match &options.tabix_index {
         Some(index) => index,
         None => {
-            &Tabix::from_compressed_file(store_service, &options.index_path, options.no_cache)
+            &TabixIndex::from_compressed_file(store_service, &options.index_path, options.no_cache)
                 .await?
         }
     };
@@ -108,16 +103,12 @@ pub async fn tabix_search(
         }
     };
 
-    result.tabix_header = Some(tabix_header.clone());
+    result.header = Some(Box::new(tabix_header.clone()));
     result.tabix_index = Some(tabix.clone());
 
     if options.header_only {
-        result.lines = tabix_header.to_lines();
         return Ok(result);
     }
-
-    let mut chunks = Vec::new();
-    let mut flat_coords = Vec::new();
 
     for coord in &options.coordinates {
         let bin_numbers = get_bin_numbers(coord);
@@ -126,38 +117,26 @@ pub async fn tabix_search(
         };
         let chr_idx = &tabix.references[chr_i];
         let coord_chunks = tabix.get_optimized_chunks(chr_idx, bin_numbers, coord);
-        for _ in 0..coord_chunks.len() {
-            flat_coords.push(coord.clone());
-        }
-        chunks.push(coord_chunks);
-    }
 
-    let flat_chunks = chunks.concat();
-    let data = fetch(store_service, &options.file_path, &flat_chunks)
-        .await
-        .map_err(|e| SearchError::ReadError {
-            path: options.file_path.to_string(),
-            source: e,
-        })?;
-
-    let raw_data =
-        decompress_chunks(&flat_chunks, &data)
+        let data = fetch(store_service, &options.file_path, &coord_chunks)
             .await
-            .map_err(|e| SearchError::CodecError {
+            .map_err(|e| SearchError::ReadError {
                 path: options.file_path.to_string(),
                 source: e,
             })?;
 
-    let lines = data_to_lines(&raw_data, &flat_coords, &options.output_format).map_err(|e| {
-        SearchError::ParseError {
-            source: e,
-            path: options.file_path.clone(),
-        }
-    })?;
+        let raw_data =
+            decompress_chunks(&coord_chunks, &data)
+                .await
+                .map_err(|e| SearchError::CodecError {
+                    path: options.file_path.to_string(),
+                    source: e,
+                })?;
 
-    let mut all_lines = get_header_lines(options, tabix_header);
-    all_lines.extend(lines);
-    result.lines = all_lines;
+        let lines = data_to_lines(&raw_data.concat(), coord, &options.output_format)?;
+        result.lines.push(lines);
+    }
+
     Ok(result)
 }
 
