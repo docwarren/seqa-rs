@@ -23,39 +23,6 @@ const GRCH37: [u32; 25] = [249250621, 243199373, 198022430, 191154276, 180915260
 /// Chromosome lengths for GRCh38 (same as hg38).
 const GRCH38: [u32; 25] = [248956422, 242193529, 198295559, 190214555, 181538259, 170805979, 159345973, 145138636, 138394717, 133797422, 135086622, 133275309, 114364328, 107043718, 101991189, 90338345, 83257441, 80373285, 58617616, 64444167, 46709983, 50818468, 156040895, 57227415, 16569];
 
-/// Converts a 0-based chromosome index (0 = chr1, 22 = chrX, 23 = chrY, 24 = chrM)
-/// to its standard `"chrN"` name.  Returns `None` for indices ≥ 25.
-pub fn index_to_chr_str(index: usize) -> Option<String> {
-    match index {
-        0 => Some("chr1".to_string()),
-        1 => Some("chr2".to_string()),
-        2 => Some("chr3".to_string()),
-        3 => Some("chr4".to_string()),
-        4 => Some("chr5".to_string()),
-        5 => Some("chr6".to_string()),
-        6 => Some("chr7".to_string()),
-        7 => Some("chr8".to_string()),
-        8 => Some("chr9".to_string()),
-        9 => Some("chr10".to_string()),
-        10 => Some("chr11".to_string()),
-        11 => Some("chr12".to_string()),
-        12 => Some("chr13".to_string()),
-        13 => Some("chr14".to_string()),
-        14 => Some("chr15".to_string()),
-        15 => Some("chr16".to_string()),
-        16 => Some("chr17".to_string()),
-        17 => Some("chr18".to_string()),
-        18 => Some("chr19".to_string()),
-        19 => Some("chr20".to_string()),
-        20 => Some("chr21".to_string()),
-        21 => Some("chr22".to_string()),
-        22 => Some("chrX".to_string()),
-        23 => Some("chrY".to_string()),
-        24 => Some("chrM".to_string()),
-        _ => None,
-    }
-}
-
 /// Converts a chromosome name to its 0-based index.
 ///
 /// Both `"chr"` prefixed (e.g. `"chr1"`, `"chrX"`) and bare numeric/letter names
@@ -159,27 +126,6 @@ pub fn get_longest_possible_genome() -> [u32; 25] {
     genome
 }
 
-/// Returns the length of `chr` in the given reference build, or `None` if either
-/// the chromosome name or the genome name is unrecognised.
-///
-/// Supported genome names: `"hg19"`, `"hg38"`, `"grch37"`, `"grch38"`,
-/// `"ch37"` (alias for GRCh37), `"ch38"` (alias for GRCh38).
-pub fn chromosome_len(chr: &str, genome: &str) -> Option<u32> {
-    if let Some(index) = chr_index(chr) {
-        match genome {
-            "hg19" => Some(HG19[index]),
-            "hg38" => Some(HG38[index]),
-            "grch37" => Some(GRCH37[index]),
-            "grch38" => Some(GRCH38[index]),
-            "ch37" => Some(GRCH37[index]),
-            "ch38" => Some(GRCH38[index]),
-            _ => None
-        }
-    } else {
-        None
-    }
-}
-
 #[test]
 fn test_chr_index() {
     assert_eq!(chr_index("chr1"), Some(0));
@@ -190,14 +136,6 @@ fn test_chr_index() {
     assert_eq!(chr_index("M"), Some(24));
     assert_eq!(chr_index("chr23"), None);
     assert_eq!(chr_index("chr_unknown"), None);
-}
-
-#[test]
-fn test_index_to_chr_str() {
-    assert_eq!(index_to_chr_str(0), Some("chr1".to_string()));
-    assert_eq!(index_to_chr_str(22), Some("chrX".to_string()));
-    assert_eq!(index_to_chr_str(24), Some("chrM".to_string()));
-    assert_eq!(index_to_chr_str(25), None);
 }
 
 #[test]
@@ -219,13 +157,4 @@ fn test_chromosome_aliases() {
     assert_eq!(chromosome_aliases("M"), vec!["M", "chrM", "MT", "chrMT"]);
     assert_eq!(chromosome_aliases("MT"), vec!["MT", "chrMT", "M", "chrM"]);
     assert_eq!(chromosome_aliases("chrMT"), vec!["chrMT", "MT", "M", "chrM"]);
-}
-
-#[test]
-fn test_chromosome_len() {
-    assert_eq!(chromosome_len("chr1", "hg19"), Some(249250621));
-    assert_eq!(chromosome_len("chrX", "hg38"), Some(156040895));
-    assert_eq!(chromosome_len("chrM", "grch37"), Some(16569));
-    assert_eq!(chromosome_len("chr1", "unknown"), None);
-    assert_eq!(chromosome_len("chr_unknown", "hg19"), None);
 }

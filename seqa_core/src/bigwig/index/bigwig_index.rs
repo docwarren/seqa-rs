@@ -15,12 +15,12 @@ use crate::stores::StoreService;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BigwigIndex {
-    pub header: header::BigwigHeader,
-    pub zoom_headers: Vec<ZoomHeader>,
-    pub total_summary: TotalSummary,
-    pub chromosome_tree: BigwigChrTree,
-    pub data_count: u32,
-    pub file_path: String,
+    pub(crate) header: header::BigwigHeader,
+    pub(crate) zoom_headers: Vec<ZoomHeader>,
+    pub(crate) total_summary: TotalSummary,
+    pub(crate) chromosome_tree: BigwigChrTree,
+    pub(crate) data_count: u32,
+    pub(crate) file_path: String,
 }
 
 impl BigwigIndex {

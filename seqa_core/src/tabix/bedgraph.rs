@@ -29,10 +29,6 @@ pub struct BedGraphLine {
     pub value: f64,
 }
 
-impl BedGraphLine {
-    pub const COLUMNS: [&str; 4] = ["chromosome", "begin", "end", "value"];
-}
-
 impl FromBytes for BedGraphLine {
     type Error = ParsingError;
 
@@ -66,9 +62,6 @@ impl Display for BedGraphLine {
 }
 
 impl Feature for BedGraphLine {
-    fn get_id(&self) -> String {
-        format!("{}:{}-{}", self.chrom, self.begin, self.end)
-    }
 
     fn coordinate(&self) -> Coordinate {
         Coordinate {

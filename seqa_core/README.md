@@ -128,4 +128,4 @@ Most integration tests in `tests/` run against real data in S3, Azure and GCS, s
 
 ## Coordinate System
 
-All formats preserve their native coordinates. Each `Coordinate` carries its `CoordinateSystem`, and the canonical internal format is **0-based half-open** `[begin, end)`. Use `Coordinate::to_canonical()` for interval math, and `Coordinate::overlaps()` to compare coordinates in any system. A record's coordinate is available from `Feature::coordinate()`. Terminology: always `begin`/`end`, never `start`/`stop`.
+All formats preserve their native coordinates. Each `Coordinate` carries its `CoordinateSystem`, and the canonical internal format is **0-based half-open** `[begin, end)`. Use `Coordinate::to_canonical()` for interval math, and `Coordinate::overlaps()` to compare coordinates in any system. Search results are returned as text lines in each format's native coordinate system. Terminology: always `begin`/`end`, never `start`/`stop`.

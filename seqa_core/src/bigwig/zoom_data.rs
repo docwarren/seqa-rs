@@ -33,20 +33,6 @@ pub struct ZoomData {
 impl ZoomData {
     pub const SIZE: usize = 32; // Size in bytes of a ZoomData record
 
-    pub fn new() -> Self {
-        ZoomData {
-            chrom_id: 0,
-            chrom_name: String::new(),
-            chrom_start: 0,
-            chrom_end: 0,
-            valid_count: 0,
-            min: 0.0,
-            max: 0.0,
-            sum: 0.0,
-            sum_squares: 0.0,
-        }
-    }
-
     pub fn from_bytes(bytes: &[u8], chr_tree: &BigwigChrTree) -> Result<Self, String> {
         if bytes.len() < 32 {
             return Err("Not enough bytes for a complete ZoomData".into());

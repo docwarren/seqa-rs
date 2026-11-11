@@ -24,11 +24,11 @@ use crate::api::search_error::SearchError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BaiIndex {
-    pub magic: [u8; 4],
-    pub n_ref: u32,
-    pub references: Vec<ChrIdx>,
-    pub n_no_coor: u64,
-    pub first_feature_offset: VirtualOffset, // Used for figuring out the length of the header
+    pub(crate) magic: [u8; 4],
+    pub(crate) n_ref: u32,
+    pub(crate) references: Vec<ChrIdx>,
+    pub(crate) n_no_coor: u64,
+    pub(crate) first_feature_offset: VirtualOffset, // Used for figuring out the length of the header
 }
 
 impl BaiIndex {

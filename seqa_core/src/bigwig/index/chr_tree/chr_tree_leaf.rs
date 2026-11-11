@@ -23,14 +23,6 @@ pub struct ChrTreeLeaf {
 
 impl ChrTreeLeaf {
     
-    pub fn new() -> Self {
-        ChrTreeLeaf {
-            key: String::new(),
-            chr_id: 0,
-            chr_size: 0
-        }
-    }
-
     pub fn from_bytes(bytes: &[u8], offset: usize, key_size: u32) -> Result<(Self, usize), ParsingError> {
         if bytes.len() < 8 + key_size as usize {
             return Err(ParsingError::InsufficientBytes);

@@ -12,11 +12,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-pub mod bin_util;
-pub mod chunk;
-pub mod chunk_util;
-pub mod bin;
-pub mod virtual_offset;
-pub mod constants;
+pub(crate) mod bin_util;
+pub(crate) mod chunk;
+pub(crate) mod chunk_util;
+pub(crate) mod bin;
+pub(crate) mod virtual_offset;
+pub(crate) mod constants;
 pub mod index_cache;
-pub mod chr_idx;
+pub(crate) mod chr_idx;

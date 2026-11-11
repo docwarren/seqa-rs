@@ -14,17 +14,7 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use crate::api::parsing_error::ParsingError;
-
-#[derive(Debug, Error)]
-pub enum ZoomHeaderError {
-    #[error("Failed to parse ZoomHeader: {0}")]
-    HeaderError(String),
-
-    #[error("Parsing error: {0}")]
-    ParseError(#[from] core::array::TryFromSliceError),
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZoomHeader {

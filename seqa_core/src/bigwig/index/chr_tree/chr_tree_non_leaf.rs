@@ -23,13 +23,6 @@ pub struct ChrTreeNonLeaf {
 }
 
 impl ChrTreeNonLeaf {
-    pub fn new() -> Self {
-        ChrTreeNonLeaf {
-            key: String::new(),
-            child_offset: 0,
-            child: ChrTreeNode::new(),
-        }
-    }
 
     pub fn from_bytes(
         bytes: &[u8],

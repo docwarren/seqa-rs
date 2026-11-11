@@ -33,7 +33,7 @@ use crate::tabix::tabix_search::tabix_search;
 /// Each range runs from the chunk's first block to one maximum block size past its
 /// last block, so the last block is always fetched whole.  Returns one buffer per
 /// chunk, in the same order as `chunks`.
-pub async fn fetch(
+pub(crate) async fn fetch(
     store_service: &StoreService,
     file_path: &str,
     chunks: &[Chunk],
@@ -48,7 +48,7 @@ pub async fn fetch(
 /// `fetched[i]` must be the data returned by [`fetch`] for `chunks[i]`.  Returns one
 /// buffer per chunk, starting at `begin_vp`.  The tail is not trimmed, so the buffer may
 /// end part way through a record.
-pub async fn decompress_chunks(
+pub(crate) async fn decompress_chunks(
     chunks: &[Chunk],
     fetched: &[Vec<u8>],
 ) -> Result<Vec<Vec<u8>>, CodecError> {

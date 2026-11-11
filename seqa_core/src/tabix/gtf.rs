@@ -31,20 +31,6 @@ pub struct GtfLine {
     pub attributes: String,
 }
 
-impl GtfLine {
-    pub const COLUMNS: [&str; 9] = [
-        "chromosome",
-        "source",
-        "feature",
-        "begin",
-        "end",
-        "score",
-        "strand",
-        "frame",
-        "attributes",
-    ];
-}
-
 impl FromBytes for GtfLine {
     type Error = ParsingError;
 
@@ -114,9 +100,6 @@ impl std::fmt::Display for GtfLine {
 }
 
 impl crate::traits::feature::Feature for GtfLine {
-    fn get_id(&self) -> String {
-        format!("{}:{}-{}", self.chromosome, self.begin, self.end)
-    }
 
     fn coordinate(&self) -> Coordinate {
         Coordinate {

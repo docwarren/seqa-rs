@@ -24,7 +24,7 @@ fn update_bins(mut k: u32, max_k: u32, bins: &mut [u32; MAX_BIN_SIZE], i: &mut u
     }
 }
 
-pub fn region_to_bins(begin: u32, end: u32, bins: &mut [u32; MAX_BIN_SIZE]) -> usize {
+fn region_to_bins(begin: u32, end: u32, bins: &mut [u32; MAX_BIN_SIZE]) -> usize {
     let mut i: usize = 0;
 
     bins[i] = 0;

@@ -15,11 +15,7 @@
 
 use std::time::Duration;
 use moka::future::Cache;
-use seqa_core::bam::bai::BaiIndex;
-use seqa_core::bam::bam_header::header::BamHeader;
-use seqa_core::fasta::fai::FaiIndex;
-use seqa_core::tabix::tabix_header::TabixHeader;
-use seqa_core::tabix::tabix_index::TabixIndex;
+use seqa_core::{BaiIndex, BamHeader, FaiIndex, TabixHeader, TabixIndex};
 
 const IDLE_TTL: Duration = Duration::from_secs(600);
 

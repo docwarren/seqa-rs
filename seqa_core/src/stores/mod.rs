@@ -26,7 +26,7 @@ use url::Url;
 
 pub mod buckets;
 pub mod error;
-pub mod store;
+pub(crate) mod store;
 
 use error::StoreError;
 
@@ -176,7 +176,7 @@ impl StoreService {
         }
     }
 
-    pub fn get_or_create_store(&self, path: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
+    pub(crate) fn get_or_create_store(&self, path: &str) -> Result<Arc<dyn ObjectStore>, StoreError> {
         let abs_path = Self::get_absolute_path(path)?;
         let bucket = Self::get_bucket_from_path(&abs_path)?;
         let (store_kind, _) = Self::get_obj_scheme_and_path(&abs_path)?;
@@ -197,19 +197,19 @@ impl StoreService {
     /// # Errors
     ///
     /// Returns [`StoreError`] on path normalisation failure or storage I/O errors.
-    pub async fn get_range(&self, path: &str, range: Range<u64>) -> Result<Vec<u8>, StoreError> {
+    pub(crate) async fn get_range(&self, path: &str, range: Range<u64>) -> Result<Vec<u8>, StoreError> {
         let (_, url) = Self::get_obj_scheme_and_path(path)?;
         let store = self.get_or_create_store(path)?;
         Ok(store.get_range(&url, range).await?.to_vec())
     }
 
-    pub async fn get_ranges(&self, path: &str, ranges: &[Range<u64>]) -> Result<Vec<Vec<u8>>, StoreError> {
+    pub(crate) async fn get_ranges(&self, path: &str, ranges: &[Range<u64>]) -> Result<Vec<Vec<u8>>, StoreError> {
         let (_, url) = Self::get_obj_scheme_and_path(path)?;
         let store = self.get_or_create_store(path)?;
         Ok(store.get_ranges(&url, ranges).await?.iter().map(|r| r.to_vec()).collect())
     }
 
-    pub fn get_absolute_path(path: &str) -> Result<String, StoreError> {
+    pub(crate) fn get_absolute_path(path: &str) -> Result<String, StoreError> {
         let mut abs_path = path.to_owned();
 
         if !path.contains("://") {
@@ -231,7 +231,7 @@ impl StoreService {
 
     /// Get file path
     /// Gets a Path object from the string supplied.
-    pub fn get_obj_scheme_and_path(path: &str) -> Result<(ObjectStoreScheme, ObjectStorePath), StoreError> {
+    pub(crate) fn get_obj_scheme_and_path(path: &str) -> Result<(ObjectStoreScheme, ObjectStorePath), StoreError> {
         let url = Url::parse(path)?;
 
         match ObjectStoreScheme::parse(&url) {
@@ -314,7 +314,7 @@ impl StoreService {
     /// is the reason this derives the root from the URI rather than from a
     /// scheme-and-bucket pair: rebuilding `az://{container}/…` silently drops
     /// the account, producing a URI that cannot be listed.
-    pub fn store_root_uri(prefix: &str) -> Result<String, StoreError> {
+    pub(crate) fn store_root_uri(prefix: &str) -> Result<String, StoreError> {
         let url = Url::parse(prefix)?;
         let (scheme, _) = Self::get_obj_scheme_and_path(prefix)?;
 
@@ -595,5 +595,12 @@ mod tests {
         // A bare path has no scheme, so URI parsing fails with a clear error
         // rather than silently listing something unexpected.
         assert!(service.list_directory("/tmp").await.is_err());
+    }
+
+    #[test]
+    fn get_canonical_path_s3() {
+        let path = "s3://com.gmail.docarw/test_data/density.bw";
+        let (_, canonical) = StoreService::get_obj_scheme_and_path(path).expect("Failed to get canonical path");
+        assert_eq!(canonical.as_ref(), "test_data/density.bw");
     }
 }

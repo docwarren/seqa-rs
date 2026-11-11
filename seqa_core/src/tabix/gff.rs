@@ -31,20 +31,6 @@ pub struct GffLine {
     pub group: Option<String>,
 }
 
-impl GffLine {
-    pub const COLUMNS: [&str; 9] = [
-        "chromosome",
-        "source",
-        "feature",
-        "begin",
-        "end",
-        "score",
-        "strand",
-        "frame",
-        "group",
-    ];
-}
-
 impl FromBytes for GffLine {
     type Error = ParsingError;
 
@@ -120,9 +106,6 @@ impl std::fmt::Display for GffLine {
 }
 
 impl crate::traits::feature::Feature for GffLine {
-    fn get_id(&self) -> String {
-        format!("{}:{}-{}", self.chromosome, self.begin, self.end)
-    }
 
     fn coordinate(&self) -> Coordinate {
         Coordinate {

@@ -30,7 +30,7 @@ use crate::stores::{StoreService, error::StoreError};
 ///
 /// # Returns
 /// * Local path where the index file should be cached or exists
-pub fn get_local_index_path(index_path: &str) -> PathBuf {
+fn get_local_index_path(index_path: &str) -> PathBuf {
     let is_remote = index_path.starts_with("s3://")
         || index_path.starts_with("az://")
         || index_path.starts_with("gs://")
@@ -58,7 +58,7 @@ pub fn get_local_index_path(index_path: &str) -> PathBuf {
 ///
 /// # Returns
 /// * Result containing the bytes of the index file
-pub async fn get_or_download_index(
+pub(crate) async fn get_or_download_index(
     store_service: &StoreService,
     index_path: &str,
     no_cache: bool,
@@ -116,7 +116,7 @@ async fn cache_index_locally(local_path: &Path, bytes: &[u8]) -> Result<(), std:
 ///
 /// # Arguments
 /// * `index_path` - Path to the index file (same value passed to `get_or_download_index`)
-pub fn delete_local_index(index_path: &str) {
+fn delete_local_index(index_path: &str) {
     let local_path = get_local_index_path(index_path);
     if local_path.exists()
         && let Err(e) = std::fs::remove_file(&local_path) {
@@ -193,5 +193,39 @@ mod tests {
     fn test_get_local_index_path_file_scheme() {
         let path = get_local_index_path("file:///media/user/data/file.bam.bai");
         assert_eq!(path, PathBuf::from("/media/user/data/file.bam.bai"));
+    }
+
+    #[tokio::test]
+    async fn no_cache_does_not_write_index_file() {
+        use crate::api::search::search_features;
+        use crate::api::search_options::SearchOptions;
+        use crate::stores::StoreService;
+
+        let no_cache_file = "s3://com.gmail.docarw/test_data/test.bedgraph.gz";
+        let no_cache_index = "s3://com.gmail.docarw/test_data/test.bedgraph.gz.tbi";
+        let _guard = IndexGuard::new(no_cache_index);
+
+        let cache_path = get_local_index_path(no_cache_index);
+        assert!(
+            !cache_path.exists(),
+            "Cache file should not exist before search"
+        );
+
+        let options = SearchOptions::new(no_cache_file, &vec!["chr1:1-100000000".to_string()])
+            .unwrap()
+            .set_index_path(no_cache_index)
+            .set_output_format("bedgraph")
+            .set_include_header(false)
+            .set_no_cache(true);
+
+        let store_service = StoreService::new();
+        let result = search_features(&store_service, &options)
+            .await
+            .expect("Failed to search BEDGRAPH");
+        assert!(!result.lines[0].is_empty(), "Search should return results");
+        assert!(
+            !cache_path.exists(),
+            "Cache file should not exist after search with no_cache=true"
+        );
     }
 }

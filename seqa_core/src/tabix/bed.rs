@@ -59,20 +59,6 @@ pub struct BedLine {
 }
 
 impl BedLine {
-    pub const COLUMNS: [&str; 12] = [
-        "chromosome",
-        "begin",
-        "end",
-        "name",
-        "score",
-        "strand",
-        "thick_begin",
-        "thick_end",
-        "item_rgb",
-        "block_count",
-        "block_sizes",
-        "block_begins",
-    ];
 
     pub fn read_block_values(vals: &str) -> Result<Vec<u32>, ParsingError> {
         let tokens: Vec<&str> = vals.split(",").collect();
@@ -246,13 +232,6 @@ impl Display for BedLine {
 }
 
 impl Feature for BedLine {
-    fn get_id(&self) -> String {
-        if let Some(name) = &self.name {
-            name.clone()
-        } else {
-            format!("{}:{}-{}", self.chromosome, self.begin, self.end)
-        }
-    }
 
     fn coordinate(&self) -> Coordinate {
         Coordinate {

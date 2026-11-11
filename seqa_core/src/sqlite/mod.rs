@@ -28,7 +28,7 @@ const HG19_GENCODE_GENES: &[u8] = include_bytes!("../../data/hg19.gencode.gene.d
 const HG38_CYTOBANDS: &[u8] = include_bytes!("../../data/hg38.cytobands.db");
 const HG19_CYTOBANDS: &[u8] = include_bytes!("../../data/hg19.cytobands.db");
 
-pub fn normalize_genome(genome: &str) -> &'static str {
+fn normalize_genome(genome: &str) -> &'static str {
     match genome.to_ascii_lowercase().as_str() {
         "grch37" | "hg19" | "ch37" => "hg19",
         _ => "hg38",

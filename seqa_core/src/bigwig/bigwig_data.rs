@@ -40,7 +40,7 @@ pub struct DataPoint {
     pub value: f32,
 }
 
-pub fn read_type_1_data(bytes: &[u8], chr_id: u32) -> Result<(DataPoint, usize), String> {
+fn read_type_1_data(bytes: &[u8], chr_id: u32) -> Result<(DataPoint, usize), String> {
     let begin = u32::from_le_bytes(
         bytes[0..4]
             .try_into()
@@ -68,7 +68,7 @@ pub fn read_type_1_data(bytes: &[u8], chr_id: u32) -> Result<(DataPoint, usize),
     ))
 }
 
-pub fn read_type_2_data(
+fn read_type_2_data(
     bytes: &[u8],
     chr_id: u32,
     span: u32,
@@ -96,7 +96,7 @@ pub fn read_type_2_data(
     ))
 }
 
-pub fn read_type_3_data(
+fn read_type_3_data(
     bytes: &[u8],
     chr_id: u32,
     begin: u32,
@@ -133,21 +133,6 @@ impl BigwigData {
         "sum?",
         "sum_squares?",
     ];
-
-    pub fn new() -> Self {
-        BigwigData {
-            chromosome_id: 0,
-            begin: 0,
-            end: 0,
-            step: 0,
-            span: 0,
-            type_code: 0,
-            reserved: 0,
-            item_count: 0,
-            data: Vec::new(),
-            size: 0,
-        }
-    }
 
     pub fn from_bytes(bytes: &[u8], chr_tree: &BigwigChrTree) -> Result<Self, String> {
         if bytes.len() < 32 {
@@ -234,15 +219,6 @@ impl Display for BigwigData {
 }
 
 impl DataPoint {
-    pub fn new(chr_id: u32, chr_name: String, begin: u32, end: u32, value: f32) -> Self {
-        DataPoint {
-            chr_id,
-            chr_name,
-            begin,
-            end,
-            value,
-        }
-    }
 }
 
 impl Display for DataPoint {

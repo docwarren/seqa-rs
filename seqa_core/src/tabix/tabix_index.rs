@@ -27,19 +27,19 @@ use crate::traits::sam_index::SamIndex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TabixIndex {
-    pub magic: String,
-    pub n_ref: i32,
-    pub format: i32,
-    pub col_seq: i32,
-    pub col_beg: i32,
-    pub col_end: i32,
-    pub meta: i32,
-    pub skip: i32,
-    pub l_nm: i32,
-    pub names: Vec<String>,
-    pub references: Vec<ChrIdx>,
-    pub n_no_coor: u64,
-    pub first_feature_offset: VirtualOffset
+    pub(crate) magic: String,
+    pub(crate) n_ref: i32,
+    pub(crate) format: i32,
+    pub(crate) col_seq: i32,
+    pub(crate) col_beg: i32,
+    pub(crate) col_end: i32,
+    pub(crate) meta: i32,
+    pub(crate) skip: i32,
+    pub(crate) l_nm: i32,
+    pub(crate) names: Vec<String>,
+    pub(crate) references: Vec<ChrIdx>,
+    pub(crate) n_no_coor: u64,
+    pub(crate) first_feature_offset: VirtualOffset
 }
 
 impl Default for TabixIndex {

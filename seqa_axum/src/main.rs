@@ -30,14 +30,14 @@ use seqa_core::models::gene_coordinate::GeneCoordinate;
 use seqa_core::sqlite::{self, genes};
 use seqa_core::stores::buckets::{CloudBackend, list_buckets as list_cloud_buckets};
 use seqa_core::stores::{DirectoryEntry, StoreService};
-use seqa_core::tabix::tabix_header::TabixHeader;
+use seqa_core::TabixHeader;
 use seqa_core::utils::{FileFormat, supported_formats};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::sync::Arc;
 use thiserror::Error;
 use tower_http::cors::CorsLayer;
-use seqa_core::bam::bam_header::header::BamHeader;
+use seqa_core::BamHeader;
 
 pub mod cache;
 pub mod search;

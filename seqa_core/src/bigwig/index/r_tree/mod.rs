@@ -38,14 +38,6 @@ pub struct RTree {
 }
 
 impl RTree {
-    pub fn new() -> Self {
-        RTree {
-            header: RTreeHeader::new(),
-            offset: 0,
-            root_offset: 0,
-            root: RTreeNode::new(),
-        }
-    }
 
     pub async fn from_file(
         store: &StoreService,

@@ -21,15 +21,10 @@ use crate::api::search_result::SearchResult;
 use crate::coordinate::Coordinate;
 use crate::indexes::bin_util::get_bin_numbers;
 use crate::stores::StoreService;
-use crate::tabix::bed::BedLine;
-use crate::tabix::bedgraph::BedGraphLine;
-use crate::tabix::gff::GffLine;
-use crate::tabix::gtf::GtfLine;
 use crate::tabix::tabix_index::TabixIndex;
 use crate::tabix::tabix_header::TabixHeader;
 use crate::traits::feature::Feature;
 use crate::traits::sam_index::SamIndex;
-use crate::traits::to_lines::ToLines;
 use bstr::ByteSlice;
 
 fn read_lines(
@@ -140,44 +135,4 @@ pub async fn tabix_search(
     }
 
     Ok(result)
-}
-
-/// Returns the header lines to put before the results when `options.include_header` is set.
-///
-/// VCF returns the file's own `#` header lines.  BED, BedGraph, GFF and GTF return a
-/// single tab-separated line of column names.  Returns nothing when `include_header` is
-/// `false`.
-pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> Vec<String> {
-    if options.include_header {
-        match options.output_format {
-            OutputFormat::VCF => tabix_header.to_lines(),
-            OutputFormat::GFF => vec![GffLine::COLUMNS.join("\t")],
-            OutputFormat::GTF => vec![GtfLine::COLUMNS.join("\t")],
-            OutputFormat::BED => vec![BedLine::COLUMNS.join("\t")],
-            OutputFormat::BEDGRAPH => vec![BedGraphLine::COLUMNS.join("\t")],
-            _ => Vec::new(),
-        }
-    } else {
-        Vec::new()
-    }
-}
-
-#[test]
-fn test_get_header_lines() {
-    let mut options =
-        SearchOptions::new("test.gff.gz", &vec!["chr1:1-10000000".to_string()]).unwrap();
-    options.include_header = true;
-    options.output_format = OutputFormat::GFF;
-    options.index_path = "test.gff.gz.tbi".to_string();
-    options.header_only = false;
-    options.bigwig_index = None;
-
-    let tabix_header = TabixHeader::new();
-    let header_lines = get_header_lines(&options, &tabix_header);
-    println!("{:?}", header_lines);
-    assert_eq!(header_lines.len(), 1);
-    assert_eq!(
-        header_lines[0],
-        "chromosome\tsource\tfeature\tbegin\tend\tscore\tstrand\tframe\tgroup"
-    );
 }

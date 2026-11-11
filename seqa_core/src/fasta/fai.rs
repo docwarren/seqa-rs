@@ -33,7 +33,7 @@ pub struct Contig {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct FaiIndex {
-    pub contigs: HashMap<String, Contig>,
+    pub(crate) contigs: HashMap<String, Contig>,
 }
 
 impl FaiIndex {

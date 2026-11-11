@@ -26,7 +26,7 @@ pub mod chr_tree_node;
 pub mod chr_tree_leaf;
 pub mod chr_tree_non_leaf;
 
-pub fn read_tree(root: &ChrTreeNode) -> (HashMap<String, u32>, HashMap<u32, String>) {
+fn read_tree(root: &ChrTreeNode) -> (HashMap<String, u32>, HashMap<u32, String>) {
     let mut key_map = HashMap::new();
     let mut name_map = HashMap::new();
 

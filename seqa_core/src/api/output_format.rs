@@ -60,17 +60,7 @@ impl OutputFormat {
     /// # Errors
     ///
     /// Returns `Err(String)` when `format` does not match any known format name.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use seqa_core::api::output_format::OutputFormat;
-    ///
-    /// assert_eq!(OutputFormat::get_enum("bam").unwrap(), OutputFormat::BAM);
-    /// assert_eq!(OutputFormat::get_enum("VCF").unwrap(), OutputFormat::VCF);
-    /// assert!(OutputFormat::get_enum("unknown").is_err());
-    /// ```
-    pub fn get_enum(format: &str) -> Result<OutputFormat, String> {
+    pub(crate) fn get_enum(format: &str) -> Result<OutputFormat, String> {
         match format.to_lowercase().as_str() {
             "bam" => Ok(OutputFormat::BAM),
             "fasta" => Ok(OutputFormat::FASTA),
@@ -93,7 +83,7 @@ impl OutputFormat {
     /// boxed [`crate::traits::feature::Feature`].  Only text-based tabix formats
     /// (VCF, BED, BedGraph, GFF, GTF) are supported; all other variants return a
     /// function that always errors with "Unsupported output format".
-    pub fn read_from_bytes(&self, line: &[u8]) -> Result<Box<dyn Feature>, ParsingError> {
+    pub(crate) fn read_from_bytes(&self, line: &[u8]) -> Result<Box<dyn Feature>, ParsingError> {
         match self {
             OutputFormat::VCF => Ok(Box::new(VcfLine::from_bytes(line)?.0)),
             OutputFormat::BED => Ok(Box::new(BedLine::from_bytes(line)?.0)),
@@ -123,5 +113,17 @@ impl std::fmt::Display for OutputFormat {
             OutputFormat::GTF => write!(f, "GTF"),
             OutputFormat::STRING => write!(f, "STRING"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_enum_parses_format_names() {
+        assert_eq!(OutputFormat::get_enum("bam").unwrap(), OutputFormat::BAM);
+        assert_eq!(OutputFormat::get_enum("VCF").unwrap(), OutputFormat::VCF);
+        assert!(OutputFormat::get_enum("unknown").is_err());
     }
 }

@@ -14,9 +14,8 @@
 // limitations under the License.
 use seqa_core::api::search::search_features;
 use seqa_core::api::search_options::SearchOptions;
-use seqa_core::indexes::index_cache::{IndexGuard, get_local_index_path};
+use seqa_core::indexes::index_cache::IndexGuard;
 use seqa_core::stores::StoreService;
-use seqa_core::tabix::tabix_search::tabix_search;
 
 const S3_VCF: &str = "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz";
 const S3_VCF_INDEX: &str = "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi";
@@ -63,7 +62,7 @@ async fn vcf_chr12() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr12"));
     assert_eq!(result.lines[0].len(), 3);
@@ -87,7 +86,7 @@ async fn vcf_chr_x() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chrX"));
     assert_eq!(result.lines[0].len(), 6);
@@ -111,7 +110,7 @@ async fn vcf_chr4() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr4"));
     assert_eq!(result.lines[0].len(), 1);
@@ -131,7 +130,7 @@ async fn vcf_multiple_coords() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr4"));
     assert_eq!(result.lines.len(), 2);
@@ -157,7 +156,7 @@ async fn vcf_many_lines() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
     assert_eq!(result.lines[0].len(), 112930);
@@ -181,7 +180,7 @@ async fn cnv_vcf_chr_12() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr12"));
     assert_eq!(result.lines[0].len(), 250);
@@ -237,7 +236,7 @@ async fn azure_vcf() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
     assert_eq!(result.lines[0].len(), 112930);
@@ -261,7 +260,7 @@ async fn gc_vcf() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
     assert_eq!(result.lines[0].len(), 112930);
@@ -272,37 +271,6 @@ async fn gc_vcf() {
     assert_eq!(
         result.lines[0][112929],
         "chr1	199999917	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,bwa_gatk3,cortex,isaac2	GT	0|1"
-    );
-}
-
-#[tokio::test]
-#[serial_test::serial(bedgraph_cache)]
-async fn no_cache_does_not_write_index_file() {
-    let no_cache_file = "s3://com.gmail.docarw/test_data/test.bedgraph.gz";
-    let no_cache_index = "s3://com.gmail.docarw/test_data/test.bedgraph.gz.tbi";
-    let _guard = IndexGuard::new(no_cache_index);
-
-    let cache_path = get_local_index_path(no_cache_index);
-    assert!(
-        !cache_path.exists(),
-        "Cache file should not exist before search"
-    );
-
-    let options = SearchOptions::new(no_cache_file, &vec!["chr1:1-100000000".to_string()])
-        .unwrap()
-        .set_index_path(no_cache_index)
-        .set_output_format("bedgraph")
-        .set_include_header(false)
-        .set_no_cache(true);
-
-    let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
-        .await
-        .expect("Failed to search BEDGRAPH");
-    assert!(!result.lines[0].is_empty(), "Search should return results");
-    assert!(
-        !cache_path.exists(),
-        "Cache file should not exist after search with no_cache=true"
     );
 }
 
@@ -320,7 +288,7 @@ async fn http_vcf() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
     assert_eq!(result.lines[0].len(), 112930);
@@ -370,7 +338,7 @@ async fn vcf_unknown_chromosome_returns_empty_lines() {
     .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search VCF");
     assert_eq!(result.coordinates.len(), 3);
@@ -396,7 +364,7 @@ async fn vcf_header_only_returns_empty_lines() {
     .set_header_only(true);
 
     let store_service = StoreService::new();
-    let result = tabix_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search VCF");
     assert_eq!(result.coordinates.len(), 2);

@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
 /// Returns `true` if `coord` is no longer than `len` bases.
-pub fn check_coord_for_length(coord: &Coordinate, len: usize) -> bool {
+pub(crate) fn check_coord_for_length(coord: &Coordinate, len: usize) -> bool {
     coord.get_length() as usize <= len
 }
 

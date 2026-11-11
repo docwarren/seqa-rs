@@ -47,7 +47,7 @@ async fn bam_chr12() {
 async fn bam_chr12_more() {
     let _guard = IndexGuard::new(S3_BAM_INDEX);
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bam::bam_search::bam_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
 
     let options = SearchOptions::new(S3_BAM, &vec!["chr12:10000000-10010000".to_string()])
@@ -57,7 +57,7 @@ async fn bam_chr12_more() {
         .set_output_format("bam");
 
     let store_service = StoreService::new();
-    let result = bam_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search BAM for chr12"));
     assert_eq!(result.lines[0].len(), 5639);
@@ -67,7 +67,7 @@ async fn bam_chr12_more() {
 async fn bam_chr1() {
     let _guard = IndexGuard::new(S3_BAM_INDEX);
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bam::bam_search::bam_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
 
     let options = SearchOptions::new(S3_BAM, &vec!["chr1:10000000-10200000".to_string()])
@@ -77,7 +77,7 @@ async fn bam_chr1() {
         .set_output_format("bam");
 
     let store_service = StoreService::new();
-    let result = bam_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search BAM for chr1"));
     assert_eq!(result.lines[0].len(), 108198);
@@ -87,7 +87,7 @@ async fn bam_chr1() {
 async fn bam_chr_m() {
     let _guard = IndexGuard::new(S3_BAM_INDEX);
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bam::bam_search::bam_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
 
     let options = SearchOptions::new(S3_BAM, &vec!["chrM:1-1".to_string()])
@@ -97,7 +97,7 @@ async fn bam_chr_m() {
         .set_output_format("bam");
 
     let store_service = StoreService::new();
-    let result = bam_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search BAM for chrM"));
 

@@ -67,3 +67,28 @@ pub fn get_http_store(path: &str) -> Result<HttpStore, StoreError> {
 pub fn get_local_store() -> Result<LocalFileSystem, StoreError> {
     Ok(LocalFileSystem::new())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // These build object stores via *Builder::from_env() and need cloud credentials.
+    #[test]
+    fn test_get_s3_store_from_bucket() {
+        let bucket = "com.gmail.docarw";
+        assert!(get_s3_store_from_bucket(bucket).is_ok());
+    }
+
+    #[test]
+    fn test_get_gc_store_from_bucket() {
+        let bucket = "genre_test_bucket";
+        assert!(get_gc_store_from_bucket(bucket).is_ok());
+    }
+
+    #[test]
+    fn test_az_store_from_container_name() {
+        let container_name = "genreblobs/genre-test-data";
+        let store = get_azure_store_from_container(container_name);
+        assert!(store.is_ok());
+    }
+}

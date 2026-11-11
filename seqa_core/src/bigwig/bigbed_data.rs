@@ -34,17 +34,6 @@ impl BigbedData {
 
     pub const COLUMNS: [&str; 3] = ["# chromosome", "begin", "end"];
 
-    pub fn new() -> Self {
-        BigbedData {
-            chrom_id: 0,
-            chrom_name: String::new(),
-            chrom_start: 0,
-            chrom_end: 0,
-            rest: String::new(),
-            size: 0,
-        }
-    }
-
     /// Parse a BigBed record from bytes
     /// Records are: chromId (4), chromStart (4), chromEnd (4), rest (zero-terminated string)
     pub fn from_bytes(bytes: &[u8], chr_tree: &BigwigChrTree) -> Result<Self, String> {
