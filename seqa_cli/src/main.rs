@@ -16,7 +16,6 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use log::error;
 use seqa_core::api::search::search_features;
-use seqa_core::api::search_error::SearchError;
 use seqa_core::api::search_options::SearchOptions;
 use seqa_core::sqlite::genes::GeneError;
 use seqa_core::sqlite::{
@@ -25,6 +24,7 @@ use seqa_core::sqlite::{
 };
 use seqa_core::stores::StoreService;
 use std::io::{self, Write};
+use seqa_core::api::search_result::SearchResult;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -72,6 +72,16 @@ enum Commands {
         #[command(subcommand)]
         command: GeneCommands,
     },
+
+    /// Look up cytobands for a chromosome from the local SQLite db
+    Cytobands {
+        /// Chromosome name (e.g. chr1)
+        chromosome: String,
+
+        /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
+        #[arg(short = 'r', long, default_value = "grch38")]
+        reference: String,
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -99,16 +109,6 @@ enum GeneCommands {
         /// Source (refseq / gencode)
         #[arg(short = 's', long, default_value = "refseq")]
         source: String
-    },
-
-    /// Print cytobands for a chromosome.
-    Cytobands {
-        /// Chromosome name (e.g. chr1)
-        chromosome: String,
-
-        /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
-        #[arg(short = 'r', long, default_value = "grch38")]
-        reference: String,
     },
 }
 
@@ -139,6 +139,8 @@ async fn main() -> Result<()> {
                 }
             }
 
+            let store_service = StoreService::new();
+
             let mut options =
                 SearchOptions::new(&file, &[coordinates]).expect("Invalid coordinates");
 
@@ -146,24 +148,19 @@ async fn main() -> Result<()> {
             if let Some(ref genome) = reference {
                 options = options.set_genome(genome);
             }
-
             options = match with_header {
                 Some(true) => options.set_include_header(true),
                 _ => options.set_include_header(false),
             };
-
             options = match only_header {
                 Some(true) => options.set_header_only(true),
                 _ => options.set_header_only(false),
             };
-
             options = options.set_no_cache(no_cache);
 
-            let store_service = StoreService::new();
-
-            match search(&store_service, &options).await {
-                Ok(lines) => {
-                    let result = print_output(&lines);
+            match search_features(&store_service, &options).await {
+                Ok(search_result) => {
+                    let result = print_output(&search_result, &options);
                     match result {
                         Ok(_) => Ok(()),
                         Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
@@ -177,6 +174,23 @@ async fn main() -> Result<()> {
         }
         Commands::Genes { command } => {
             run_gene_command(command).with_context(|| "Error fetching genes / cytobands")
+        }
+        Commands::Cytobands { chromosome, reference } => {
+            let conn = sqlite::connect_cytobands(&reference)?;
+            let stdout = io::stdout();
+            let mut handle = stdout.lock();
+            for c in genes::get_cytobands(&conn, &chromosome)? {
+                if writeln!(
+                    handle,
+                    "{}\t{}\t{}\t{}\t{}",
+                    c.chromosome, c.begin, c.end, c.name, c.stain
+                )
+                    .is_err()
+                {
+                    break;
+                }
+            }
+            Ok(())
         }
     }
 }
@@ -204,41 +218,30 @@ fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
                 }
             }
         }
-        GeneCommands::Cytobands {
-            chromosome,
-            reference,
-        } => {
-            let conn = sqlite::connect_cytobands(&reference)?;
-            let stdout = io::stdout();
-            let mut handle = stdout.lock();
-            for c in genes::get_cytobands(&conn, &chromosome)? {
-                if writeln!(
-                    handle,
-                    "{}\t{}\t{}\t{}\t{}",
-                    c.chromosome, c.begin, c.end, c.name, c.stain
-                )
-                .is_err()
-                {
-                    break;
-                }
-            }
-        }
     }
     Ok(())
 }
 
-async fn search(
-    store_service: &StoreService,
-    options: &SearchOptions,
-) -> Result<Vec<String>, SearchError> {
-    let search_result = search_features(store_service, options).await?;
-    Ok(search_result.lines)
+fn print_output(search_result: &SearchResult, options: &SearchOptions) -> io::Result<()> {
+
+    if (options.include_header || options.header_only) && let Some(header) = &search_result.header {
+        write_lines(&header.to_lines())?;
+    }
+    for i in 0..search_result.coordinates.len() {
+        if search_result.coordinates.len() > 1 {
+            write_lines(&[search_result.coordinates[i].clone()])?;
+            write_lines(&["---------------------------------------------------".to_string()])?;
+        }
+        write_lines(&search_result.lines[i])?;
+    }
+    Ok(())
+
+
 }
 
-fn print_output(lines: &[String]) -> io::Result<()> {
+fn write_lines(lines: &[String]) -> io::Result<()> {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
-
     for line in lines {
         writeln!(handle, "{}", line)?;
     }
