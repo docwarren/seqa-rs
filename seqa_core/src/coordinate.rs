@@ -14,31 +14,14 @@
 // limitations under the License.
 
 use crate::api::parsing_error::ParsingError;
-use crate::api::search_error::SearchError;
 use crate::models::coordinate_system::CoordinateSystem;
 use crate::utils::parse_coordinates;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-/// Checks that no coordinate is longer than `len` bases.
-///
-/// # Errors
-///
-/// Returns [`SearchError::InvalidRequest`] for the first coordinate that is too long.
-pub fn check_coords_for_length(coords: &[Coordinate], len: usize) -> Result<(), SearchError> {
-    for coord in coords {
-        if coord.get_length() as usize > len {
-            return Err(SearchError::InvalidRequest {
-                requested: format!("{}", coord),
-                reason: format!(
-                    "Maximum query size exceeded: coords length: {}, max length: {}",
-                    coord.get_length(),
-                    len
-                ),
-            });
-        }
-    }
-    Ok(())
+/// Returns `true` if `coord` is no longer than `len` bases.
+pub fn check_coord_for_length(coord: &Coordinate, len: usize) -> bool {
+    coord.get_length() as usize <= len
 }
 
 /// A genomic interval: a chromosome plus begin and end positions in a given

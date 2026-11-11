@@ -68,11 +68,13 @@ pub struct SearchOptions {
     pub genome: Option<String>,
     /// File format of [`SearchOptions::file_path`].
     pub output_format: OutputFormat,
-    /// Whether to include the file header lines in [`crate::api::search_result::SearchResult::lines`].
-    /// Defaults to `true`.
+    /// Whether the caller wants the file header.  The searches always return the header in
+    /// [`crate::api::search_result::SearchResult::header`]; this flag tells the caller
+    /// whether to use it.  Defaults to `true`.
     pub include_header: bool,
-    /// When `true`, return only header lines and skip data records.
-    /// Defaults to `false`.
+    /// When `true`, skip data records: every entry in
+    /// [`crate::api::search_result::SearchResult::lines`] is empty and only the header is
+    /// returned.  Defaults to `false`.
     pub header_only: bool,
     /// Controls how CIGAR strings are rendered in BAM/SAM output.
     pub cigar_format: CigarFormat,
@@ -165,7 +167,7 @@ impl SearchOptions {
         self.clone()
     }
 
-    /// Controls whether file header lines are included in the result.
+    /// Sets [`SearchOptions::include_header`].
     pub fn set_include_header(&mut self, include_header: bool) -> Self {
         self.include_header = include_header;
         self.clone()
@@ -180,7 +182,7 @@ impl SearchOptions {
         self.clone()
     }
 
-    /// When `true`, only header lines are returned and data records are skipped.
+    /// Sets [`SearchOptions::header_only`].
     pub fn set_header_only(&mut self, header_only: bool) -> Self {
         self.header_only = header_only;
         self.clone()

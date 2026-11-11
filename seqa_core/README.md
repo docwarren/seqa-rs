@@ -17,13 +17,18 @@ let options = SearchOptions::new(
 
 let store_service = StoreService::new();
 let result = search_features(&store_service, &options).await?;
-for line in &result.lines {
-    println!("{}", line);
+for i in 0..result.coordinates.len() {
+    println!("{}", result.coordinates[i]);
+    for line in &result.lines[i] {
+        println!("{}", line);
+    }
 }
 ```
 
 - `SearchOptions::new` infers the index path and file format from the extension, and parses each coordinate string as **1-based closed**.
-- A search can cover several regions. Results come back grouped by region, in the order the regions were given.
+- A search can cover several regions. `result.lines` has one entry per region, in the order the regions were given, and `result.coordinates[i]` is the region for `result.lines[i]`.
+- A region that is invalid for the file (a chromosome the file doesn't contain, a range past the end of a FASTA contig, or over the size limits below) gets an empty entry; the rest of the search still runs.
+- The file header is returned in `result.header`, not in `lines`. `include_header` doesn't change what the search returns; it tells the caller whether to show the header. With `header_only`, every entry in `lines` is empty.
 - The parsed index and header are returned in the `SearchResult`. Pass them back in through `SearchOptions` (`bam_index`, `bam_header`, `tabix_index`, `tabix_header`, `fasta_index`, `bigwig_index`, `bigbed_index`) to skip downloading them again on later queries.
 
 ### Coordinate strings
@@ -43,7 +48,7 @@ Commas are stripped (`chr1:1,000,000-2,000,000`). Chromosome names with or witho
 | BAM | 200,001 |
 | FASTA | 250,000,000 |
 
-Larger regions return `SearchError::InvalidRequest`. Other formats have no limit.
+A larger region gets an empty entry in `lines`. Other formats have no limit.
 
 ## Supported File Formats
 
@@ -106,7 +111,7 @@ export GOOGLE_SERVICE_ACCOUNT=/path/to/credentials.json
 - `sqlite` — enables gene symbol and cytoband lookups via SQLite (`rusqlite`)
 
 ```toml
-seqa_core = "7"
+seqa_core = "8"
 ```
 
 ## Testing

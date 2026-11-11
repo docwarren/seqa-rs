@@ -14,7 +14,7 @@
 // limitations under the License.
 use seqa_core::api::search::search_features;
 use seqa_core::api::search_options::SearchOptions;
-use seqa_core::indexes::index_cache::{delete_local_index, get_local_index_path};
+use seqa_core::indexes::index_cache::{IndexGuard, get_local_index_path};
 use seqa_core::stores::StoreService;
 use seqa_core::tabix::tabix_search::tabix_search;
 
@@ -28,21 +28,6 @@ const AZ_VCF: &str = "az://genreblobs/genre-test-data/NA12877.EVA.vcf.gz";
 const AZ_VCF_INDEX: &str = "az://genreblobs/genre-test-data/NA12877.EVA.vcf.gz.tbi";
 const GCS_VCF: &str = "gs://genre_test_bucket/NA12877.EVA.vcf.gz";
 const GCS_VCF_INDEX: &str = "gs://genre_test_bucket/NA12877.EVA.vcf.gz.tbi";
-
-// In common/mod.rs
-pub struct IndexGuard(&'static str);
-
-impl IndexGuard {
-    pub fn new(path: &'static str) -> Self {
-        Self(path)
-    }
-}
-
-impl Drop for IndexGuard {
-    fn drop(&mut self) {
-        delete_local_index(self.0);
-    }
-}
 
 #[tokio::test]
 async fn vcf_chr1() {
@@ -366,4 +351,56 @@ async fn bedgraph_test() {
         .await
         .expect("Failed to search BEDGRAPH for chr1");
     assert_eq!(result.lines[0].len(), 5860);
+}
+
+#[tokio::test]
+async fn vcf_unknown_chromosome_returns_empty_lines() {
+    let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
+    let options = SearchOptions::new(
+        S3_VCF,
+        &vec![
+            "chrM:1-16000".to_string(),
+            "chr12:1-120000".to_string(),
+            "chrM:1-16000".to_string(),
+        ],
+    )
+    .unwrap()
+    .set_index_path(S3_VCF_INDEX)
+    .set_output_format("vcf")
+    .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = tabix_search(&store_service, &options)
+        .await
+        .expect("Failed to search VCF");
+    assert_eq!(result.coordinates.len(), 3);
+    assert_eq!(result.lines.len(), 3);
+    assert!(result.lines[0].is_empty());
+    assert_eq!(
+        result.lines[1][0],
+        "chr12	86886	.	G	C	.	PASS	MTD=isaac2,bwa_freebayes,bwa_platypus,bwa_gatk3	GT	1|1"
+    );
+    assert!(result.lines[2].is_empty());
+}
+
+#[tokio::test]
+async fn vcf_header_only_returns_empty_lines() {
+    let _guard = IndexGuard::new(S3_VCF_INDEX); // Automatically deletes index on scope exit, even on panic!
+    let options = SearchOptions::new(
+        S3_VCF,
+        &vec!["chr12:1-120000".to_string(), "chrX:154927181-154929412".to_string()],
+    )
+    .unwrap()
+    .set_index_path(S3_VCF_INDEX)
+    .set_output_format("vcf")
+    .set_header_only(true);
+
+    let store_service = StoreService::new();
+    let result = tabix_search(&store_service, &options)
+        .await
+        .expect("Failed to search VCF");
+    assert_eq!(result.coordinates.len(), 2);
+    assert_eq!(result.lines.len(), 2);
+    assert!(result.lines[0].is_empty());
+    assert!(result.lines[1].is_empty());
 }

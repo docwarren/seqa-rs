@@ -35,7 +35,8 @@ ln -s $(pwd)/target/release/seqa ~/.local/bin/seqa
 
 ```bash
 seqa search <file> <coordinates> [OPTIONS]
-seqa genes <coordinates|symbols|cytobands> [OPTIONS]
+seqa genes <coordinates|symbols> [OPTIONS]
+seqa cytobands <chromosome> [OPTIONS]
 ```
 
 ### Coordinate Formats
@@ -50,7 +51,7 @@ Coordinates are 1-based and inclusive.
 
 Commas are stripped automatically: `chr1:1,000,000-2,000,000` works fine. Chromosome names with or without the `chr` prefix are accepted.
 
-BAM searches are limited to 200,001 bases per query, so whole-chromosome BAM queries are rejected. FASTA queries are limited to 250,000,000 bases.
+BAM searches are limited to 200,001 bases per query, so a whole-chromosome BAM query returns no records. FASTA queries are limited to 250,000,000 bases. A chromosome that isn't in the file also returns no records.
 
 ### Search Options
 
@@ -63,7 +64,7 @@ BAM searches are limited to 200,001 bases per query, so whole-chromosome BAM que
 
 ### Gene Commands
 
-Gene data comes from the bundled SQLite databases. `-r, --reference` accepts `hg38`, `hg19`, `grch37` or `grch38`, and defaults to `grch38`.
+Gene data comes from the bundled SQLite databases. `-r, --reference` accepts `hg38`, `hg19`, `grch37` or `grch38`, and defaults to `hg38` (same build as `grch38`). The `genes` commands also take `-s, --source`: `refseq` (default) or `gencode`.
 
 ```bash
 # Coordinates (gene, chromosome, begin, end) for a gene symbol
@@ -72,8 +73,11 @@ seqa genes coordinates BRCA2
 # Every gene symbol, one per line
 seqa genes symbols -r hg19
 
+# Gene symbols from GENCODE
+seqa genes symbols -s gencode
+
 # Cytobands for a chromosome
-seqa genes cytobands chr1
+seqa cytobands chr1
 ```
 
 ### Examples

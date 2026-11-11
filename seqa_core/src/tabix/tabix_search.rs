@@ -73,14 +73,14 @@ pub fn data_to_lines(
 /// from `index_path` / `file_path`.  Both are returned in the [`SearchResult`] so callers
 /// can pass them back in on later queries.
 ///
-/// Result lines are grouped by coordinate in the order the coordinates were given.  Header
-/// lines from [`get_header_lines`] come first when `include_header` is set; when
-/// `header_only` is set only the file header is returned.
+/// `lines` has one entry per coordinate, in the order the coordinates were given, holding
+/// the records that overlap it.  The entry is empty when the coordinate names a chromosome
+/// that is not in the index.  When `header_only` is set every entry is empty.  The file
+/// header is always returned in [`SearchResult::header`].
 ///
 /// # Errors
 ///
-/// Returns [`SearchError::InvalidRequest`] if a coordinate names a chromosome that is not
-/// in the index, or [`SearchError::ParseError`] if a record cannot be parsed.
+/// Returns [`SearchError::ParseError`] if a record cannot be parsed.
 pub async fn tabix_search(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -107,12 +107,14 @@ pub async fn tabix_search(
     result.tabix_index = Some(tabix.clone());
 
     if options.header_only {
+        result.lines = vec![Vec::new(); options.coordinates.len()];
         return Ok(result);
     }
 
     for coord in &options.coordinates {
         let bin_numbers = get_bin_numbers(coord);
         let Some(chr_i) = tabix.get_chromosome_index_by_name(coord.get_chromosome()) else {
+            result.lines.push(Vec::new());
             continue;
         };
         let chr_idx = &tabix.references[chr_i];

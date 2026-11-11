@@ -132,13 +132,9 @@ pub fn get_bw_chromosome_id(
 ///
 /// A zoom level is chosen per coordinate from the coordinate's length.  When one matches,
 /// that coordinate's lines are zoom summaries; otherwise they are the raw data points.
-/// Lines are grouped by coordinate in the order given.  When `include_header` is set,
-/// each coordinate's lines start with a column-name line.
-///
-/// # Errors
-///
-/// Returns [`SearchError::InvalidRequest`] if a coordinate names a chromosome that is not
-/// in the file.
+/// `lines` has one entry per coordinate, in the order the coordinates were given.  The
+/// entry is empty when the coordinate names a chromosome that is not in the file or has no
+/// data.  The column-name header is always returned in [`SearchResult::header`].
 pub async fn bigwig_search(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -161,7 +157,12 @@ pub async fn bigwig_search(
 
     for coord in &coordinates {
         let zoom_header = index.get_zoom_header(coord);
-        let chr_id = get_bw_chromosome_id(index, coord)?;
+        let Ok(chr_id) = get_bw_chromosome_id(index, coord) else {
+            ranges.push(get_range_from_leaves(&[]));
+            leaves.push(Vec::new());
+            zoom_headers.push(None);
+            continue;
+        };
         let index_offset = get_index_begin(index, zoom_header);
         let index_end = get_index_end(store_service, index, zoom_header).await?;
         let r_tree =
@@ -174,23 +175,32 @@ pub async fn bigwig_search(
         zoom_headers.push(zoom_header);
     }
 
+    let mut fetch_ranges: Vec<Range<u64>> = Vec::new();
+    for i in 0..coordinates.len() {
+        if !leaves[i].is_empty() {
+            fetch_ranges.push(ranges[i].clone());
+        }
+    }
+
     let data = index
-        .get_data(store_service, &ranges, &options.file_path)
+        .get_data(store_service, &fetch_ranges, &options.file_path)
         .await?;
 
     let mut decompressed_data: Vec<Vec<Vec<u8>>> = Vec::new();
+    let mut j = 0;
 
     for i in 0..coordinates.len() {
         if leaves[i].is_empty() {
             decompressed_data.push(vec![]);
             continue;
         }
-        let decompressed = decompress_data(&data[i], &leaves[i], &ranges[i], is_compressed)
+        let decompressed = decompress_data(&data[j], &leaves[i], &ranges[i], is_compressed)
             .map_err(|e| SearchError::CodecError {
                 path: options.file_path.to_string(),
                 source: e,
             })?;
         decompressed_data.push(decompressed);
+        j += 1;
     }
 
     let mut lines: Vec<Vec<String>> = Vec::new();

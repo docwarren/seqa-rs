@@ -124,6 +124,31 @@ pub fn delete_local_index(index_path: &str) {
         }
 }
 
+/// Deletes a locally cached index file when it goes out of scope.
+///
+/// Hold one for the length of a test that downloads an index, so the cached file is
+/// removed whether the test passes or panics:
+///
+/// ```rust
+/// use seqa_core::indexes::index_cache::IndexGuard;
+///
+/// let _guard = IndexGuard::new("s3://my-bucket/sample.bam.bai");
+/// ```
+pub struct IndexGuard(String);
+
+impl IndexGuard {
+    /// Creates a guard for `index_path` (the same value passed to `delete_local_index`).
+    pub fn new(index_path: &str) -> Self {
+        IndexGuard(index_path.to_string())
+    }
+}
+
+impl Drop for IndexGuard {
+    fn drop(&mut self) {
+        delete_local_index(&self.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

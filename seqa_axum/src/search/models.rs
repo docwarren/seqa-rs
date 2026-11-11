@@ -19,4 +19,6 @@ use serde::Deserialize;
 pub struct SearchRequest {
     pub coordinates: String,
     pub path: String,
+    pub with_header: Option<bool>,
+    pub only_header: Option<bool>,
 }

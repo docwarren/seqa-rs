@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script creates a SQLite database and imports gene coordinate data from TSV files into the database tables.
+# This script creates a SQLite database and imports gene coordinate data from CSV files into the database tables.
 # Depends on
 # python3
 # sqlite3
