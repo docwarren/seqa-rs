@@ -111,7 +111,7 @@ export GOOGLE_SERVICE_ACCOUNT=/path/to/credentials.json
 - `sqlite` — enables gene symbol and cytoband lookups via SQLite (`rusqlite`)
 
 ```toml
-seqa_core = "8"
+seqa_core = "9"
 ```
 
 ## Testing
