@@ -32,7 +32,7 @@ pub struct BigbedData {
 impl BigbedData {
     pub const HEADER_SIZE: usize = 12; // chromId + chromStart + chromEnd
 
-    pub const COLUMNS: [&str; 3] = ["chromosome", "begin", "end"];
+    pub const COLUMNS: [&str; 3] = ["# chromosome", "begin", "end"];
 
     pub fn new() -> Self {
         BigbedData {

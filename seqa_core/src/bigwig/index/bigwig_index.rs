@@ -27,29 +27,10 @@ impl BigwigIndex {
     pub async fn new(store: &StoreService, file_path: &str) -> Result<BigwigIndex, SearchError> {
         let bigwig_header = get_bigwig_header(store, file_path).await?;
         let detail_bytes = get_bigwig_detail_bytes(store, &bigwig_header, file_path).await?;
-        let zoom_headers = get_zoom_headers(&bigwig_header, &detail_bytes).map_err(|e| {
-            SearchError::ParseError {
-                path: file_path.to_string(),
-                source: e,
-            }
-        })?;
-        let total_summary = get_total_summary(&bigwig_header, &detail_bytes).map_err(|e| {
-            SearchError::ParseError {
-                path: file_path.to_string(),
-                source: e,
-            }
-        })?;
-        let chromosome_tree =
-            BigwigChrTree::from_bytes(&detail_bytes, &bigwig_header).map_err(|e| {
-                SearchError::ParseError {
-                    path: file_path.to_string(),
-                    source: e,
-                }
-            })?;
-        let data_count = get_data_count(&detail_bytes).map_err(|e| SearchError::ParseError {
-            path: file_path.to_string(),
-            source: e,
-        })?;
+        let zoom_headers = get_zoom_headers(&bigwig_header, &detail_bytes)?;
+        let total_summary = get_total_summary(&bigwig_header, &detail_bytes)?;
+        let chromosome_tree = BigwigChrTree::from_bytes(&detail_bytes, &bigwig_header)?;
+        let data_count = get_data_count(&detail_bytes)?;
 
         Ok(BigwigIndex {
             header: bigwig_header,

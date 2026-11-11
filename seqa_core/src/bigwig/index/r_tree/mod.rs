@@ -62,18 +62,10 @@ impl RTree {
                     source: e,
                 })?;
         let index_header =
-            RTreeHeader::from_bytes(&tree_bytes).map_err(|e| SearchError::ParseError {
-                source: e,
-                path: file_path.to_string(),
-            })?;
+            RTreeHeader::from_bytes(&tree_bytes)?;
         let root_offset = range.start as usize + RTreeHeader::SIZE;
         let root =
-            RTreeNode::from_bytes(&tree_bytes[RTreeHeader::SIZE..], root_offset).map_err(|e| {
-                SearchError::ParseError {
-                    path: file_path.to_string(),
-                    source: e,
-                }
-            })?;
+            RTreeNode::from_bytes(&tree_bytes[RTreeHeader::SIZE..], root_offset)?;
 
         Ok(RTree {
             header: index_header,

@@ -1,12 +1,12 @@
 use super::output_format::OutputFormat;
 use crate::api::parsing_error::ParsingError;
 use crate::bam::bai::BaiIndex;
-use crate::bam::header::header::BamHeader;
+use crate::bam::bam_header::header::BamHeader;
 use crate::bigwig::index::bigwig_index::BigwigIndex;
 use crate::coordinate::Coordinate;
 use crate::fasta::fai::FaiIndex;
 use crate::models::coordinate_system::CoordinateSystem;
-use crate::tabix::tabix::Tabix;
+use crate::tabix::tabix_index::TabixIndex;
 use crate::tabix::tabix_header::TabixHeader;
 use crate::utils::get_output_format;
 use serde::{Deserialize, Serialize};
@@ -86,7 +86,7 @@ pub struct SearchOptions {
     /// Pre-parsed BAM header; supply to avoid re-downloading on repeated queries.
     pub bam_header: Option<BamHeader>,
     /// Pre-parsed tabix index; supply to avoid re-downloading on repeated queries.
-    pub tabix_index: Option<Tabix>,
+    pub tabix_index: Option<TabixIndex>,
     /// Pre-parsed tabix header; supply to avoid re-downloading on repeated queries.
     pub tabix_header: Option<TabixHeader>,
     /// Pre-parsed FASTA index; supply to avoid re-downloading on repeated queries.

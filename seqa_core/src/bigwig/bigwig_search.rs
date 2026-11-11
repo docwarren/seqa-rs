@@ -28,6 +28,7 @@ use crate::codecs::decompress_auto;
 use crate::coordinate::Coordinate;
 use crate::stores::StoreService;
 use std::ops::Range;
+use crate::bigwig::bigwig_header::BigWigHeader;
 
 /// Parses a decompressed BigWig data block and formats each data point that overlaps `coord`.
 pub fn get_data_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordinate) -> Vec<String> {
@@ -143,6 +144,8 @@ pub async fn bigwig_search(
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
     let mut result = SearchResult::new();
+    result.header = Some(Box::new(BigWigHeader{}));
+    result.coordinates = options.coordinates.iter().map(|c| c.to_string()).collect();
     let coordinates = options.coordinates.clone();
 
     let index = match &options.bigwig_index {
@@ -190,10 +193,7 @@ pub async fn bigwig_search(
         decompressed_data.push(decompressed);
     }
 
-    let mut lines: Vec<Vec<String>> = vec![get_header_lines(
-        &BigwigData::COLUMNS,
-        options.include_header,
-    )];
+    let mut lines: Vec<Vec<String>> = Vec::new();
     for (i, coord) in coordinates.iter().enumerate() {
         let is_zoom = zoom_headers[i].is_some();
         let blocks = &decompressed_data[i];
@@ -204,7 +204,7 @@ pub async fn bigwig_search(
             is_zoom,
         ));
     }
-    result.lines = lines.concat();
+    result.lines = lines;
     Ok(result)
 }
 

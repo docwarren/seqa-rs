@@ -57,13 +57,13 @@ async fn vcf_chr1() {
     let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
-    assert_eq!(result.lines.len(), 14);
+    assert_eq!(result.lines[0].len(), 14);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr1	116549	.	C	T	.	SuspiciousHomAlt	MTD=bwa_freebayes	GT	1|1"
     );
     assert_eq!(
-        result.lines[13],
+        result.lines[0][13],
         "chr1	356537	.	G	A	.	SuspiciousHomAlt	MTD=cgi	GT	1|1"
     );
 }
@@ -81,13 +81,13 @@ async fn vcf_chr12() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr12"));
-    assert_eq!(result.lines.len(), 3);
+    assert_eq!(result.lines[0].len(), 3);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr12	86886	.	G	C	.	PASS	MTD=isaac2,bwa_freebayes,bwa_platypus,bwa_gatk3	GT	1|1"
     );
     assert_eq!(
-        result.lines[2],
+        result.lines[0][2],
         "chr12	91430	.	T	A	.	SuspiciousHomAlt	MTD=bwa_freebayes,bwa_platypus,bwa_gatk3	GT	1|1"
     );
 }
@@ -105,13 +105,13 @@ async fn vcf_chr_x() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chrX"));
-    assert_eq!(result.lines.len(), 6);
+    assert_eq!(result.lines[0].len(), 6);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chrX	154927181	.	C	CCAC,T	.	PASS	MTD=bwa_platypus	GT	1"
     );
     assert_eq!(
-        result.lines[5],
+        result.lines[0][5],
         "chrX	154929412	.	C	T	.	PASS	MTD=bwa_freebayes,bwa_platypus,cortex,bwa_gatk3	GT	1"
     );
 }
@@ -129,9 +129,9 @@ async fn vcf_chr4() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr4"));
-    assert_eq!(result.lines.len(), 1);
+    assert_eq!(result.lines[0].len(), 1);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr4	4928401	.	C	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,isaac2,bwa_gatk3	GT	0|1"
     );
 }
@@ -149,13 +149,15 @@ async fn vcf_multiple_coords() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr4"));
-    assert_eq!(result.lines.len(), 9);
+    assert_eq!(result.lines.len(), 2);
+    assert_eq!(result.coordinates.len(), 2);
+    assert_eq!(result.lines.concat().len(), 9);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr12	86886	.	G	C	.	PASS	MTD=isaac2,bwa_freebayes,bwa_platypus,bwa_gatk3	GT	1|1"
     );
     assert_eq!(
-        result.lines[8],
+        result.lines[1][result.lines[1].len() - 1],
         "chrX	154929412	.	C	T	.	PASS	MTD=bwa_freebayes,bwa_platypus,cortex,bwa_gatk3	GT	1"
     );
 }
@@ -173,13 +175,13 @@ async fn vcf_many_lines() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
-    assert_eq!(result.lines.len(), 112930);
+    assert_eq!(result.lines[0].len(), 112930);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr1	100006117	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,isaac2,bwa_gatk3	GT	1|1"
     );
     assert_eq!(
-        result.lines[112929],
+        result.lines[0][112929],
         "chr1	199999917	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,bwa_gatk3,cortex,isaac2	GT	0|1"
     );
 }
@@ -197,13 +199,13 @@ async fn cnv_vcf_chr_12() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr12"));
-    assert_eq!(result.lines.len(), 250);
+    assert_eq!(result.lines[0].len(), 250);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr12	16000	NA12878_DUP_chr12_1	G	<DUP>	999	DEPTH_LT_5KB;REF_PANEL_GENOTYPES	ALGORITHMS=depth;CHR2=chr12;END=18000;EVIDENCE=RD;SVLEN=2000;SVTYPE=DUP;PROTEIN_CODING__NEAREST_TSS=IQSEC3;PROTEIN_CODING__INTERGENIC;AN=314;AC=226;AF=0.719745;N_BI_GENOS=157;N_HOMREF=24;N_HET=40;N_HOMALT=93;FREQ_HOMREF=0.152866;FREQ_HET=0.254777;FREQ_HOMALT=0.592357	GT:EV:GQ:RD_CN:RD_GQ	0/1:RD:21:3:21"
     );
     assert_eq!(
-        result.lines[249],
+        result.lines[0][249],
         "chr12	99894566	NA12878_DEL_chr12_124	A	<DEL>	951	PASS	ALGORITHMS=depth,manta,wham;BOTHSIDES_SUPPORT;CHR2=chr12;END=99898009;EVIDENCE=PE,RD,SR;SVLEN=3443;SVTYPE=DEL;PROTEIN_CODING__INTRONIC=ANKS1B;NONCODING_SPAN=DNase;NONCODING_BREAKPOINT=Tommerup_TADanno;AN=314;AC=8;AF=0.025478;N_BI_GENOS=157;N_HOMREF=149;N_HET=8;N_HOMALT=0;FREQ_HOMREF=0.949045;FREQ_HET=0.0509554;FREQ_HOMALT=0;gnomad_v2.1_sv_SVID=.;gnomad_v2.1_sv_AF=0.025629;gnomad_v2.1_sv_AFR_AF=0.014055;gnomad_v2.1_sv_AMR_AF=0.029534;gnomad_v2.1_sv_EAS_AF=0;gnomad_v2.1_sv_EUR_AF=0.047613	GT:EV:GQ:PE_GQ:PE_GT:RD_CN:RD_GQ:SR_GQ:SR_GT	0/1:RD,PE,SR:99:260:1:1:125:791:1"
     );
 }
@@ -221,7 +223,7 @@ async fn gff_test() {
     let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search GFF for chr1"));
-    assert_eq!(result.lines.len(), 31);
+    assert_eq!(result.lines[0].len(), 31);
 }
 
 #[tokio::test]
@@ -237,7 +239,7 @@ async fn gtf_test() {
     let result = search_features(&store_service, &options)
         .await
         .expect(&format!("Failed to search GTF for chr1",));
-    assert_eq!(result.lines.len(), 31);
+    assert_eq!(result.lines[0].len(), 31);
 }
 
 #[tokio::test]
@@ -253,13 +255,13 @@ async fn azure_vcf() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
-    assert_eq!(result.lines.len(), 112930);
+    assert_eq!(result.lines[0].len(), 112930);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr1	100006117	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,isaac2,bwa_gatk3	GT	1|1"
     );
     assert_eq!(
-        result.lines[112929],
+        result.lines[0][112929],
         "chr1	199999917	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,bwa_gatk3,cortex,isaac2	GT	0|1"
     );
 }
@@ -277,13 +279,13 @@ async fn gc_vcf() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
-    assert_eq!(result.lines.len(), 112930);
+    assert_eq!(result.lines[0].len(), 112930);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr1	100006117	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,isaac2,bwa_gatk3	GT	1|1"
     );
     assert_eq!(
-        result.lines[112929],
+        result.lines[0][112929],
         "chr1	199999917	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,bwa_gatk3,cortex,isaac2	GT	0|1"
     );
 }
@@ -312,7 +314,7 @@ async fn no_cache_does_not_write_index_file() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect("Failed to search BEDGRAPH");
-    assert!(!result.lines.is_empty(), "Search should return results");
+    assert!(!result.lines[0].is_empty(), "Search should return results");
     assert!(
         !cache_path.exists(),
         "Cache file should not exist after search with no_cache=true"
@@ -336,13 +338,13 @@ async fn http_vcf() {
     let result = tabix_search(&store_service, &options)
         .await
         .expect(&format!("Failed to search VCF for chr1"));
-    assert_eq!(result.lines.len(), 112930);
+    assert_eq!(result.lines[0].len(), 112930);
     assert_eq!(
-        result.lines[0],
+        result.lines[0][0],
         "chr1	100006117	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,isaac2,bwa_gatk3	GT	1|1"
     );
     assert_eq!(
-        result.lines[112929],
+        result.lines[0][112929],
         "chr1	199999917	.	G	A	.	PASS	MTD=cgi,bwa_freebayes,bwa_platypus,bwa_gatk3,cortex,isaac2	GT	0|1"
     );
 }
@@ -363,5 +365,5 @@ async fn bedgraph_test() {
     let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search BEDGRAPH for chr1");
-    assert_eq!(result.lines.len(), 5860);
+    assert_eq!(result.lines[0].len(), 5860);
 }

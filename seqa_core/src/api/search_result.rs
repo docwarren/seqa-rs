@@ -14,11 +14,10 @@
 // limitations under the License.
 
 use crate::bam::bai::BaiIndex;
-use crate::bam::header::header::BamHeader;
 use crate::bigwig::index::bigwig_index::BigwigIndex;
 use crate::fasta::fai::FaiIndex;
-use crate::tabix::tabix::Tabix;
-use crate::tabix::tabix_header::TabixHeader;
+use crate::tabix::tabix_index::TabixIndex;
+use crate::traits::to_lines::ToLines;
 
 /// The result of a genomic region search.
 ///
@@ -33,17 +32,17 @@ pub struct SearchResult {
     /// BigBed shares the same index structure as BigWig.
     pub bigbed_index: Option<BigwigIndex>,
     /// Parsed tabix index; present after a [`crate::tabix::tabix_search::tabix_search`] call.
-    pub tabix_index: Option<Tabix>,
-    /// Tabix file header; present after a [`crate::tabix::tabix_search::tabix_search`] call.
-    pub tabix_header: Option<TabixHeader>,
+    pub tabix_index: Option<TabixIndex>,
     /// Parsed FASTA index (`.fai`); present after a [`crate::fasta::fasta_search::fasta_search`] call.
     pub fasta_index: Option<FaiIndex>,
     /// Parsed BAM index (`.bai`); present after a [`crate::bam::bam_search::bam_search`] call.
     pub bam_index: Option<BaiIndex>,
     /// BAM file header; present after a [`crate::bam::bam_search::bam_search`] call.
-    pub bam_header: Option<BamHeader>,
+    pub header: Option<Box<dyn ToLines>>,
+    /// Array of Coordinate Strings corresponding to the array of result strings
+    pub coordinates: Vec<String>,
     /// Query result lines in the native text format of the file (SAM, VCF, BED, etc.).
-    pub lines: Vec<String>,
+    pub lines: Vec<Vec<String>>,
 }
 
 impl SearchResult {
@@ -52,11 +51,11 @@ impl SearchResult {
         SearchResult {
             bigwig_index: None,
             bigbed_index: None,
-            tabix_header: None,
             tabix_index: None,
-            bam_header: None,
             bam_index: None,
             fasta_index: None,
+            header: None,
+            coordinates: Vec::new(),
             lines: Vec::new(),
         }
     }

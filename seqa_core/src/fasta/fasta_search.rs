@@ -42,6 +42,7 @@ pub async fn fasta_search(
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
     let mut result = SearchResult::new();
+    result.coordinates = options.coordinates.iter().map(|c| c.to_string()).collect();
 
     check_coords_for_length(&options.coordinates, MAX_FASTA_SEARCH_SIZE)?;
 
@@ -61,13 +62,10 @@ pub async fn fasta_search(
             source: e,
         })?;
 
-    let lines = bytes
+    result.lines = bytes
         .iter()
         .map(|chunk| {
-            let data = String::from_utf8(chunk.clone()).map_err(|e| SearchError::ParseError {
-                path: options.file_path.to_string(),
-                source: ParsingError::StringParseError(e),
-            })?;
+            let data = String::from_utf8(chunk.clone()).map_err(ParsingError::StringParseError)?;
 
             Ok::<Vec<String>, SearchError>(
                 data.split('\n')
@@ -76,7 +74,6 @@ pub async fn fasta_search(
             )
         })
         .collect::<Result<Vec<Vec<String>>, SearchError>>()?;
-    result.lines = lines.into_iter().flatten().collect();
 
     Ok(result)
 }

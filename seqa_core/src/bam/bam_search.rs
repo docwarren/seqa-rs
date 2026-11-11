@@ -17,7 +17,7 @@ use crate::api::search_error::SearchError;
 use crate::api::search_options::{CigarFormat, SearchOptions};
 use crate::api::search_result::SearchResult;
 use crate::bam::bai::BaiIndex;
-use crate::bam::header::header::BamHeader;
+use crate::bam::bam_header::header::BamHeader;
 use crate::bam::read::Read;
 use crate::coordinate::{Coordinate, check_coords_for_length};
 use crate::indexes::bin_util::get_bin_numbers;
@@ -62,19 +62,12 @@ fn read_lines(
 /// `data[i]` is searched for reads overlapping `coordinate[i]`, so the two slices must
 /// line up one-to-one (one entry per fetched chunk).  Lines are returned in that order.
 pub fn data_to_lines(
-    data: &[Vec<u8>],
-    coordinate: &[Coordinate],
+    data: &[u8],
+    coordinate: &Coordinate,
     cigar_format: &CigarFormat,
     bam_header: &BamHeader,
 ) -> Result<Vec<String>, SearchError> {
-    let mut lines = Vec::new();
-    for (idx, coord) in coordinate.iter().enumerate() {
-        match read_lines(&data[idx], coord, cigar_format, bam_header) {
-            Ok(l) => lines.push(l),
-            Err(err) => return Err(err),
-        }
-    }
-    Ok(lines.concat())
+    read_lines(data, coordinate, cigar_format, bam_header)
 }
 
 /// Searches a BAM file for reads overlapping each of [`SearchOptions::coordinates`].
@@ -96,11 +89,11 @@ pub async fn bam_search(
     store_service: &StoreService,
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
-    let coordinates = options.coordinates.clone();
 
-    check_coords_for_length(&coordinates, MAX_BAM_SEARCH_SIZE)?;
+    check_coords_for_length(&options.coordinates, MAX_BAM_SEARCH_SIZE)?;
 
     let mut result = SearchResult::new();
+    result.coordinates = options.coordinates.iter().map(|c| c.to_string()).collect();
 
     let bai = match &options.bam_index {
         Some(index) => index,
@@ -116,52 +109,37 @@ pub async fn bam_search(
     };
 
     result.bam_index = Some(bai.clone());
-    result.bam_header = Some(bam_header.clone());
+    result.header = Some(Box::new(bam_header.clone()));
 
     if options.header_only {
-        result.lines = bam_header.to_lines();
         return Ok(result);
     }
 
-    let mut start_lines = if options.include_header {
-        bam_header.to_lines()
-    } else {
-        Vec::new()
-    };
-
-    let mut chunks = Vec::with_capacity(coordinates.len());
-    let mut flat_coords = Vec::new();
-
-    for coord in &coordinates {
+    for coord in &options.coordinates {
         let bin_numbers = get_bin_numbers(coord);
         let Some(chr_i) = bam_header.get_chromosome_index_by_name(coord.get_chromosome()) else {
             continue;
         };
         let chr_idx = &bai.references[chr_i];
-        let chunks_for_coord = bai.get_optimized_chunks(chr_idx, bin_numbers, coord);
-        for _ in 0..chunks_for_coord.len() {
-            flat_coords.push(coord.clone());
-        }
-        chunks.push(chunks_for_coord);
+        let chunks = bai.get_optimized_chunks(chr_idx, bin_numbers, coord);
+
+        let compressed = fetch(store_service, &options.file_path, &chunks)
+            .await
+            .map_err(|e| SearchError::ReadError {
+                path: options.file_path.to_string(),
+                source: e,
+            })?;
+
+        let raw_data = decompress_chunks(&chunks, &compressed)
+            .await
+            .map_err(|e| SearchError::CodecError {
+                path: options.file_path.to_string(),
+                source: e,
+            })?;
+
+        let lines = data_to_lines(&raw_data.concat(), coord, &options.cigar_format, bam_header)?;
+        result.lines.push(lines);
     }
 
-    let flat_chunks = chunks.concat();
-    let compressed = fetch(store_service, &options.file_path, &flat_chunks)
-        .await
-        .map_err(|e| SearchError::ReadError {
-            path: options.file_path.to_string(),
-            source: e,
-        })?;
-
-    let raw_data = decompress_chunks(&flat_chunks, &compressed)
-        .await
-        .map_err(|e| SearchError::CodecError {
-            path: options.file_path.to_string(),
-            source: e,
-        })?;
-
-    let lines = data_to_lines(&raw_data, &flat_coords, &options.cigar_format, bam_header)?;
-    start_lines.extend(lines);
-    result.lines = start_lines;
     Ok(result)
 }

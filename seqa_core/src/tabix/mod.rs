@@ -3,7 +3,7 @@ pub mod bed_pe;
 pub mod bedgraph;
 pub mod gff;
 pub mod gtf;
-pub mod tabix;
+pub mod tabix_index;
 pub mod tabix_header;
 pub mod tabix_search;
 pub mod variant_type;

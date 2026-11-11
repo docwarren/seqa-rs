@@ -16,3 +16,4 @@
 pub mod feature;
 pub mod sam_index;
 pub mod from_bytes;
+pub mod to_lines;

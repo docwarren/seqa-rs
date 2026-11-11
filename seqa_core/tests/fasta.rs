@@ -33,7 +33,7 @@ async fn fasta_chr1() {
     let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search FASTA for chr1");
-    assert_eq!(result.lines.join("").len(), 100);
+    assert_eq!(result.lines[0].join("").len(), 100);
 }
 
 #[tokio::test]
@@ -51,7 +51,7 @@ async fn fasta_chr2() {
     let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search FASTA for chr1");
-    assert_eq!(result.lines.join("").len(), 100);
+    assert_eq!(result.lines[0].join("").len(), 100);
 }
 
 #[tokio::test]
@@ -69,5 +69,7 @@ async fn fasta_multiple_coordinates() {
     let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search FASTA for chr1");
-    assert_eq!(result.lines.join("").len(), 200);
+    assert_eq!(result.coordinates.len(), 2);
+    assert_eq!(result.lines.len(), 2);
+    assert_eq!(result.lines.concat().join("").len(), 200);
 }

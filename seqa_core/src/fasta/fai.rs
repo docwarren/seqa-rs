@@ -56,10 +56,7 @@ impl FaiIndex {
                     source: e,
                 })?;
 
-        FaiIndex::from_bytes(bytes).map_err(|e| SearchError::ParseError {
-            path: idx_path.to_string(),
-            source: e,
-        })
+        Ok(FaiIndex::from_bytes(bytes)?)
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ParsingError> {

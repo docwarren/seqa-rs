@@ -37,8 +37,10 @@
 //!
 //!     let store_service = StoreService::new();
 //!     let result = search_features(&store_service, &opts).await?;
-//!     for line in &result.lines {
-//!         println!("{}", line);
+//!     for coordinate_lines in &result.lines {
+//!         for line in coordinate_lines {
+//!             println!("{}", line);
+//!         }
 //!     }
 //!     Ok(())
 //! }

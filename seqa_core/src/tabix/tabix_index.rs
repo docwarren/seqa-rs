@@ -26,7 +26,7 @@ use crate::stores::StoreService;
 use crate::traits::sam_index::SamIndex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tabix {
+pub struct TabixIndex {
     pub magic: String,
     pub n_ref: i32,
     pub format: i32,
@@ -42,15 +42,15 @@ pub struct Tabix {
     pub first_feature_offset: VirtualOffset
 }
 
-impl Default for Tabix {
+impl Default for TabixIndex {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Tabix {
+impl TabixIndex {
     pub fn new() -> Self {
-        Tabix {
+        TabixIndex {
             magic: String::new(),
             n_ref: 0,
             format: 0,
@@ -90,7 +90,7 @@ impl Tabix {
                 path: idx_path.to_string(),
                 source: e
             })?;
-        Tabix::from_compressed_bytes(bytes, idx_path)
+        TabixIndex::from_compressed_bytes(bytes, idx_path)
     }
 
     pub fn from_compressed_bytes(bytes: Vec<u8>, file_path: &str) -> Result<Self, SearchError> {
@@ -103,15 +103,12 @@ impl Tabix {
                 source: e,
                 path: file_path.to_string()
             })?;
-        Tabix::from_bytes(decompressed).map_err(|e| SearchError::ParseError {
-            path: file_path.to_string(),
-            source: e
-        })
+        Ok(TabixIndex::from_bytes(decompressed)?)
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ParsingError> {
         let mut i = 0;
-        let mut tabix = Tabix::new();
+        let mut tabix = TabixIndex::new();
 
         tabix.magic = String::from_utf8(bytes[i..i + 4].to_vec())?;
         i += 4;
@@ -217,4 +214,4 @@ impl Tabix {
     }
 }
 
-impl SamIndex for Tabix {}
+impl SamIndex for TabixIndex {}

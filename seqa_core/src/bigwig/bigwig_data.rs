@@ -124,7 +124,7 @@ impl BigwigData {
     pub const SIZE: usize = 24; // Size of the BigwigData without its datapoints.
 
     pub const COLUMNS: [&str; 8] = [
-        "chromosome",
+        "# chromosome",
         "begin",
         "end",
         "valid_count/value",
