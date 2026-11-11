@@ -32,6 +32,13 @@ pub struct SearchRequest {
     pub output_format: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct SearchResultJson {
+    coordinates: Vec<String>,
+    header: Vec<String>,
+    lines: Vec<Vec<String>>,
+}
+
 pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, Error> {
     let method = event.method().clone();
     let path = event.uri().path().to_string();
@@ -49,15 +56,24 @@ pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, E
 }
 
 async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
-    let options: SearchOptions = match event.payload::<SearchRequest>()? {
+    let payload = match event.payload::<SearchRequest>() {
+        Ok(p) => p,
+        Err(e) => return error_response(400, &format!("Invalid request body: {}", e)),
+    };
+    let options: SearchOptions = match payload {
         Some(request) => {
             let genome = request.genome.unwrap_or("hg38".to_string());
             let mut options =
-                SearchOptions::new(&request.path, std::slice::from_ref(&request.coordinates))?
-                    .set_include_header(request.with_header.unwrap_or(false))
-                    .set_header_only(request.only_header.unwrap_or(false))
-                    .set_cigar_format(CigarFormat::Standard)
-                    .set_genome(&genome);
+                match SearchOptions::new(&request.path, std::slice::from_ref(&request.coordinates))
+                {
+                    Ok(o) => o,
+                    Err(e) => return error_response(400, &format!("{}", e)),
+                };
+            let mut options = options
+                .set_include_header(request.with_header.unwrap_or(false))
+                .set_header_only(request.only_header.unwrap_or(false))
+                .set_cigar_format(CigarFormat::Standard)
+                .set_genome(&genome);
 
             if let Some(path) = request.index_path {
                 options = options.set_index_path(&path);
@@ -67,23 +83,28 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
             }
             options
         }
-        _ => {
-            return Ok(Response::builder()
-                .status(400)
-                .body("Invalid request body".into())
-                .map_err(Box::new)?)
-        }
+        _ => return error_response(400, "Invalid request body"),
     };
 
     let store = StoreService::new();
-    let result = search_features(&store, &options).await?;
-    let lines = serde_json::to_string(&result.lines)?;
+    let result = match search_features(&store, &options).await {
+        Ok(r) => r,
+        Err(e) => return error_response(500, &format!("{}", e)),
+    };
+    let header = if let Some(header) = result.header {
+        header.to_lines()
+    } else {
+        Vec::new()
+    };
 
-    Ok(Response::builder()
-        .status(200)
-        .header("content-type", "application/json")
-        .body(Body::Text(lines))
-        .map_err(Box::new)?)
+    json_response(
+        200,
+        &SearchResultJson {
+            coordinates: result.coordinates,
+            header,
+            lines: result.lines,
+        },
+    )
 }
 
 fn gene_symbols(genome: &str, source: &str) -> Result<Response<Body>, Error> {
@@ -178,7 +199,8 @@ mod tests {
         let response = function_handler(build_request(&options)).await.unwrap();
         assert_eq!(response.status(), 200);
 
-        let lines: Vec<String> = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        let result: SearchResultJson = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        let lines = result.lines.concat();
         assert!(!lines.is_empty(), "expected BigWig chr12 results");
 
         for line in &lines {
@@ -208,7 +230,8 @@ mod tests {
         let response = function_handler(build_request(&options)).await.unwrap();
         assert_eq!(response.status(), 200);
 
-        let lines: Vec<String> = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        let result: SearchResultJson = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        let lines = result.lines.concat();
         assert!(!lines.is_empty(), "expected BAM chr2 results");
 
         for line in &lines {
