@@ -34,14 +34,14 @@ ln -s $(pwd)/target/release/seqa ~/.local/bin/seqa
 ## Usage
 
 ```bash
-seqa search <file> <coordinates> [OPTIONS]
+seqa search <file> <coordinates>... [OPTIONS]
 seqa genes <coordinates|symbols> [OPTIONS]
 seqa cytobands <chromosome> [OPTIONS]
 ```
 
 ### Coordinate Formats
 
-Coordinates are 1-based and inclusive.
+Coordinates are 1-based and inclusive. Pass one or more, separated by spaces.
 
 | Format | Example | Description |
 |--------|---------|-------------|
@@ -88,6 +88,9 @@ seqa search /path/to/sample.bam chr12:10000000-10010000
 
 # Full chromosome
 seqa search /path/to/sample.vcf.gz chr1
+
+# Several regions in one search
+seqa search /path/to/sample.vcf.gz chr1:1000000-2000000 chr2:500000-600000 chrX
 
 # With header
 seqa search /path/to/sample.gff.gz chr5:1000-2000 -w true
@@ -142,7 +145,7 @@ The bucket or container is taken from the URL, so it doesn't need to be set.
 
 ## Output
 
-Results are written to stdout in each format's native representation:
+Results are written to stdout in each format's native representation. When more than one coordinate is given, each coordinate's results are preceded by the coordinate (tab-separated `chromosome begin end`) and a `---` separator line. A coordinate with no results, or one that isn't valid for the file, prints just its heading.
 
 | Input | Output |
 |-------|--------|
