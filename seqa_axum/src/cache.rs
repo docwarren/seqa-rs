@@ -14,20 +14,19 @@
 // limitations under the License.
 
 use std::time::Duration;
-
 use moka::future::Cache;
 use seqa_core::bam::bai::BaiIndex;
-use seqa_core::bam::header::header::BamHeader;
+use seqa_core::bam::bam_header::header::BamHeader;
 use seqa_core::fasta::fai::FaiIndex;
-use seqa_core::tabix::tabix::Tabix;
 use seqa_core::tabix::tabix_header::TabixHeader;
+use seqa_core::tabix::tabix_index::TabixIndex;
 
 const IDLE_TTL: Duration = Duration::from_secs(600);
 
 #[derive(Clone)]
 pub struct AppCache {
     pub bai: Cache<String, BaiIndex>,
-    pub tabix: Cache<String, Tabix>,
+    pub tabix: Cache<String, TabixIndex>,
     pub fai: Cache<String, FaiIndex>,
     pub bam_header: Cache<String, BamHeader>,
     pub tabix_header: Cache<String, TabixHeader>,

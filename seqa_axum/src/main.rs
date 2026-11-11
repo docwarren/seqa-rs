@@ -30,11 +30,14 @@ use seqa_core::models::gene_coordinate::GeneCoordinate;
 use seqa_core::sqlite::{self, genes};
 use seqa_core::stores::buckets::{CloudBackend, list_buckets as list_cloud_buckets};
 use seqa_core::stores::{DirectoryEntry, StoreService};
+use seqa_core::tabix::tabix_header::TabixHeader;
 use seqa_core::utils::{FileFormat, supported_formats};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::sync::Arc;
 use thiserror::Error;
 use tower_http::cors::CorsLayer;
+use seqa_core::bam::bam_header::header::BamHeader;
 
 pub mod cache;
 pub mod search;
@@ -51,6 +54,13 @@ pub struct FileEntry {
     pub path: String,
     pub last_modified: String,
     pub size: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AxumSearchResult {
+    coordinates: Vec<String>,
+    header: Vec<String>,
+    lines: Vec<Vec<String>>,
 }
 
 /// Body of `POST /files/list`.
@@ -90,7 +100,7 @@ async fn index() -> &'static str {
 async fn feature_search(
     State(state): State<AppState>,
     payload: Result<Json<SearchRequest>, JsonRejection>,
-) -> Result<String, ApiError> {
+) -> Result<Json<AxumSearchResult>, ApiError> {
     let Json(request) =
         payload.map_err(|e| ApiError::BadRequest(format!("Invalid JSON payload: {}", e)))?;
 
@@ -121,7 +131,17 @@ async fn feature_search(
         .map_err(|e| ApiError::InternalError(format!("Search Failed: {:?}", e.to_string())))?;
     write_back_to_cache(&state.cache, &search_options, &result).await;
 
-    Ok(result.lines.into_iter().collect::<Vec<String>>().join("\n"))
+    let result_header = if let Some(header) = result.header {
+        header.to_lines()
+    } else {
+        Vec::new()
+    };
+
+    Ok(Json(AxumSearchResult {
+        coordinates: result.coordinates,
+        header: result_header,
+        lines: result.lines,
+    }))
 }
 
 async fn populate_from_cache(cache: &AppCache, options: &mut SearchOptions) {
@@ -156,11 +176,19 @@ async fn write_back_to_cache(
             .insert(options.index_path.clone(), bai.clone())
             .await;
     }
-    if let Some(header) = &result.bam_header {
-        cache
-            .bam_header
-            .insert(options.file_path.clone(), header.clone())
-            .await;
+    if let Some(header) = &result.header
+        && options.index_path.ends_with(".bai")
+    {
+        // 1. Upcast
+        let any_box: &dyn Any = header.as_ref();
+
+        // 2. Consume and downcast`
+        if let Some(header) = any_box.downcast_ref::<BamHeader>() {
+            cache
+                .bam_header
+                .insert(options.file_path.clone(), header.clone())
+                .await;
+        }
     }
     if let Some(tabix) = &result.tabix_index {
         cache
@@ -168,11 +196,19 @@ async fn write_back_to_cache(
             .insert(options.index_path.clone(), tabix.clone())
             .await;
     }
-    if let Some(header) = &result.tabix_header {
-        cache
-            .tabix_header
-            .insert(options.file_path.clone(), header.clone())
-            .await;
+    if let Some(header) = &result.header
+        && options.index_path.ends_with(".tbi")
+    {
+        // 1. Upcast
+        let any_box: &dyn Any = header.as_ref();
+
+        // 2. Consume and downcast`
+        if let Some(header) = any_box.downcast_ref::<TabixHeader>() {
+            cache
+                .tabix_header
+                .insert(options.file_path.clone(), header.clone())
+                .await;
+        }
     }
     if let Some(fai) = &result.fasta_index {
         cache
@@ -208,7 +244,7 @@ async fn list_dir(
 
 async fn get_gene_symbols(
     Path(genome): Path<String>,
-    Path(source): Path<String>
+    Path(source): Path<String>,
 ) -> Result<Json<Vec<GeneCoordinate>>, ApiError> {
     let connection = sqlite::connect_genes(&genome, &source)
         .map_err(|e| ApiError::InternalError(format!("Error connecting to DB: {}", e)))?;
@@ -414,10 +450,42 @@ mod tests {
         let response = app().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let body = body_string(response).await;
-        assert!(body.contains("chr1\t116549"));
+        // The body is JSON, so the tab separator is escaped as a literal `\t`.
+        assert!(body.contains(r"chr1\t116549"));
         seqa_core::indexes::index_cache::delete_local_index(
             "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi",
         );
+    }
+
+    #[tokio::test]
+    async fn test_write_back_caches_headers() {
+        use super::{AppCache, write_back_to_cache};
+        use seqa_core::api::search::search_features;
+        use seqa_core::api::search_options::SearchOptions;
+        use seqa_core::stores::StoreService;
+
+        let store = StoreService::new();
+        let cache = AppCache::new();
+
+        let vcf = "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz";
+        let vcf_index = "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi";
+        let options = SearchOptions::new(vcf, &["chr1:116549-116549".to_string()])
+            .unwrap()
+            .set_index_path(vcf_index);
+        let result = search_features(&store, &options).await.unwrap();
+        write_back_to_cache(&cache, &options, &result).await;
+        assert!(cache.tabix_header.get(vcf).await.is_some());
+        seqa_core::indexes::index_cache::delete_local_index(vcf_index);
+
+        let bam = "s3://com.gmail.docarw/test_data/NA12877.bam";
+        let bam_index = "s3://com.gmail.docarw/test_data/NA12877.bam.bai";
+        let options = SearchOptions::new(bam, &["chr1:10000000-10000000".to_string()])
+            .unwrap()
+            .set_index_path(bam_index);
+        let result = search_features(&store, &options).await.unwrap();
+        write_back_to_cache(&cache, &options, &result).await;
+        assert!(cache.bam_header.get(bam).await.is_some());
+        seqa_core::indexes::index_cache::delete_local_index(bam_index);
     }
 
     #[tokio::test]
