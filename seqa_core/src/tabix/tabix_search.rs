@@ -21,15 +21,10 @@ use crate::api::search_result::SearchResult;
 use crate::coordinate::Coordinate;
 use crate::indexes::bin_util::get_bin_numbers;
 use crate::stores::StoreService;
-use crate::tabix::bed::BedLine;
-use crate::tabix::bedgraph::BedGraphLine;
-use crate::tabix::gff::GffLine;
-use crate::tabix::gtf::GtfLine;
 use crate::tabix::tabix_index::TabixIndex;
 use crate::tabix::tabix_header::TabixHeader;
 use crate::traits::feature::Feature;
 use crate::traits::sam_index::SamIndex;
-use crate::traits::to_lines::ToLines;
 use bstr::ByteSlice;
 
 fn read_lines(
@@ -73,14 +68,14 @@ pub fn data_to_lines(
 /// from `index_path` / `file_path`.  Both are returned in the [`SearchResult`] so callers
 /// can pass them back in on later queries.
 ///
-/// Result lines are grouped by coordinate in the order the coordinates were given.  Header
-/// lines from [`get_header_lines`] come first when `include_header` is set; when
-/// `header_only` is set only the file header is returned.
+/// `lines` has one entry per coordinate, in the order the coordinates were given, holding
+/// the records that overlap it.  The entry is empty when the coordinate names a chromosome
+/// that is not in the index.  When `header_only` is set every entry is empty.  The file
+/// header is always returned in [`SearchResult::header`].
 ///
 /// # Errors
 ///
-/// Returns [`SearchError::InvalidRequest`] if a coordinate names a chromosome that is not
-/// in the index, or [`SearchError::ParseError`] if a record cannot be parsed.
+/// Returns [`SearchError::ParseError`] if a record cannot be parsed.
 pub async fn tabix_search(
     store_service: &StoreService,
     options: &SearchOptions,
@@ -107,12 +102,14 @@ pub async fn tabix_search(
     result.tabix_index = Some(tabix.clone());
 
     if options.header_only {
+        result.lines = vec![Vec::new(); options.coordinates.len()];
         return Ok(result);
     }
 
     for coord in &options.coordinates {
         let bin_numbers = get_bin_numbers(coord);
         let Some(chr_i) = tabix.get_chromosome_index_by_name(coord.get_chromosome()) else {
+            result.lines.push(Vec::new());
             continue;
         };
         let chr_idx = &tabix.references[chr_i];
@@ -138,44 +135,4 @@ pub async fn tabix_search(
     }
 
     Ok(result)
-}
-
-/// Returns the header lines to put before the results when `options.include_header` is set.
-///
-/// VCF returns the file's own `#` header lines.  BED, BedGraph, GFF and GTF return a
-/// single tab-separated line of column names.  Returns nothing when `include_header` is
-/// `false`.
-pub fn get_header_lines(options: &SearchOptions, tabix_header: &TabixHeader) -> Vec<String> {
-    if options.include_header {
-        match options.output_format {
-            OutputFormat::VCF => tabix_header.to_lines(),
-            OutputFormat::GFF => vec![GffLine::COLUMNS.join("\t")],
-            OutputFormat::GTF => vec![GtfLine::COLUMNS.join("\t")],
-            OutputFormat::BED => vec![BedLine::COLUMNS.join("\t")],
-            OutputFormat::BEDGRAPH => vec![BedGraphLine::COLUMNS.join("\t")],
-            _ => Vec::new(),
-        }
-    } else {
-        Vec::new()
-    }
-}
-
-#[test]
-fn test_get_header_lines() {
-    let mut options =
-        SearchOptions::new("test.gff.gz", &vec!["chr1:1-10000000".to_string()]).unwrap();
-    options.include_header = true;
-    options.output_format = OutputFormat::GFF;
-    options.index_path = "test.gff.gz.tbi".to_string();
-    options.header_only = false;
-    options.bigwig_index = None;
-
-    let tabix_header = TabixHeader::new();
-    let header_lines = get_header_lines(&options, &tabix_header);
-    println!("{:?}", header_lines);
-    assert_eq!(header_lines.len(), 1);
-    assert_eq!(
-        header_lines[0],
-        "chromosome\tsource\tfeature\tbegin\tend\tscore\tstrand\tframe\tgroup"
-    );
 }

@@ -31,7 +31,7 @@ use crate::genome::get_longest_possible_genome;
 ///
 /// Returns [`SearchError::NotFound`] when a local path does not exist, or
 /// [`SearchError::AbsolutePathError`] when it cannot be made absolute.
-pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
+pub(crate) fn format_file_path(file_path: &str) -> Result<String, SearchError> {
     if file_path.starts_with("/") || file_path.starts_with("./") || file_path.starts_with("../") {
         match std::fs::exists(file_path) {
             Ok(true) => (),
@@ -72,7 +72,7 @@ pub fn format_file_path(file_path: &str) -> Result<String, SearchError> {
 ///
 /// Returns [`SearchError::InvalidCoordinateFormat`] when the chromosome name is not
 /// recognised or a numeric field cannot be parsed.
-pub fn parse_coordinates(coords: &str) -> Result<(String, u32, u32), SearchError> {
+pub(crate) fn parse_coordinates(coords: &str) -> Result<(String, u32, u32), SearchError> {
     let tokens: Vec<&str> = coords.split(':').collect();
     let chromosome = tokens[0].to_string();
     let chr_idx = crate::genome::chr_index(&chromosome).ok_or(
@@ -112,7 +112,7 @@ fn get_begin_end(tokens: &[&str], chr_idx: usize) -> Result<(u32, u32), ParsingE
 /// [`get_output_format`] and [`get_index_path`] derive from it, so they cannot
 /// drift apart as the two hand-written if-else chains they replaced did.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FormatSpec {
+struct FormatSpec {
     /// The format these extensions map to.
     pub format: OutputFormat,
     /// Recognised extensions, each including the leading dot.
@@ -127,7 +127,7 @@ pub struct FormatSpec {
 /// Text-based tabix formats appear only in their bgzipped form — a plain
 /// `.vcf`, `.bed` or `.gff` cannot be range-queried, so offering it would
 /// produce a file that fails at load time.
-pub const SUPPORTED_FORMATS: &[FormatSpec] = &[
+const SUPPORTED_FORMATS: &[FormatSpec] = &[
     FormatSpec {
         format: OutputFormat::BAM,
         extensions: &[".bam"],
@@ -179,7 +179,7 @@ pub const SUPPORTED_FORMATS: &[FormatSpec] = &[
 ///
 /// Matching is longest-extension-first, so `sample.bedgraph.gz` resolves to
 /// BEDGRAPH rather than being shadowed by a shorter suffix.
-pub fn match_format(file_path: &str) -> Option<&'static FormatSpec> {
+fn match_format(file_path: &str) -> Option<&'static FormatSpec> {
     let lower_path = file_path.to_ascii_lowercase();
 
     SUPPORTED_FORMATS
@@ -228,7 +228,7 @@ pub fn supported_formats() -> Vec<FileFormat> {
 /// # Errors
 ///
 /// Returns [`SearchError::IndexPathError`] when the extension is not supported.
-pub fn get_index_path(file_path: &str) -> Result<String, SearchError> {
+pub(crate) fn get_index_path(file_path: &str) -> Result<String, SearchError> {
     let spec = match_format(file_path).ok_or_else(|| {
         SearchError::IndexPathError("Unable to get index path from file extension".into())
     })?;
@@ -247,7 +247,7 @@ pub fn get_index_path(file_path: &str) -> Result<String, SearchError> {
 ///
 /// Returns [`SearchError::PathTypeError`] when the extension does not match any
 /// known format.
-pub fn get_output_format(file_path: &str) -> Result<OutputFormat, SearchError> {
+pub(crate) fn get_output_format(file_path: &str) -> Result<OutputFormat, SearchError> {
     match_format(file_path)
         .map(|spec| spec.format.clone())
         .ok_or_else(|| {

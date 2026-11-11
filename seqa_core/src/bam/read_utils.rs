@@ -34,7 +34,7 @@ pub fn map_sequence_code(code: u8) -> char {
     }
 }
 
-pub fn get_tag_ua_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_ua_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i < bytes.len() {
         Ok((format!("{}", bytes[i] as char), i + 1))
     } else {
@@ -42,7 +42,7 @@ pub fn get_tag_ua_value(bytes: &[u8], i: usize) -> Result<(String, usize), Strin
     }
 }
 
-pub fn get_tag_c_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_c_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i < bytes.len() {
         Ok((format!("{}", i8::from_le_bytes([bytes[i]])), i + 1))
     } else {
@@ -50,7 +50,7 @@ pub fn get_tag_c_value(bytes: &[u8], i: usize) -> Result<(String, usize), String
     }
 }
 
-pub fn get_tag_uc_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_uc_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i < bytes.len() {
         Ok((format!("{}", bytes[i]), i + 1))
     } else {
@@ -58,7 +58,7 @@ pub fn get_tag_uc_value(bytes: &[u8], i: usize) -> Result<(String, usize), Strin
     }
 }
 
-pub fn get_tag_s_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_s_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i + 2 <= bytes.len() {
         let val_str = format!("{}", i16::from_le_bytes(bytes[i..i + 2].try_into().map_err(|e| format!("Invalid i16: {}", e))?));
         Ok((val_str, i + 2))
@@ -67,7 +67,7 @@ pub fn get_tag_s_value(bytes: &[u8], i: usize) -> Result<(String, usize), String
     }
 }
 
-pub fn get_tag_us_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_us_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i + 2 <= bytes.len() {
         let val_str = format!("{}", u16::from_le_bytes(bytes[i..i + 2].try_into().map_err(|e| format!("Invalid u16: {}", e))?));
         Ok((val_str, i + 2))
@@ -76,7 +76,7 @@ pub fn get_tag_us_value(bytes: &[u8], i: usize) -> Result<(String, usize), Strin
     }
 }
 
-pub fn get_tag_i_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_i_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i + 4 <= bytes.len() {
         let val_str = format!("{}", i32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|e| format!("Invalid i32: {}", e))?));
         Ok((val_str, i + 4))
@@ -85,7 +85,7 @@ pub fn get_tag_i_value(bytes: &[u8], i: usize) -> Result<(String, usize), String
     }
 }
 
-pub fn get_tag_ui_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_ui_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i + 4 <= bytes.len() {
         let val_str = format!("{}", u32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|e| format!("Invalid u32: {}", e))?));
         Ok((val_str, i + 4))
@@ -94,7 +94,7 @@ pub fn get_tag_ui_value(bytes: &[u8], i: usize) -> Result<(String, usize), Strin
     }
 }
 
-pub fn get_tag_f_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_f_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     if i + 4 <= bytes.len() {
         let val_str = format!("{}", f32::from_le_bytes(bytes[i..i + 4].try_into().map_err(|e| format!("Invalid f32: {}", e))?));
         Ok((val_str, i + 4))
@@ -103,7 +103,7 @@ pub fn get_tag_f_value(bytes: &[u8], i: usize) -> Result<(String, usize), String
     }
 }
 
-pub fn get_tag_z_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_z_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     let mut end = i;
     while end < bytes.len() && bytes[end] != 0 {
         end += 1;
@@ -112,7 +112,7 @@ pub fn get_tag_z_value(bytes: &[u8], i: usize) -> Result<(String, usize), String
     Ok((value, end + 1)) // +1 to skip the null terminator
 }
 
-pub fn get_tag_h_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
+fn get_tag_h_value(bytes: &[u8], i: usize) -> Result<(String, usize), String> {
     let mut end = i;
     while end < bytes.len() && bytes[end] != 0 {
         end += 1;

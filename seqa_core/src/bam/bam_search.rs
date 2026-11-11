@@ -19,7 +19,7 @@ use crate::api::search_result::SearchResult;
 use crate::bam::bai::BaiIndex;
 use crate::bam::bam_header::header::BamHeader;
 use crate::bam::read::Read;
-use crate::coordinate::{Coordinate, check_coords_for_length};
+use crate::coordinate::{Coordinate, check_coord_for_length};
 use crate::indexes::bin_util::get_bin_numbers;
 use crate::stores::StoreService;
 use crate::traits::feature::Feature;
@@ -76,21 +76,15 @@ pub fn data_to_lines(
 /// from `index_path` / `file_path`.  Both are returned in the [`SearchResult`] so callers
 /// can pass them back in on later queries.
 ///
-/// Result lines are SAM records, grouped by coordinate in the order the coordinates were
-/// given.  When `include_header` is set the SAM header lines come first; when
-/// `header_only` is set only the header is returned.  Overlapping coordinates can return
-/// the same read more than once.
-///
-/// # Errors
-///
-/// Returns [`SearchError::InvalidRequest`] if a coordinate covers more than 200,001 bases
-/// or names a chromosome that is not in the BAM header.
+/// `lines` has one entry per coordinate, in the order the coordinates were given, holding
+/// the SAM records that overlap it.  The entry is empty when the coordinate covers more
+/// than 200,001 bases or names a chromosome that is not in the BAM header.  Overlapping
+/// coordinates can return the same read more than once.  When `header_only` is set every
+/// entry is empty.  The SAM header is always returned in [`SearchResult::header`].
 pub async fn bam_search(
     store_service: &StoreService,
     options: &SearchOptions,
 ) -> Result<SearchResult, SearchError> {
-
-    check_coords_for_length(&options.coordinates, MAX_BAM_SEARCH_SIZE)?;
 
     let mut result = SearchResult::new();
     result.coordinates = options.coordinates.iter().map(|c| c.to_string()).collect();
@@ -112,12 +106,18 @@ pub async fn bam_search(
     result.header = Some(Box::new(bam_header.clone()));
 
     if options.header_only {
+        result.lines = vec![Vec::new(); options.coordinates.len()];
         return Ok(result);
     }
 
     for coord in &options.coordinates {
+        if !check_coord_for_length(coord, MAX_BAM_SEARCH_SIZE) {
+            result.lines.push(Vec::new());
+            continue;
+        }
         let bin_numbers = get_bin_numbers(coord);
         let Some(chr_i) = bam_header.get_chromosome_index_by_name(coord.get_chromosome()) else {
+            result.lines.push(Vec::new());
             continue;
         };
         let chr_idx = &bai.references[chr_i];

@@ -27,8 +27,8 @@ use crate::traits;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BamHeader {
-    pub header_lines: Vec<HeaderLine>,
-    pub references: Vec<BamReference>,
+    pub(crate) header_lines: Vec<HeaderLine>,
+    pub(crate) references: Vec<BamReference>,
 }
 
 fn parse_header_lines(bytes: &[u8]) -> Result<BamHeader, ParsingError> {

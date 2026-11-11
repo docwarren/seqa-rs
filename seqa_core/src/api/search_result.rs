@@ -23,7 +23,9 @@ use crate::traits::to_lines::ToLines;
 ///
 /// Each format-specific search function populates the relevant index/header fields
 /// so that callers can cache the parsed index across subsequent queries without
-/// re-downloading it.  The actual data lines are always in [`SearchResult::lines`].
+/// re-downloading it.  The data lines are in [`SearchResult::lines`], with one entry per
+/// requested coordinate.  An entry is empty when its coordinate is invalid for the file
+/// (for example a chromosome the file does not contain) or matches nothing.
 #[derive(Default)]
 pub struct SearchResult {
     /// Parsed BigWig index; present after a [`crate::bigwig::bigwig_search::bigwig_search`] call.
@@ -37,11 +39,13 @@ pub struct SearchResult {
     pub fasta_index: Option<FaiIndex>,
     /// Parsed BAM index (`.bai`); present after a [`crate::bam::bam_search::bam_search`] call.
     pub bam_index: Option<BaiIndex>,
-    /// BAM file header; present after a [`crate::bam::bam_search::bam_search`] call.
+    /// File header; present after a BAM, tabix, BigWig or BigBed search.
     pub header: Option<Box<dyn ToLines>>,
-    /// Array of Coordinate Strings corresponding to the array of result strings
+    /// The requested coordinates, one per entry in [`SearchResult::lines`].
     pub coordinates: Vec<String>,
-    /// Query result lines in the native text format of the file (SAM, VCF, BED, etc.).
+    /// Result lines in the native text format of the file (SAM, VCF, BED, etc.).
+    /// `lines[i]` holds the results for `coordinates[i]`, so the two always have the same
+    /// length.
     pub lines: Vec<Vec<String>>,
 }
 

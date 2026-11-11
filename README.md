@@ -59,14 +59,36 @@ The server binds to `127.0.0.1:8000` and exposes:
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET`  | `/` | Health check |
-| `POST` | `/search` | Genomic range query — JSON body `{"path": "...", "coordinates": "chr:begin-end"}`; returns the result lines as plain text |
+| `POST` | `/search` | Genomic range query — see [Search request](#search-request) |
 | `POST` | `/files` | Recursively list objects under a storage URI — JSON body is a bare string, e.g. `"s3://bucket/prefix/"` |
 | `POST` | `/files/list` | List one level of a cloud URI (folders and files) — JSON body `{"uri": "s3://bucket/prefix/"}`; local paths are rejected |
 | `GET`  | `/files/buckets/{backend}` | List the buckets/containers the configured credentials can see — `backend` is `s3`, `gcs` or `azure` |
 | `GET`  | `/files/formats` | Supported file formats, their extensions and index extensions |
-| `GET`  | `/genes/symbols/{genome}` | List gene symbols for `hg19`/`hg38`/`grch37`/`grch38` |
-| `GET`  | `/genes/coordinates/{genome}/{gene}` | Look up coordinates for a gene symbol |
+| `GET`  | `/genes/symbols/{genome}/{source}/` | List gene symbols for `hg19`/`hg38`/`grch37`/`grch38`; `source` is `refseq` or `gencode` |
 | `GET`  | `/cytobands/{genome}/{chromosome}` | Cytobands for a chromosome |
+
+### Search request
+
+```json
+{
+    "path": "s3://my-bucket/sample.vcf.gz",
+    "coordinates": "chr1:1000000-2000000",
+    "with_header": false,
+    "only_header": false
+}
+```
+
+`with_header` and `only_header` are optional and default to `false`. The response is JSON:
+
+```json
+{
+    "coordinates": ["chr1:1000000-2000000"],
+    "header": [],
+    "lines": [["chr1\t1000123\t...", "..."]]
+}
+```
+
+`lines` has one array per entry in `coordinates`. An array is empty when the coordinate matches nothing, names a chromosome the file doesn't contain, or is over the format's size limit. `header` is empty unless `with_header` or `only_header` is `true`.
 
 Parsed indexes and headers are cached in memory between `/search` requests.
 
@@ -81,9 +103,8 @@ cargo test -p seqa_axum
 ## Development
 
 ```bash
-# Run unit tests (no credentials needed)
+# Run unit tests (a few read from S3 and Azure, so they need credentials)
 cargo test -p seqa_core --lib
-cargo test -p seqa_core --test read
 
 # Run cloud integration tests (requires credentials)
 cargo test -p seqa_core --test bam

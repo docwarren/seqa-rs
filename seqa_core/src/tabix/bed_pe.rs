@@ -52,21 +52,6 @@ pub struct BedpeLine {
     pub extra_fields: Option<String>,
 }
 
-impl BedpeLine {
-    pub const COLUMNS: [&str; 10] = [
-        "chromosome1",
-        "begin1",
-        "end1",
-        "chromosome2",
-        "begin2",
-        "end2",
-        "name",
-        "score",
-        "strand1",
-        "strand2",
-    ];
-}
-
 impl FromBytes for BedpeLine {
     type Error = ParsingError;
 
@@ -167,12 +152,6 @@ impl Display for BedpeLine {
 }
 
 impl Feature for BedpeLine {
-    fn get_id(&self) -> String {
-        self.name.clone().unwrap_or(format!(
-            "{}:{}-{};{}:{}-{}",
-            self.chromosome1, self.begin1, self.end1, self.chromosome2, self.begin2, self.end2
-        ))
-    }
 
     fn coordinate(&self) -> Coordinate {
         Coordinate {

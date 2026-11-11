@@ -1,9 +1,10 @@
 #!/bin/bash
 # Depends on:
-#   extract_genes.py
-#   lftp
 #   wget
 #   gunzip
+#   sed
+#   awk
+#   sort
 #   bgzip
 #   tabix
 

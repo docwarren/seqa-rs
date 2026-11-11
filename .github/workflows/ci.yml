@@ -24,12 +24,6 @@ jobs:
       - name: Build
         run: cargo build
 
-      - name: Unit tests
-        run: cargo test -p seqa_core --lib
-
-      - name: Read / CIGAR tests
-        run: cargo test -p seqa_core --test read
-
       - name: Local store test
         run: cargo test -p seqa_core --test local
 
@@ -59,6 +53,10 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+
+      # Some seqa_core unit tests read from real cloud storage, so they run here
+      - name: seqa_core unit tests
+        run: cargo test -p seqa_core --lib
 
       - name: seqa_core cloud tests
         run: |

@@ -33,21 +33,6 @@ impl RTreeHeader {
 
     pub const SIZE: usize = 48;
 
-    pub fn new() -> Self {
-        RTreeHeader {
-            magic: 0x52545245, // "RTree" in ASCII
-            block_size: 0,
-            item_count: 0,
-            start_chrom_idx: 0,
-            start_base: 0,
-            end_chrom_idx: 0,
-            end_base: 0,
-            end_file_offset: 0,
-            items_per_slot: 0,
-            reserved: 0,
-        }
-    }
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParsingError> {
         if bytes.len() < RTreeHeader::SIZE {
             return Err(ParsingError::InsufficientBytes);

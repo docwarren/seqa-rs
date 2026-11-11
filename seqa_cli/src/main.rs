@@ -46,9 +46,10 @@ enum Commands {
         /// - bedgraph
         file: String,
 
-        /// Genomic coordinates to search for in the file
-        /// The format should be "chr:start-end" or "chr:position"
-        coordinates: String,
+        /// One or more genomic coordinates to search for in the file, separated by spaces
+        /// The format should be "chr:start-end", "chr:position" or "chr"
+        #[arg(required = true)]
+        coordinates: Vec<String>,
 
         /// Reference genome build (hg38 or hg19)
         #[arg(short = 'r', long)]
@@ -142,7 +143,7 @@ async fn main() -> Result<()> {
             let store_service = StoreService::new();
 
             let mut options =
-                SearchOptions::new(&file, &[coordinates]).expect("Invalid coordinates");
+                SearchOptions::new(&file, &coordinates).expect("Invalid coordinates");
 
             // Set genome before coordinates so set_coordinates can use it
             if let Some(ref genome) = reference {
@@ -246,4 +247,36 @@ fn write_lines(lines: &[String]) -> io::Result<()> {
         writeln!(handle, "{}", line)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_accepts_multiple_coordinates() {
+        let cli = Cli::try_parse_from([
+            "seqa",
+            "search",
+            "sample.vcf.gz",
+            "chr1:1-100",
+            "chr2:5,000-6,000",
+            "chrX",
+            "-w",
+            "true",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Search { coordinates, with_header, .. } => {
+                assert_eq!(coordinates, vec!["chr1:1-100", "chr2:5,000-6,000", "chrX"]);
+                assert_eq!(with_header, Some(true));
+            }
+            _ => panic!("expected search command"),
+        }
+    }
+
+    #[test]
+    fn search_requires_a_coordinate() {
+        assert!(Cli::try_parse_from(["seqa", "search", "sample.vcf.gz"]).is_err());
+    }
 }

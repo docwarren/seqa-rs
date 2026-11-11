@@ -30,14 +30,14 @@ use seqa_core::models::gene_coordinate::GeneCoordinate;
 use seqa_core::sqlite::{self, genes};
 use seqa_core::stores::buckets::{CloudBackend, list_buckets as list_cloud_buckets};
 use seqa_core::stores::{DirectoryEntry, StoreService};
-use seqa_core::tabix::tabix_header::TabixHeader;
+use seqa_core::TabixHeader;
 use seqa_core::utils::{FileFormat, supported_formats};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::sync::Arc;
 use thiserror::Error;
 use tower_http::cors::CorsLayer;
-use seqa_core::bam::bam_header::header::BamHeader;
+use seqa_core::BamHeader;
 
 pub mod cache;
 pub mod search;
@@ -123,7 +123,9 @@ async fn feature_search(
     }
 
     let mut search_options = SearchOptions::new(&request.path, &[request.coordinates])
-        .map_err(|e| ApiError::BadRequest(format!("Invalid coordinates: {}", e)))?;
+        .map_err(|e| ApiError::BadRequest(format!("Invalid coordinates: {}", e)))?
+        .set_include_header(request.with_header.unwrap_or(false))
+        .set_header_only(request.only_header.unwrap_or(false));
 
     populate_from_cache(&state.cache, &mut search_options).await;
     let result = search_features(&state.store, &search_options)
@@ -131,7 +133,9 @@ async fn feature_search(
         .map_err(|e| ApiError::InternalError(format!("Search Failed: {:?}", e.to_string())))?;
     write_back_to_cache(&state.cache, &search_options, &result).await;
 
-    let result_header = if let Some(header) = result.header {
+    let result_header = if (search_options.include_header || search_options.header_only)
+        && let Some(header) = result.header
+    {
         header.to_lines()
     } else {
         Vec::new()
@@ -371,6 +375,7 @@ mod tests {
     use axum::body::Body;
     use axum::http::{Request, StatusCode, header};
     use http_body_util::BodyExt;
+    use seqa_core::indexes::index_cache::IndexGuard;
     use tower::ServiceExt;
 
     fn json_request(method: &str, uri: &str, body: &'static str) -> Request<Body> {
@@ -442,6 +447,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_vcf() {
+        let _guard = IndexGuard::new("s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi");
         let req = json_request(
             "POST",
             "/search",
@@ -452,9 +458,31 @@ mod tests {
         let body = body_string(response).await;
         // The body is JSON, so the tab separator is escaped as a literal `\t`.
         assert!(body.contains(r"chr1\t116549"));
-        seqa_core::indexes::index_cache::delete_local_index(
-            "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi",
+    }
+
+    #[tokio::test]
+    async fn test_search_header_only_when_requested() {
+        let _guard = IndexGuard::new("s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi");
+
+        let req = json_request(
+            "POST",
+            "/search",
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": "chr1:116549-116549"}"#,
         );
+        let response = app().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_string(response).await;
+        assert!(body.contains(r#""header":[]"#));
+
+        let req = json_request(
+            "POST",
+            "/search",
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": "chr1:116549-116549", "with_header": true}"#,
+        );
+        let response = app().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_string(response).await;
+        assert!(body.contains("##fileformat=VCF"));
     }
 
     #[tokio::test]
@@ -469,23 +497,23 @@ mod tests {
 
         let vcf = "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz";
         let vcf_index = "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi";
+        let _vcf_guard = IndexGuard::new(vcf_index);
         let options = SearchOptions::new(vcf, &["chr1:116549-116549".to_string()])
             .unwrap()
             .set_index_path(vcf_index);
         let result = search_features(&store, &options).await.unwrap();
         write_back_to_cache(&cache, &options, &result).await;
         assert!(cache.tabix_header.get(vcf).await.is_some());
-        seqa_core::indexes::index_cache::delete_local_index(vcf_index);
 
         let bam = "s3://com.gmail.docarw/test_data/NA12877.bam";
         let bam_index = "s3://com.gmail.docarw/test_data/NA12877.bam.bai";
+        let _bam_guard = IndexGuard::new(bam_index);
         let options = SearchOptions::new(bam, &["chr1:10000000-10000000".to_string()])
             .unwrap()
             .set_index_path(bam_index);
         let result = search_features(&store, &options).await.unwrap();
         write_back_to_cache(&cache, &options, &result).await;
         assert!(cache.bam_header.get(bam).await.is_some());
-        seqa_core::indexes::index_cache::delete_local_index(bam_index);
     }
 
     #[tokio::test]

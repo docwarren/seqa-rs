@@ -12,20 +12,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use core::array::TryFromSliceError;
-use thiserror::Error;
 use super::overlaps::Overlaps;
 use crate::bigwig::index::r_tree::r_tree_node::RTreeNode;
 use crate::api::parsing_error::ParsingError;
-
-#[derive(Debug, Clone, Error)]
-pub enum RTreeNonLeafError {
-    #[error("Failed to read RTree non leaf: {0}")]
-    ReadError(String),
-
-    #[error("Parsing error: {0}")]
-    ParseError(#[from] TryFromSliceError),
-}
 
 
 #[derive(Debug, Clone, Default)]
@@ -41,17 +30,6 @@ pub struct RTreeNonLeaf {
 impl RTreeNonLeaf {
 
     pub const SIZE: usize = 24; // Size of the RTreeNonLeaf in bytes
-
-    pub fn new() -> Self {
-        RTreeNonLeaf {
-            start_chrom_idx: u32::MAX,
-            start_base: u32::MAX,
-            end_chrom_idx: u32::MAX,
-            end_base: u32::MAX,
-            child_node_offset: u32::MAX as u64,
-            child: RTreeNode::new(),
-        }
-    }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParsingError> {
         if bytes.len() < RTreeNonLeaf::SIZE {

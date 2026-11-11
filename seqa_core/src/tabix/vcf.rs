@@ -368,9 +368,6 @@ impl Display for VcfLine {
 }
 
 impl Feature for VcfLine {
-    fn get_id(&self) -> String {
-        self.id.clone()
-    }
 
     fn coordinate(&self) -> Coordinate {
         Coordinate {
@@ -402,7 +399,7 @@ mod test {
             Vec::from([("DP".to_string(), "100".to_string())])
         );
         assert_eq!(vcf_record.sample_data.len(), 0);
-        assert_eq!(vcf_record.get_id(), ".");
+        assert_eq!(vcf_record.id, ".");
         assert_eq!(vcf_record.get_begin(), 2);
         assert_eq!(vcf_record.get_end(), 4);
         assert_eq!(vcf_record.get_length(), 2);
@@ -423,7 +420,7 @@ mod test {
         assert_eq!(record.get_info_val("SVTYPE"), Some("DUP".to_string()));
         assert_eq!(record.get_variant_type(), Ok(VariantType::SvDup));
         assert_eq!(record.sample_data.len(), 1);
-        assert_eq!(record.get_id(), "MantaDUP:TANDEM:1137:0:1:0:0:0".to_owned());
+        assert_eq!(record.id, "MantaDUP:TANDEM:1137:0:1:0:0:0".to_owned());
         assert_eq!(record.get_begin(), 14110160);
         assert_eq!(record.get_end(), 14112070);
         assert_eq!(record.get_length(), 1910);
@@ -445,7 +442,7 @@ mod test {
         assert_eq!(record.get_variant_type(), Ok(VariantType::CnLoss));
         assert_eq!(record.sample_data.len(), 1);
         assert_eq!(
-            record.get_id(),
+            record.id,
             "Canvas:LOSS:1:25274840-25315204".to_owned()
         );
         assert_eq!(record.get_begin(), 25_274_839);

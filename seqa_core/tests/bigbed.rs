@@ -15,18 +15,15 @@
 
 /// Tests for BigBed file search functionality.
 /// Compares bigbed_search results against tabix_search on equivalent BED data.
-use seqa_core::indexes::index_cache::delete_local_index;
+use seqa_core::indexes::index_cache::IndexGuard;
 
 const BIGBED_PATH: &str = "s3://com.soma23.data/hg38/mane.bb";
 const BED_PATH: &str = "s3://com.soma23.data/hg38/mane.bed.gz";
 const BED_INDEX_PATH: &str = "s3://com.soma23.data/hg38/mane.bed.gz.tbi";
 
-fn cleanup_bed_index() {
-    delete_local_index(BED_INDEX_PATH);
-}
-
 #[tokio::test]
 async fn bigbed_search_matches_tabix() {
+    let _guard = IndexGuard::new(BED_INDEX_PATH);
     use seqa_core::api::search::search_features;
     use seqa_core::api::search_options::SearchOptions;
     use seqa_core::stores::StoreService;
@@ -71,22 +68,21 @@ async fn bigbed_search_matches_tabix() {
             i, bb_line, bed_line
         );
     }
-    cleanup_bed_index();
 }
 
 #[tokio::test]
 async fn bigbed_search_chr1_small_region() {
+    let _guard = IndexGuard::new(BED_INDEX_PATH);
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bigwig::bigbed_search::bigbed_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
-    use seqa_core::tabix::tabix_search::tabix_search;
 
     let bb_options = SearchOptions::new(BIGBED_PATH, &vec!["chr1:65000-72000".to_string()])
         .unwrap()
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let bb_result = bigbed_search(&store_service, &bb_options)
+    let bb_result = search_features(&store_service, &bb_options)
         .await
         .expect("Failed to search BigBed");
 
@@ -96,7 +92,7 @@ async fn bigbed_search_chr1_small_region() {
         .set_output_format("bed")
         .set_include_header(false);
 
-    let bed_result = tabix_search(&store_service, &bed_options)
+    let bed_result = search_features(&store_service, &bed_options)
         .await
         .expect("Failed to search BED");
 
@@ -105,22 +101,21 @@ async fn bigbed_search_chr1_small_region() {
     for (bb_line, bed_line) in bb_result.lines[0].iter().zip(bed_result.lines[0].iter()) {
         assert_eq!(bb_line, bed_line);
     }
-    cleanup_bed_index();
 }
 
 #[tokio::test]
 async fn bigbed_search_different_chromosome() {
+    let _guard = IndexGuard::new(BED_INDEX_PATH);
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bigwig::bigbed_search::bigbed_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
-    use seqa_core::tabix::tabix_search::tabix_search;
 
     let bb_options = SearchOptions::new(BIGBED_PATH, &vec!["chr2:1000000-2000000".to_string()])
         .unwrap()
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let bb_result = bigbed_search(&store_service, &bb_options)
+    let bb_result = search_features(&store_service, &bb_options)
         .await
         .expect("Failed to search BigBed");
 
@@ -130,7 +125,7 @@ async fn bigbed_search_different_chromosome() {
         .set_output_format("bed")
         .set_include_header(false);
 
-    let bed_result = tabix_search(&store_service, &bed_options)
+    let bed_result = search_features(&store_service, &bed_options)
         .await
         .expect("Failed to search BED");
 
@@ -139,13 +134,12 @@ async fn bigbed_search_different_chromosome() {
     for (bb_line, bed_line) in bb_result.lines[0].iter().zip(bed_result.lines[0].iter()) {
         assert_eq!(bb_line, bed_line);
     }
-    cleanup_bed_index();
 }
 
 #[tokio::test]
 async fn bigbed_returns_correct_coordinates() {
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bigwig::bigbed_search::bigbed_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
 
     let options = SearchOptions::new(BIGBED_PATH, &vec!["chr1:1000000-1100000".to_string()])
@@ -153,7 +147,7 @@ async fn bigbed_returns_correct_coordinates() {
         .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = bigbed_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search BigBed");
 
@@ -170,4 +164,27 @@ async fn bigbed_returns_correct_coordinates() {
             end
         );
     }
+}
+
+#[tokio::test]
+async fn bigbed_unknown_chromosome_returns_empty_lines() {
+    use seqa_core::api::search_options::SearchOptions;
+    use seqa_core::api::search::search_features;
+    use seqa_core::stores::StoreService;
+
+    let options = SearchOptions::new(
+        BIGBED_PATH,
+        &vec!["chrM:1-16000".to_string(), "chr1:1000000-1100000".to_string()],
+    )
+    .unwrap()
+    .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = search_features(&store_service, &options)
+        .await
+        .expect("Failed to search BigBed");
+    assert_eq!(result.coordinates.len(), 2);
+    assert_eq!(result.lines.len(), 2);
+    assert!(result.lines[0].is_empty());
+    assert!(!result.lines[1].is_empty());
 }

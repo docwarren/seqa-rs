@@ -56,7 +56,7 @@ async fn s3_bigwig() {
 #[tokio::test]
 async fn azure_bigwig() {
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bigwig::bigwig_search::bigwig_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
 
     let options = SearchOptions::new(
@@ -68,7 +68,7 @@ async fn azure_bigwig() {
     .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = bigwig_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search BigWig for chr4");
     let begin = result.lines[0][0].split('\t').collect::<Vec<&str>>()[1]
@@ -95,7 +95,7 @@ async fn azure_bigwig() {
 #[tokio::test]
 async fn gc_bigwig() {
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bigwig::bigwig_search::bigwig_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
 
     let options = SearchOptions::new(
@@ -107,7 +107,7 @@ async fn gc_bigwig() {
     .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = bigwig_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search BigWig for chr4");
     let begin = result.lines[0][0].split('\t').collect::<Vec<&str>>()[1]
@@ -134,7 +134,7 @@ async fn gc_bigwig() {
 #[tokio::test]
 async fn http_bigwig() {
     use seqa_core::api::search_options::SearchOptions;
-    use seqa_core::bigwig::bigwig_search::bigwig_search;
+    use seqa_core::api::search::search_features;
     use seqa_core::stores::StoreService;
 
     let options = SearchOptions::new(
@@ -146,7 +146,7 @@ async fn http_bigwig() {
     .set_include_header(false);
 
     let store_service = StoreService::new();
-    let result = bigwig_search(&store_service, &options)
+    let result = search_features(&store_service, &options)
         .await
         .expect("Failed to search BigWig for chr4");
     let begin = result.lines[0][0].split('\t').collect::<Vec<&str>>()[1]
@@ -210,4 +210,29 @@ async fn bigwig_multiple_coordinates() {
     assert!(last_begin < 100_000_000);
     assert_eq!(chr1, "chr4");
     assert_eq!(chr2, "chr5");
+}
+
+#[tokio::test]
+async fn bigwig_unknown_chromosome_returns_empty_lines() {
+    use seqa_core::api::search::search_features;
+    use seqa_core::api::search_options::SearchOptions;
+    use seqa_core::stores::StoreService;
+
+    let options = SearchOptions::new(
+        "s3://com.gmail.docarw/test_data/density.bw",
+        &vec!["chrM:1-16000".to_string(), "chr4:120000000-140000000".to_string()],
+    )
+    .unwrap()
+    .set_index_path("-")
+    .set_output_format("bigwig")
+    .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = search_features(&store_service, &options)
+        .await
+        .expect("Failed to search BigWig");
+    assert_eq!(result.coordinates.len(), 2);
+    assert_eq!(result.lines.len(), 2);
+    assert!(result.lines[0].is_empty());
+    assert!(!result.lines[1].is_empty());
 }

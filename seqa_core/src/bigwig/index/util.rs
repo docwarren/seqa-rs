@@ -39,7 +39,7 @@ pub fn get_zoom_strings(bytes: &[u8], chr_tree: &BigwigChrTree, coord: &Coordina
     str_array
 }
 
-pub fn get_bigwig_header_range() -> Range<u64> {
+fn get_bigwig_header_range() -> Range<u64> {
     Range {
         start: 0u64,
         end: BIGWIG_HEADER_SIZE,

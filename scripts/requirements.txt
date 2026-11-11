@@ -5,3 +5,7 @@ sqlite3
 awk
 sed
 zcat
+gunzip
+sort
+python3
+aws

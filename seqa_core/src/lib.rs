@@ -76,17 +76,29 @@
 //! - **`sqlite`** — Enables the `sqlite` module for gene-symbol and cytoband queries via SQLite.
 
 pub mod api;
-pub mod bam;
-pub mod bigwig;
-pub mod codecs;
+pub(crate) mod bam;
+pub(crate) mod bigwig;
+pub(crate) mod codecs;
 pub mod coordinate;
-pub mod fasta;
-pub mod genome;
+pub(crate) mod fasta;
+pub(crate) mod genome;
 pub mod indexes;
 pub mod models;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 pub mod stores;
-pub mod tabix;
-pub mod traits;
+pub(crate) mod tabix;
+pub(crate) mod traits;
 pub mod utils;
+
+// Index and header types returned in `SearchResult` and accepted by `SearchOptions`, so
+// callers can cache them between searches.
+pub use bam::bai::BaiIndex;
+pub use bam::bam_header::header::BamHeader;
+pub use bigwig::index::bigwig_index::BigwigIndex;
+pub use fasta::fai::FaiIndex;
+pub use tabix::tabix_header::TabixHeader;
+pub use tabix::tabix_index::TabixIndex;
+
+pub use codecs::codec_error::CodecError;
+pub use traits::to_lines::ToLines;

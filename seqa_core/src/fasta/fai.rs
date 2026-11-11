@@ -33,7 +33,7 @@ pub struct Contig {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct FaiIndex {
-    pub contigs: HashMap<String, Contig>,
+    pub(crate) contigs: HashMap<String, Contig>,
 }
 
 impl FaiIndex {
@@ -93,11 +93,9 @@ impl FaiIndex {
     /// Coordinates are 1-based closed.  Each range starts at the first base and ends one
     /// byte after the last base, so it includes any newlines in between.
     ///
-    /// # Errors
-    ///
-    /// Returns [`SearchError::InvalidRequest`] if a contig is not in the index, or if
-    /// `begin` is 0 or `end` is past the end of the contig.
-    pub fn get_offsets(&self, coordinates: &[Coordinate]) -> Result<Vec<Range<u64>>, SearchError> {
+    /// There is one entry per coordinate.  It is `None` if the contig is not in the index,
+    /// or if `begin` is 0 or `end` is past the end of the contig.
+    pub fn get_offsets(&self, coordinates: &[Coordinate]) -> Vec<Option<Range<u64>>> {
         let mut ranges = vec![];
         coordinates.iter().for_each(|coord| {
             let chr = coord.get_chromosome();
@@ -105,14 +103,17 @@ impl FaiIndex {
             let end = coord.get_end();
             if let Some(contig) = self.find_contig(chr) {
                 if !FaiIndex::valid_coordinate(begin, end, contig) {
+                    ranges.push(None);
                     return;
                 }
                 let start = Self::get_offset(begin, contig);
                 let end = Self::get_offset(end, contig) + 1;
-                ranges.push(start..end);
+                ranges.push(Some(start..end));
+            } else {
+                ranges.push(None);
             }
         });
-        Ok(ranges)
+        ranges
     }
 
     fn find_contig(&self, chr: &str) -> Option<&Contig> {

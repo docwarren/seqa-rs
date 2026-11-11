@@ -25,8 +25,6 @@ use crate::coordinate::Coordinate;
 /// `Display` must write the record back out in its native text format; the tabix
 /// search uses it to produce result lines.
 pub trait Feature: std::fmt::Display {
-    /// Returns an identifier for the feature (e.g. rsID for VCF, name for BED).
-    fn get_id(&self) -> String;
     /// Returns the feature's position, tagged with its format's native coordinate system.
     fn coordinate(&self) -> Coordinate;
 }

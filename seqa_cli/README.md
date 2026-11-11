@@ -34,13 +34,14 @@ ln -s $(pwd)/target/release/seqa ~/.local/bin/seqa
 ## Usage
 
 ```bash
-seqa search <file> <coordinates> [OPTIONS]
-seqa genes <coordinates|symbols|cytobands> [OPTIONS]
+seqa search <file> <coordinates>... [OPTIONS]
+seqa genes <coordinates|symbols> [OPTIONS]
+seqa cytobands <chromosome> [OPTIONS]
 ```
 
 ### Coordinate Formats
 
-Coordinates are 1-based and inclusive.
+Coordinates are 1-based and inclusive. Pass one or more, separated by spaces.
 
 | Format | Example | Description |
 |--------|---------|-------------|
@@ -50,7 +51,7 @@ Coordinates are 1-based and inclusive.
 
 Commas are stripped automatically: `chr1:1,000,000-2,000,000` works fine. Chromosome names with or without the `chr` prefix are accepted.
 
-BAM searches are limited to 200,001 bases per query, so whole-chromosome BAM queries are rejected. FASTA queries are limited to 250,000,000 bases.
+BAM searches are limited to 200,001 bases per query, so a whole-chromosome BAM query returns no records. FASTA queries are limited to 250,000,000 bases. A chromosome that isn't in the file also returns no records.
 
 ### Search Options
 
@@ -63,7 +64,7 @@ BAM searches are limited to 200,001 bases per query, so whole-chromosome BAM que
 
 ### Gene Commands
 
-Gene data comes from the bundled SQLite databases. `-r, --reference` accepts `hg38`, `hg19`, `grch37` or `grch38`, and defaults to `grch38`.
+Gene data comes from the bundled SQLite databases. `-r, --reference` accepts `hg38`, `hg19`, `grch37` or `grch38`, and defaults to `hg38` (same build as `grch38`). The `genes` commands also take `-s, --source`: `refseq` (default) or `gencode`.
 
 ```bash
 # Coordinates (gene, chromosome, begin, end) for a gene symbol
@@ -72,8 +73,11 @@ seqa genes coordinates BRCA2
 # Every gene symbol, one per line
 seqa genes symbols -r hg19
 
+# Gene symbols from GENCODE
+seqa genes symbols -s gencode
+
 # Cytobands for a chromosome
-seqa genes cytobands chr1
+seqa cytobands chr1
 ```
 
 ### Examples
@@ -84,6 +88,9 @@ seqa search /path/to/sample.bam chr12:10000000-10010000
 
 # Full chromosome
 seqa search /path/to/sample.vcf.gz chr1
+
+# Several regions in one search
+seqa search /path/to/sample.vcf.gz chr1:1000000-2000000 chr2:500000-600000 chrX
 
 # With header
 seqa search /path/to/sample.gff.gz chr5:1000-2000 -w true
@@ -138,7 +145,7 @@ The bucket or container is taken from the URL, so it doesn't need to be set.
 
 ## Output
 
-Results are written to stdout in each format's native representation:
+Results are written to stdout in each format's native representation. When more than one coordinate is given, each coordinate's results are preceded by the coordinate (tab-separated `chromosome begin end`) and a `---` separator line. A coordinate with no results, or one that isn't valid for the file, prints just its heading.
 
 | Input | Output |
 |-------|--------|

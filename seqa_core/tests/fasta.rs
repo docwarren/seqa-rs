@@ -73,3 +73,34 @@ async fn fasta_multiple_coordinates() {
     assert_eq!(result.lines.len(), 2);
     assert_eq!(result.lines.concat().join("").len(), 200);
 }
+
+#[tokio::test]
+async fn fasta_invalid_coordinates_return_empty_lines() {
+    use seqa_core::api::search_options::SearchOptions;
+    use seqa_core::stores::StoreService;
+
+    let options = SearchOptions::new(
+        S3_FASTA,
+        &vec![
+            "chr1:248956423-248956500".to_string(),
+            "chr1:10001-10100".to_string(),
+            "chr1:1-260000000".to_string(),
+            "chr2:10001-10100".to_string(),
+        ],
+    )
+    .unwrap()
+    .set_index_path(S3_FASTA_INDEX)
+    .set_output_format("fasta")
+    .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = search_features(&store_service, &options)
+        .await
+        .expect("Failed to search FASTA");
+    assert_eq!(result.coordinates.len(), 4);
+    assert_eq!(result.lines.len(), 4);
+    assert!(result.lines[0].is_empty());
+    assert_eq!(result.lines[1].join("").len(), 100);
+    assert!(result.lines[2].is_empty());
+    assert_eq!(result.lines[3].join("").len(), 100);
+}

@@ -29,17 +29,6 @@ impl RTreeLeaf {
 
     pub const SIZE: usize = 32; // Size of the RTreeLeaf in bytes
 
-    pub fn new() -> Self {
-        RTreeLeaf {
-            start_chrom_idx: 0,
-            start_base: 0,
-            end_chrom_idx: 0,
-            end_base: 0,
-            data_offset: 0,
-            data_size: 0,
-        }
-    }
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParsingError> {
         if bytes.len() < RTreeLeaf::SIZE {
             return Err(ParsingError::InsufficientBytes);

@@ -91,11 +91,12 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
         Ok(r) => r,
         Err(e) => return error_response(500, &format!("{}", e)),
     };
-    let header = if let Some(header) = result.header {
-        header.to_lines()
-    } else {
-        Vec::new()
-    };
+    let mut header = Vec::new();
+    if options.include_header || options.header_only {
+        if let Some(h) = result.header {
+            header = h.to_lines();
+        }
+    }
 
     json_response(
         200,
@@ -152,6 +153,7 @@ fn error_response(status: u16, message: &str) -> Result<Response<Body>, Error> {
 mod tests {
     use super::*;
     use lambda_http::{Body, Request};
+    use seqa_core::indexes::index_cache::IndexGuard;
 
     fn build_request(options: &SearchOptions) -> Request {
         let coordinate = &options.coordinates[0];
@@ -218,6 +220,7 @@ mod tests {
 
     #[tokio::test]
     async fn bam_chr2_range() {
+        let _guard = IndexGuard::new("s3://com.gmail.docarw/test_data/NA12877.bam.bai");
         let options = SearchOptions::new(
             "s3://com.gmail.docarw/test_data/NA12877.bam",
             &vec!["chr2:50000000-50000100".to_string()],
@@ -238,6 +241,32 @@ mod tests {
             let fields: Vec<&str> = line.split('\t').collect();
             assert_eq!(fields[2], "chr2", "unexpected reference in line: {}", line);
         }
+    }
+
+    #[tokio::test]
+    async fn header_only_when_requested() {
+        let _guard = IndexGuard::new("s3://com.gmail.docarw/test_data/NA12877.bam.bai");
+        let mut options = SearchOptions::new(
+            "s3://com.gmail.docarw/test_data/NA12877.bam",
+            &vec!["chr2:50000000-50000100".to_string()],
+        )
+        .unwrap()
+        .set_index_path("s3://com.gmail.docarw/test_data/NA12877.bam.bai")
+        .set_output_format("bam")
+        .set_include_header(false);
+
+        let response = function_handler(build_request(&options)).await.unwrap();
+        assert_eq!(response.status(), 200);
+        let result: SearchResultJson = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        assert!(result.header.is_empty());
+        assert_eq!(result.lines.len(), 1);
+
+        options = options.set_include_header(true);
+        let response = function_handler(build_request(&options)).await.unwrap();
+        assert_eq!(response.status(), 200);
+        let result: SearchResultJson = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        assert!(!result.header.is_empty());
+        assert_eq!(result.lines.len(), 1);
     }
 
     #[tokio::test]
