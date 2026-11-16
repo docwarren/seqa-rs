@@ -119,10 +119,10 @@ async fn feature_search(
         return Err(ApiError::BadRequest("Unsupported file type".to_string()));
     }
     if request.coordinates.is_empty() {
-        return Err(ApiError::BadRequest("Empty coordinate string".to_string()));
+        return Err(ApiError::BadRequest("No coordinates".to_string()));
     }
 
-    let mut search_options = SearchOptions::new(&request.path, &[request.coordinates])
+    let mut search_options = SearchOptions::new(&request.path, &request.coordinates)
         .map_err(|e| ApiError::BadRequest(format!("Invalid coordinates: {}", e)))?
         .set_include_header(request.with_header.unwrap_or(false))
         .set_header_only(request.only_header.unwrap_or(false));
@@ -407,7 +407,7 @@ mod tests {
         let req = json_request(
             "POST",
             "/search",
-            r#"{"path": "s3://bucket/file.txt", "coordinates": "chr1:1-1000"}"#,
+            r#"{"path": "s3://bucket/file.txt", "coordinates": ["chr1:1-1000"]}"#,
         );
         let response = app().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -418,7 +418,7 @@ mod tests {
         let req = json_request(
             "POST",
             "/search",
-            r#"{"path": "s3://bucket/file.vcf.gz", "coordinates": ""}"#,
+            r#"{"path": "s3://bucket/file.vcf.gz", "coordinates": []}"#,
         );
         let response = app().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -451,7 +451,7 @@ mod tests {
         let req = json_request(
             "POST",
             "/search",
-            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": "chr1:116549-116549"}"#,
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": ["chr1:116549-116549"]}"#,
         );
         let response = app().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -461,13 +461,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_search_several_coordinates() {
+        let _guard = IndexGuard::new("s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi");
+        let req = json_request(
+            "POST",
+            "/search",
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": ["chr1:116549-116549", "chr1:1-2"]}"#,
+        );
+        let response = app().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_string(response).await;
+        assert!(body.contains(r#""coordinates":["chr1:116549","chr1:1-2"]"#), "{body}");
+        // lines is the last field: one list per coordinate, the second region has no variants
+        assert!(body.contains(r"chr1\t116549"));
+        assert!(body.ends_with(r#"],[]]}"#));
+    }
+
+    #[tokio::test]
     async fn test_search_header_only_when_requested() {
         let _guard = IndexGuard::new("s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz.tbi");
 
         let req = json_request(
             "POST",
             "/search",
-            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": "chr1:116549-116549"}"#,
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": ["chr1:116549-116549"]}"#,
         );
         let response = app().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -477,7 +494,7 @@ mod tests {
         let req = json_request(
             "POST",
             "/search",
-            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": "chr1:116549-116549", "with_header": true}"#,
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": ["chr1:116549-116549"], "with_header": true}"#,
         );
         let response = app().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);

@@ -17,7 +17,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct SearchRequest {
-    pub coordinates: String,
+    pub coordinates: Vec<String>,
     pub path: String,
     pub with_header: Option<bool>,
     pub only_header: Option<bool>,
