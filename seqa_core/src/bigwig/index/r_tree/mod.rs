@@ -30,6 +30,7 @@ pub mod r_tree_node;
 pub mod r_tree_non_leaf;
 
 #[derive(Default)]
+#[allow(dead_code)]
 pub struct RTree {
     pub header: RTreeHeader,
     pub offset: u64,

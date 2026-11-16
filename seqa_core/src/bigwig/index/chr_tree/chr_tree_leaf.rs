@@ -15,6 +15,7 @@ use crate::api::parsing_error::ParsingError;
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct ChrTreeLeaf {
     pub key: String,
     pub chr_id: u32,

@@ -42,10 +42,15 @@ pub struct Coordinate {
     pub system: CoordinateSystem,
 }
 
-/// Formats as `chromosome\tbegin\tend` using the native positions.
+/// Formats as `chromosome:begin-end`, or `chromosome:position` when begin equals end,
+/// using the native positions, so the string parses back with [`Coordinate::new`].
 impl Display for Coordinate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}\t{}\t{}", self.chromosome, self.begin, self.end)
+        if self.begin == self.end {
+            write!(f, "{}:{}", self.chromosome, self.begin)
+        } else {
+            write!(f, "{}:{}-{}", self.chromosome, self.begin, self.end)
+        }
     }
 }
 
@@ -114,5 +119,34 @@ impl Coordinate {
         let (begin, end) = self.to_canonical();
         let (other_begin, other_end) = other.to_canonical();
         begin < other_end && end > other_begin
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn displays_a_range_as_chromosome_colon_begin_dash_end() {
+        let coordinate = Coordinate::new("chr1:1000-2000", CoordinateSystem::OneBasedClosed).unwrap();
+        assert_eq!(coordinate.to_string(), "chr1:1000-2000");
+    }
+
+    #[test]
+    fn displays_a_single_base_as_chromosome_colon_position() {
+        let coordinate = Coordinate::new("chr1:116549", CoordinateSystem::OneBasedClosed).unwrap();
+        assert_eq!(coordinate.to_string(), "chr1:116549");
+    }
+
+    #[test]
+    fn display_parses_back_to_the_same_coordinate() {
+        for text in ["chr2:5-500", "chrX:42"] {
+            let coordinate = Coordinate::new(text, CoordinateSystem::OneBasedClosed).unwrap();
+            let parsed = Coordinate::new(&coordinate.to_string(), CoordinateSystem::OneBasedClosed).unwrap();
+            assert_eq!(
+                (parsed.chromosome, parsed.begin, parsed.end),
+                (coordinate.chromosome, coordinate.begin, coordinate.end)
+            );
+        }
     }
 }
