@@ -24,7 +24,7 @@ use seqa_core::stores::StoreService;
 #[derive(Serialize, Deserialize)]
 pub struct SearchRequest {
     pub path: String,
-    pub coordinates: String,
+    pub coordinates: Vec<String>,
     pub with_header: Option<bool>,
     pub only_header: Option<bool>,
     pub genome: Option<String>,
@@ -62,13 +62,14 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
     };
     let options: SearchOptions = match payload {
         Some(request) => {
+            if request.coordinates.is_empty() {
+                return error_response(400, "No coordinates");
+            }
             let genome = request.genome.unwrap_or("hg38".to_string());
-            let mut options =
-                match SearchOptions::new(&request.path, std::slice::from_ref(&request.coordinates))
-                {
-                    Ok(o) => o,
-                    Err(e) => return error_response(400, &format!("{}", e)),
-                };
+            let mut options = match SearchOptions::new(&request.path, &request.coordinates) {
+                Ok(o) => o,
+                Err(e) => return error_response(400, &format!("{}", e)),
+            };
             let mut options = options
                 .set_include_header(request.with_header.unwrap_or(false))
                 .set_header_only(request.only_header.unwrap_or(false))
@@ -156,15 +157,20 @@ mod tests {
     use seqa_core::indexes::index_cache::IndexGuard;
 
     fn build_request(options: &SearchOptions) -> Request {
-        let coordinate = &options.coordinates[0];
         let payload = SearchRequest {
             path: options.file_path.clone(),
-            coordinates: format!(
-                "{}:{}-{}",
-                coordinate.get_chromosome(),
-                coordinate.get_begin(),
-                coordinate.get_end()
-            ),
+            coordinates: options
+                .coordinates
+                .iter()
+                .map(|coordinate| {
+                    format!(
+                        "{}:{}-{}",
+                        coordinate.get_chromosome(),
+                        coordinate.get_begin(),
+                        coordinate.get_end()
+                    )
+                })
+                .collect(),
             with_header: Some(options.include_header),
             only_header: Some(options.header_only),
             genome: options.genome.clone(),
@@ -173,6 +179,15 @@ mod tests {
         };
         let body = serde_json::to_string(&payload).unwrap();
         let mut request = Request::new(Body::Text(body));
+        *request.method_mut() = Method::POST;
+        request
+            .headers_mut()
+            .insert("content-type", "application/json".parse().unwrap());
+        request
+    }
+
+    fn post_request(body: &str) -> Request {
+        let mut request = Request::new(Body::Text(body.to_string()));
         *request.method_mut() = Method::POST;
         request
             .headers_mut()
@@ -267,6 +282,42 @@ mod tests {
         let result: SearchResultJson = serde_json::from_slice(&response.body().to_vec()).unwrap();
         assert!(!result.header.is_empty());
         assert_eq!(result.lines.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn search_several_coordinates() {
+        let request = post_request(
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": ["chr1:116549-116549", "chr1:1-2"]}"#,
+        );
+        let response = function_handler(request).await.unwrap();
+        assert_eq!(response.status(), 200);
+        let result: SearchResultJson = serde_json::from_slice(&response.body().to_vec()).unwrap();
+        assert_eq!(result.coordinates.len(), 2);
+        assert!(result.coordinates[0].starts_with("chr1:116549"));
+        assert_eq!(result.coordinates[1], "chr1:1-2");
+        assert_eq!(result.lines.len(), 2);
+        assert!(!result.lines[0].is_empty());
+        assert!(result.lines[1].is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_rejects_empty_coordinates() {
+        let request = post_request(
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": []}"#,
+        );
+        let response = function_handler(request).await.unwrap();
+        assert_eq!(response.status(), 400);
+        let body = String::from_utf8(response.body().to_vec()).unwrap();
+        assert!(body.contains("No coordinates"), "{body}");
+    }
+
+    #[tokio::test]
+    async fn search_rejects_single_coordinate_string() {
+        let request = post_request(
+            r#"{"path": "s3://com.gmail.docarw/test_data/NA12877.EVA.vcf.gz", "coordinates": "chr1:1-1000"}"#,
+        );
+        let response = function_handler(request).await.unwrap();
+        assert_eq!(response.status(), 400);
     }
 
     #[tokio::test]

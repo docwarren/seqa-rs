@@ -17,7 +17,7 @@ An AWS Lambda function (HTTP, via API Gateway) that runs `seqa_core` genomic sea
 ```json
 {
     "path": "s3://my-bucket/sample.bam",
-    "coordinates": "chr12:10000000-10010000",
+    "coordinates": ["chr12:10000000-10010000", "chr12:20000000-20010000"],
     "with_header": false,
     "only_header": false,
     "genome": "hg38"
@@ -27,7 +27,7 @@ An AWS Lambda function (HTTP, via API Gateway) that runs `seqa_core` genomic sea
 | Field | Required | Description |
 |-------|----------|-------------|
 | `path` | yes | URI of the data file; the format and index path are inferred from its extension unless set below |
-| `coordinates` | yes | One region, 1-based inclusive, e.g. `chr1:1000-2000` |
+| `coordinates` | yes | One or more regions, 1-based inclusive, e.g. `["chr1:1000-2000"]`. An empty list returns 400 |
 | `with_header` | no | Return the file header in `header`. Defaults to `false` |
 | `only_header` | no | Return the header and no records. Defaults to `false` |
 | `genome` | no | Genome build, defaults to `hg38`. Not currently used by the search |
@@ -38,9 +38,9 @@ An AWS Lambda function (HTTP, via API Gateway) that runs `seqa_core` genomic sea
 
 ```json
 {
-    "coordinates": ["chr12:10000000-10010000"],
+    "coordinates": ["chr12:10000000-10010000", "chr12:20000000-20010000"],
     "header": [],
-    "lines": [["...SAM record...", "..."]]
+    "lines": [["...SAM record...", "..."], ["...SAM record..."]]
 }
 ```
 
