@@ -75,6 +75,7 @@ fn read_non_leaf_nodes(
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ChrTreeNode {
     pub is_leaf: bool,
     pub reserved: u8,

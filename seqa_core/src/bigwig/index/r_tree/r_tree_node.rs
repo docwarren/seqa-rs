@@ -23,6 +23,7 @@ pub enum RTreeNodeType {
 }
 
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct RTreeNode {
     pub is_leaf: bool,
     pub reserved: u8,

@@ -16,6 +16,7 @@ use crate::api::parsing_error::ParsingError;
 use crate::bigwig::index::chr_tree::chr_tree_node::ChrTreeNode;
 
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct ChrTreeNonLeaf {
     pub key: String,
     pub child_offset: u64,

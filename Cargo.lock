@@ -1886,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_axum"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "axum",
  "http-body-util",
@@ -1901,7 +1901,7 @@ dependencies = [
 
 [[package]]
 name = "seqa_core"
-version = "9.0.0"
+version = "9.0.1"
 dependencies = [
  "bstr",
  "flate2",

@@ -47,17 +47,15 @@ pub async fn fasta_search(
     result.fasta_index = Some(index.clone());
 
     let mut offsets: Vec<Option<Range<u64>>> = index.get_offsets(&options.coordinates);
-    for i in 0..options.coordinates.len() {
-        if !check_coord_for_length(&options.coordinates[i], MAX_FASTA_SEARCH_SIZE) {
+    for (i, coord) in options.coordinates.iter().enumerate() {
+        if !check_coord_for_length(coord, MAX_FASTA_SEARCH_SIZE) {
             offsets[i] = None;
         }
     }
 
     let mut byte_ranges: Vec<Range<u64>> = Vec::new();
-    for offset in &offsets {
-        if let Some(range) = offset {
-            byte_ranges.push(range.clone());
-        }
+    for range in offsets.iter().flatten() {
+        byte_ranges.push(range.clone());
     }
 
     let bytes = store_service

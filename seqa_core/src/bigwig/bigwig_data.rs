@@ -18,6 +18,7 @@ use crate::bigwig::index::r_tree::overlaps::Overlaps;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct BigwigData {
     pub chromosome_id: u32,
     pub begin: u32,

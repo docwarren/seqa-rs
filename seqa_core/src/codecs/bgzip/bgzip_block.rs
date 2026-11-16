@@ -15,6 +15,7 @@
 
 use crate::codecs::codec_error::CodecError;
 
+#[allow(dead_code)]
 pub struct SubBlock {
     pub s1: u8,
     pub s2: u8,

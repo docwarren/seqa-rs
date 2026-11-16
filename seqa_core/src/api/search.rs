@@ -38,7 +38,7 @@ pub(crate) async fn fetch(
     file_path: &str,
     chunks: &[Chunk],
 ) -> Result<Vec<Vec<u8>>, StoreError> {
-    let ranges = chunks.iter().map(|c| c.to_range()).collect::<Vec<_>>();
+    let ranges = chunks.iter().map(|c| c.get_range()).collect::<Vec<_>>();
     let data = store_service.get_ranges(file_path, &ranges).await?;
     Ok(data)
 }

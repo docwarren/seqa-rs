@@ -18,7 +18,6 @@ pub enum VariantType {
     Substitution,
     IndelIns,
     IndelDel,
-    IndelMixed,
     CnGain,
     CnLoss,
     CnRef,
@@ -31,6 +30,5 @@ pub enum VariantType {
     SvInv,
     SvBnd,
     SvCtx,
-    SvCpx,
-    Unknown,
+    SvCpx
 }

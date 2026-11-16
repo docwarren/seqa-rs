@@ -44,7 +44,7 @@ impl Chunk {
         }
     }
 
-    pub fn to_range(&self) -> Range<u64> {
+    pub fn get_range(&self) -> Range<u64> {
         let first_block = self.begin_vp.block_offset;
         let last_block = self.end_vp.block_offset;
         Range {
