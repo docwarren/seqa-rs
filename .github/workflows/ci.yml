@@ -27,6 +27,9 @@ jobs:
       - name: Local store test
         run: cargo test -p seqa_core --test local
 
+      - name: Reference data and integrity tests
+        run: cargo test -p seqa_core --test reference_data --test reference_data_integrity
+
       - name: Axum tests
         run: |
           cargo test -p seqa_axum test_index

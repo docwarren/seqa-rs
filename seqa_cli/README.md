@@ -64,7 +64,7 @@ BAM searches are limited to 200,001 bases per query, so a whole-chromosome BAM q
 
 ### Gene Commands
 
-Gene data comes from the bundled SQLite databases. `-r, --reference` accepts `hg38`, `hg19`, `grch37` or `grch38`, and defaults to `hg38` (same build as `grch38`). The `genes` commands also take `-s, --source`: `refseq` (default) or `gencode`.
+Gene and cytoband data is bundled into the binary as CSV. `-r, --reference` accepts `hg38`, `hg19`, `grch37` or `grch38`, and defaults to `hg38` (same build as `grch38`). The `genes` commands also take `-s, --source`: `refseq` (default) or `gencode`; any other value falls back to `refseq`.
 
 ```bash
 # Coordinates (gene, chromosome, begin, end) for a gene symbol

@@ -12,16 +12,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use log::error;
 use seqa_core::api::search::search_features;
 use seqa_core::api::search_options::SearchOptions;
-use seqa_core::sqlite::genes::GeneError;
-use seqa_core::sqlite::{
-    self,
-    genes::{self},
-};
+use seqa_core::reference_data;
 use seqa_core::stores::StoreService;
 use std::io::{self, Write};
 use seqa_core::api::search_result::SearchResult;
@@ -68,13 +64,13 @@ enum Commands {
         no_cache: bool,
     },
 
-    /// Look up gene metadata from the local SQLite databases.
+    /// Look up gene metadata from the bundled reference data.
     Genes {
         #[command(subcommand)]
         command: GeneCommands,
     },
 
-    /// Look up cytobands for a chromosome from the local SQLite db
+    /// Look up cytobands for a chromosome from the bundled reference data.
     Cytobands {
         /// Chromosome name (e.g. chr1)
         chromosome: String,
@@ -101,7 +97,7 @@ enum GeneCommands {
         source: String
     },
 
-    /// Print every gene symbol in the database, one per line.
+    /// Print every gene symbol in the bundled reference data, one per line.
     Symbols {
         /// Reference genome build (hg38, hg19, grch37, grch38). Defaults to grch38.
         #[arg(short = 'r', long, default_value = "hg38")]
@@ -174,13 +170,13 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Genes { command } => {
-            run_gene_command(command).with_context(|| "Error fetching genes / cytobands")
+            run_gene_command(command);
+            Ok(())
         }
         Commands::Cytobands { chromosome, reference } => {
-            let conn = sqlite::connect_cytobands(&reference)?;
             let stdout = io::stdout();
             let mut handle = stdout.lock();
-            for c in genes::get_cytobands(&conn, &chromosome)? {
+            for c in reference_data::cytobands(&reference, &chromosome) {
                 if writeln!(
                     handle,
                     "{}\t{}\t{}\t{}\t{}",
@@ -196,11 +192,10 @@ async fn main() -> Result<()> {
     }
 }
 
-fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
+fn run_gene_command(command: GeneCommands) {
     match command {
         GeneCommands::Coordinates { gene, reference, source } => {
-            let conn = sqlite::connect_genes(&reference, &source)?;
-            let gene_entries = genes::get_gene_symbols(&conn)?;
+            let gene_entries = reference_data::gene_coordinates(&reference, &source);
             let gene_result = gene_entries.iter().find(|g| g.symbol == gene);
             if let Some(entry) = gene_result {
                 println!(
@@ -210,17 +205,15 @@ fn run_gene_command(command: GeneCommands) -> Result<(), GeneError> {
             }
         }
         GeneCommands::Symbols { reference, source } => {
-            let conn = sqlite::connect_genes(&reference, &source)?;
             let stdout = io::stdout();
             let mut handle = stdout.lock();
-            for symbol in genes::get_gene_symbols(&conn)? {
+            for symbol in reference_data::gene_coordinates(&reference, &source) {
                 if writeln!(handle, "{}", symbol.symbol).is_err() {
                     break;
                 }
             }
         }
     }
-    Ok(())
 }
 
 fn print_output(search_result: &SearchResult, options: &SearchOptions) -> io::Result<()> {

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Depends on:
 #   wget
 #   gunzip
@@ -50,16 +51,14 @@ do
   echo "Downloading GENCODE ${genome}"
   echo "-----------------------------------------------------------------------------------------------"
 
-  if [[ ! -f ${gencode_local} ]]; then
-      wget -nv "${gencode_uri}"
-  fi
+  rm -f "${gencode_local}" "${gencode_gtf}" "${gencode_gtf}.gz"
+  wget -nv "${gencode_uri}"
 
   echo ""
   echo "Downloading REFSEQ ${genome}"
   echo "-----------------------------------------------------------------------------------------------"
-  if [[ ! -f ${refseq_local} ]]; then
-      wget -nv "${refseq_uri}"
-  fi
+  rm -f "${refseq_local}" "${refseq_gtf}" "${refseq_gtf}.gz"
+  wget -nv "${refseq_uri}"
 
   echo ""
   echo "Renaming files"
