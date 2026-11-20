@@ -11,7 +11,7 @@ def parse_args():
 def main(genome, source):
     print(genome, source)
     input = f"./{genome}/{genome}.gene.{source}.gtf.gz"
-    output = f"./{genome}/{genome}.{source}.coordinates.csv"
+    output = f"./{genome}/{genome}.{source}.genes.csv"
 
     print(f"Reading {input} and writing {output}")
 

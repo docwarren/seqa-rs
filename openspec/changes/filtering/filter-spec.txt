@@ -1,0 +1,138 @@
+# Filtering
+
+Filters are represented by a JSON object and apply to VCF files only.
+A filter narrows the records returned for the coordinates being searched; it does not change which regions are searched.
+If the filter is incomplete or incorrect, the search returns a SearchError.
+
+The baseline filters are:
+- INFO: matching an info field
+- SAMPLE: matching a sample (FORMAT) field
+- QUAL: matching the QUAL column
+- FILTERS: matching the FILTER column
+- GENES: overlapping genes
+- COORDINATES: overlapping coordinates
+
+## Filter shape
+Every filter is either a leaf or a combinator.
+
+Leaf: { "type", "key"?, "sampleId"?, "operator"?, "value" | "values" }
+- "type" is uppercase: INFO, SAMPLE, QUAL, FILTERS, GENES, COORDINATES
+- each type takes only the properties listed in its section; missing or extra properties are an error
+
+Combinators: { "AND": [ ... ] } and { "OR": [ ... ] }
+- the array must not be empty
+- combinators can be nested
+- NOT is not supported
+
+## Value types
+The comparison type is decided by the JSON value:
+- a JSON number (10) is compared numerically, parsed as f32
+- a JSON string ("10") is compared as text
+lt, gt, lte, gte need a number. contains, !contains need a string.
+If a numeric filter meets a VCF value that is not a number (and not '.'), the search returns a SearchError.
+Text comparisons never fail on type.
+
+## Info and Sample fields
+INFO: { "type": "INFO", "key", "operator", "value" }
+SAMPLE: { "type": "SAMPLE", "sampleId", "key", "operator", "value" }
+- sampleId must match a sample column in the VCF header, otherwise SearchError
+
+Text operators: eq, neq, contains, !contains
+- all text comparisons are case-insensitive
+- eq / neq compare the whole value, contains / !contains look for a substring
+Numeric operators: eq, neq, lt, gt, lte, gte
+Presence operators: exists, !exists (no "value")
+- exists matches when the key is present and its value is not '.'
+- an INFO flag (e.g. DB, no '=value') counts as present
+
+Missing values:
+- a missing key, an empty value or '.' never matches any value operator, including neq and !contains
+- only !exists matches a missing value
+
+Multi-value fields (e.g. AF=0.1,0.6) work like bcftools:
+- the filter matches if ANY of the values matches
+- '.' values are skipped; if every value is '.', the field counts as missing
+- note: AF neq 0.1 matches AF=0.1,0.2 because 0.2 is not 0.1
+
+### Genotype representation
+A special case is the GT key in samples.
+a genotype value can be type GTValue = number | '.'
+a genotype separator can be '|' or '/'
+there can only be one or zero separators and one or two GTValue
+e.g. valid genotypes:
+- 0/0
+- ./0
+- 2/3
+- .
+- ./.
+- .|.
+- 0|1
+- .|1
+Any other GT value is a SearchError when a genotype filter is applied to it.
+
+Genotype operators only apply to the GT key and take no "value".
+Other operators on GT are treated like any other sample field.
+ - 'na' matches when every allele is '.': ., ./., .|.  (./0 does not match)
+ - 'ref' matches when every allele is 0: 0, 0/0, 0|0  (./. and 0/. do not match)
+ - 'hom' matches when every allele is the same number other than 0: 1/1, 2|2, and haploid 1  (0/0, 1/2, ./. do not match)
+ - 'het' matches two called alleles with different numbers: 0/1, 1/0, 1|2  (1/1, ./1, and haploid 1 do not match)
+ - 'father' matches a '|' genotype whose right-hand value is a number other than 0: 0|1, 1|2  (0|. and 0/1 do not match)
+ - 'mother' matches a '|' genotype whose left-hand value is a number other than 0: 1|0, 2|1  (0|1, .|1, 1/0 do not match)
+
+## QUAL
+{ "type": "QUAL", "operator", "value" }
+Treated like a numeric INFO field: numeric operators only. A QUAL of '.' never matches.
+
+## Filters field
+{ "type": "FILTERS", "operator", "value" }
+The FILTER column is a list of strings. VCF uses ';' but files are not always correctly delimited, so both ';' and ',' are accepted.
+can be filtered by:
+- contains: some entry equals the value (case-insensitive). contains "PASS" does not match "PASSED".
+- !contains: no entry equals the value
+A FILTER of '.' matches neither.
+
+## Genes
+{ "type": "GENES", "values": ["BRCA1", "BRCA2"] }
+- no operator: genes always mean "overlaps"
+- the search must include a genome (hg19, hg38, grch37, grch38); otherwise SearchError
+- the gene source is refseq or gencode, and defaults to refseq; any other value is a SearchError
+- each gene is looked up in the internal database by gene name, gene source and genome. An unknown gene is a SearchError.
+- after the lookup this works as a coordinate filter with "overlaps"
+
+## Coordinates
+{ "type": "COORDINATES", "operator", "values": ["chr1", "chr2:1000-2000"] }
+- coordinates are one-based: chr, chr:pos or chr:begin-end
+- 'overlaps' keeps records that overlap ANY of the coordinates
+- '!overlaps' keeps records that overlap NONE of the coordinates
+- an unparseable coordinate or an empty list is a SearchError
+
+### Overlap and structural variants
+If a record has an END or SVLEN INFO value, it overlaps a region when EITHER breakpoint is in the region:
+- begin breakpoint: CHROM:POS
+- end breakpoint: (CHR2 if present, else CHROM):(END, else POS + |SVLEN|)
+An SV that spans a region but has neither breakpoint inside it does not overlap.
+Other records use their normal span.
+
+## Interfaces
+- seqa_cli: seqa filter <file> <coordinates...> --spec <filter.json> [-r genome] [-s refseq|gencode] [-w true] [-o true] [--no-cache]
+- seqa_axum: POST /filter with { path, coordinates, filter, genome?, gene_source?, with_header?, only_header? }
+- seqa_lambda: the search payload accepts optional filter and gene_source
+- seqa_core: SearchOptions has filter: Option<Filter> and gene_source (default refseq)
+
+## Example filter
+{
+    "AND": [
+        { "type": "QUAL", "operator": "gt", "value": 0.68 },
+        { "type": "SAMPLE", "sampleId": "NA12878", "key": "GT", "operator": "het" },
+        { "type": "SAMPLE", "sampleId": "NA12878", "key": "GT", "operator": "mother" },
+        {
+            "OR": [
+                { "type": "FILTERS", "operator": "contains", "value": "PASS" },
+                { "type": "FILTERS", "operator": "!contains", "value": "FAIL" }
+            ]
+        },
+        { "type": "INFO", "key": "DB", "operator": "exists" },
+        { "type": "GENES", "values": ["ABCD1", "BRCA1", "CNN", "DARP"] },
+        { "type": "COORDINATES", "operator": "!overlaps", "values": ["chr1", "chr2:1000-2000", "chr3"] }
+    ]
+}

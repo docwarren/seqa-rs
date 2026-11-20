@@ -1,21 +1,29 @@
 #!/bin/bash
+set -euo pipefail
 # Dependencies
 # bgzip
 # tabix
 # wget
-# sqlite3
 # awk
 # sed
 # zcat
+# python3
 # aws cli
 # aws credentials in the ENV
-# Get the script path
 
-# Run this script from a directory where you are happy to store lots of data
+# Run this script from a directory where you are happy to store lots of data.
+# Every run starts clean and downloads everything again. Any failing command stops the
+# run before anything is copied into seqa_core/data/ or uploaded to S3.
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
 CORE_DATA_DIR="$SCRIPT_PATH/../seqa_core/data/"
 mkdir -p "${CORE_DATA_DIR}"
+
+# Remove output from earlier runs
+echo "=============================================================================================================="
+echo "Removing output from earlier runs"
+echo "=============================================================================================================="
+rm -rf ./hg19 ./hg38 ./mane.bb
 
 # Download latest gene information
 echo "=============================================================================================================="
@@ -23,11 +31,11 @@ echo "Running get_transcript_data.sh"
 echo "=============================================================================================================="
 "${SCRIPT_PATH}"/get_transcript_data.sh
 
-# Create gene_coordinates dbs
+# Create gene coordinate CSV files
 echo "=============================================================================================================="
-echo "Running create_gene_coordinates_db.sh"
+echo "Running create_gene_coordinates.sh"
 echo "=============================================================================================================="
-"${SCRIPT_PATH}"/create_gene_coordinates_db.sh
+"${SCRIPT_PATH}"/create_gene_coordinates.sh
 
 # Download cytobands
 echo "=============================================================================================================="
@@ -36,14 +44,14 @@ echo "==========================================================================
 "${SCRIPT_PATH}"/download_cytobands.sh
 
 # Copy to data dir
-DBS=("./hg38/hg38.cytobands.db" "./hg19/hg19.cytobands.db" "./hg38/hg38.refseq.gene.db" "./hg19/hg19.refseq.gene.db" "./hg38/hg38.gencode.gene.db" "./hg19/hg19.gencode.gene.db")
+CSVS=("./hg38/hg38.cytobands.csv" "./hg19/hg19.cytobands.csv" "./hg38/hg38.refseq.genes.csv" "./hg19/hg19.refseq.genes.csv" "./hg38/hg38.gencode.genes.csv" "./hg19/hg19.gencode.genes.csv")
 
 echo "=============================================================================================================="
-echo "Copying databases to data directory..."
+echo "Copying CSV files to data directory..."
 echo "=============================================================================================================="
-for db in "${DBS[@]}"; do
-  echo "${db} --> ${CORE_DATA_DIR}${db}"
-  cp "${db}" "${CORE_DATA_DIR}"
+for csv in "${CSVS[@]}"; do
+  echo "${csv} --> ${CORE_DATA_DIR}"
+  cp "${csv}" "${CORE_DATA_DIR}"
 done
 
 # Upload gene data to s3

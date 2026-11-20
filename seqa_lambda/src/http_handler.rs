@@ -18,7 +18,7 @@ use lambda_http::http::Method;
 use lambda_http::{Body, Error, Request, RequestPayloadExt, Response};
 use seqa_core::api::search::search_features;
 use seqa_core::api::search_options::{CigarFormat, SearchOptions};
-use seqa_core::sqlite::{self, genes};
+use seqa_core::reference_data;
 use seqa_core::stores::StoreService;
 
 #[derive(Serialize, Deserialize)]
@@ -110,25 +110,11 @@ async fn search_handler(event: Request) -> Result<Response<Body>, Error> {
 }
 
 fn gene_symbols(genome: &str, source: &str) -> Result<Response<Body>, Error> {
-    let conn = match sqlite::connect_genes(genome, source) {
-        Ok(c) => c,
-        Err(e) => return error_response(500, &format!("{}", e)),
-    };
-    match genes::get_gene_symbols(&conn) {
-        Ok(symbols) => json_response(200, &symbols),
-        Err(e) => error_response(500, &format!("{}", e)),
-    }
+    json_response(200, &reference_data::gene_coordinates(genome, source))
 }
 
 fn cytobands(genome: &str, chromosome: &str) -> Result<Response<Body>, Error> {
-    let conn = match sqlite::connect_cytobands(genome) {
-        Ok(c) => c,
-        Err(e) => return error_response(500, &format!("{}", e)),
-    };
-    match genes::get_cytobands(&conn, chromosome) {
-        Ok(bands) => json_response(200, &bands),
-        Err(e) => error_response(500, &format!("{}", e)),
-    }
+    json_response(200, &reference_data::cytobands(genome, chromosome))
 }
 
 fn json_response<T: Serialize>(status: u16, value: &T) -> Result<Response<Body>, Error> {
@@ -345,5 +331,27 @@ mod tests {
         assert_eq!(response.status(), 200);
         let bands: serde_json::Value = serde_json::from_slice(&response.body().to_vec()).unwrap();
         assert!(bands.as_array().unwrap().len() > 0);
+    }
+
+    #[tokio::test]
+    async fn cytobands_chr1_hg19() {
+        let response = function_handler(get_request("/genes/cytobands/hg19/chr1"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200);
+        let bands: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
+        let bands = bands.as_array().unwrap();
+        assert!(!bands.is_empty());
+        assert!(bands.iter().all(|band| band["chromosome"] == "chr1"));
+    }
+
+    #[tokio::test]
+    async fn cytobands_unknown_chromosome_is_empty() {
+        let response = function_handler(get_request("/genes/cytobands/grch38/chrNotReal"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200);
+        let bands: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
+        assert_eq!(bands, serde_json::json!([]));
     }
 }

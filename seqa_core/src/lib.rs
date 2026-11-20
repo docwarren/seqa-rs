@@ -71,9 +71,11 @@
 //! - `file://` or a local path (`/`, `./`, `../`) — local filesystem
 //! - `http(s)://` — HTTP/HTTPS
 //!
-//! ## Feature flags
+//! ## Reference data
 //!
-//! - **`sqlite`** — Enables the `sqlite` module for gene-symbol and cytoband queries via SQLite.
+//! [`reference_data`] provides gene coordinates (RefSeq and GENCODE) and cytobands for hg19
+//! and hg38. The data is bundled into the binary as CSV, so it needs no files or database at
+//! runtime, and it is always available (there is no feature flag).
 
 pub mod api;
 pub(crate) mod bam;
@@ -84,8 +86,7 @@ pub(crate) mod fasta;
 pub(crate) mod genome;
 pub mod indexes;
 pub mod models;
-#[cfg(feature = "sqlite")]
-pub mod sqlite;
+pub mod reference_data;
 pub mod stores;
 pub(crate) mod tabix;
 pub(crate) mod traits;

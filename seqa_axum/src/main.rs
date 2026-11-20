@@ -27,7 +27,7 @@ use seqa_core::api::search::search_features;
 use seqa_core::api::search_options::SearchOptions;
 use seqa_core::models::cytoband::Cytoband;
 use seqa_core::models::gene_coordinate::GeneCoordinate;
-use seqa_core::sqlite::{self, genes};
+use seqa_core::reference_data;
 use seqa_core::stores::buckets::{CloudBackend, list_buckets as list_cloud_buckets};
 use seqa_core::stores::{DirectoryEntry, StoreService};
 use seqa_core::TabixHeader;
@@ -247,24 +247,15 @@ async fn list_dir(
 }
 
 async fn get_gene_symbols(
-    Path(genome): Path<String>,
-    Path(source): Path<String>,
-) -> Result<Json<Vec<GeneCoordinate>>, ApiError> {
-    let connection = sqlite::connect_genes(&genome, &source)
-        .map_err(|e| ApiError::InternalError(format!("Error connecting to DB: {}", e)))?;
-    let symbols = genes::get_gene_symbols(&connection)
-        .map_err(|e| ApiError::InternalError(format!("Error fetching symbols from DB: {}", e)))?;
-    Ok(Json(symbols))
+    Path((genome, source)): Path<(String, String)>,
+) -> Json<&'static [GeneCoordinate]> {
+    Json(reference_data::gene_coordinates(&genome, &source))
 }
 
 async fn get_cytobands(
     Path((genome, chromosome)): Path<(String, String)>,
-) -> Result<Json<Vec<Cytoband>>, ApiError> {
-    let connection = sqlite::connect_cytobands(&genome)
-        .map_err(|e| ApiError::InternalError(format!("Error connecting to DB: {}", e)))?;
-    let cytobands = genes::get_cytobands(&connection, &chromosome)
-        .map_err(|e| ApiError::InternalError(format!("Error fetching cytobands from DB: {}", e)))?;
-    Ok(Json(cytobands))
+) -> Json<Vec<Cytoband>> {
+    Json(reference_data::cytobands(&genome, &chromosome))
 }
 
 /// Lists one level of a directory or bucket prefix.
@@ -611,6 +602,22 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let response = app().oneshot(req).await.unwrap();
-        assert_ne!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = body_string(response).await;
+        assert!(body.starts_with("[{\"chromosome\":\"chr1\""), "{body}");
+    }
+
+    #[tokio::test]
+    async fn test_gene_symbols_route_returns_genes() {
+        let req = Request::builder()
+            .uri("/genes/symbols/grch38/refseq/")
+            .body(Body::empty())
+            .unwrap();
+        let response = app().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = body_string(response).await;
+        assert!(body.contains("\"symbol\":\"BRCA2\""));
     }
 }

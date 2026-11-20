@@ -106,12 +106,19 @@ export GOOGLE_SERVICE_ACCOUNT_KEY='{ "type": "service_account", ... }'
 export GOOGLE_SERVICE_ACCOUNT=/path/to/credentials.json
 ```
 
-## Features
+## Reference data
 
-- `sqlite` — enables gene symbol and cytoband lookups via SQLite (`rusqlite`)
+`seqa_core::reference_data` provides gene coordinates (RefSeq and GENCODE) and cytobands for hg19 and hg38. The data is bundled into the binary as CSV, so it needs no files or database at runtime, and there is no feature flag to enable.
+
+```rust
+use seqa_core::reference_data::{cytobands, gene_coordinates};
+
+let genes = gene_coordinates("hg38", "refseq");
+let bands = cytobands("hg38", "chr1");
+```
 
 ```toml
-seqa_core = "9"
+seqa_core = "10"
 ```
 
 ## Testing
