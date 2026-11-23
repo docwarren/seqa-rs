@@ -1833,18 +1833,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "seqa_api"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "object_store",
+ "seqa_core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "seqa_axum"
-version = "6.0.1"
+version = "7.0.0"
 dependencies = [
  "axum",
  "http-body-util",
  "moka",
+ "object_store",
+ "seqa_api",
  "seqa_core",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tower",
  "tower-http",
+ "url",
 ]
 
 [[package]]
@@ -1869,13 +1887,16 @@ dependencies = [
 
 [[package]]
 name = "seqa_lambda"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "lambda_http",
+ "object_store",
+ "seqa_api",
  "seqa_core",
  "serde",
  "serde_json",
  "tokio",
+ "url",
 ]
 
 [[package]]
