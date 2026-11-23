@@ -13,4 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod models;
+//! The `POST /files/list` request body.
+
+use serde::{Deserialize, Serialize};
+
+/// Body of `POST /files/list`.
+///
+/// A POST rather than a path parameter because URIs contain `://` and slashes,
+/// which a path segment mangles.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListDirectoryRequest {
+    /// URI of the directory or bucket prefix whose direct entries are listed.
+    pub uri: String,
+}

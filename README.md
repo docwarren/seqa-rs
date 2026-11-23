@@ -12,9 +12,10 @@ Supports BAM, VCF, GFF/GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats. In
 | Crate | Description | README |
 |-------|-------------|--------|
 | [`seqa_core`](seqa_core/) | Core library — genomic file parsing, binary index reading, cloud storage via `object_store` | [seqa_core/README.md](seqa_core/README.md) |
+| [`seqa_api`](seqa_api/) | Request and response types, notes read/save and the local-URI guard shared by `seqa_axum`, `seqa_lambda` and the Tauri app | [seqa_api/README.md](seqa_api/README.md) |
 | [`seqa`](seqa_cli/) | CLI tool — query any supported file from the command line | [seqa_cli/README.md](seqa_cli/README.md) |
-| [`seqa_axum`](seqa_axum/) | REST API server — HTTP endpoints for genomic search and file browsing | |
-| [`seqa_lambda`](seqa_lambda/) | AWS Lambda function — genomic search and gene lookups behind API Gateway | [seqa_lambda/README.md](seqa_lambda/README.md) |
+| [`seqa_axum`](seqa_axum/) | REST API server — genomic search, file browsing, notes and reference data | |
+| [`seqa_lambda`](seqa_lambda/) | AWS Lambda function — the same endpoints as `seqa_axum`, behind API Gateway | [seqa_lambda/README.md](seqa_lambda/README.md) |
 
 ## Storage Backends
 
@@ -58,27 +59,33 @@ The server binds to `127.0.0.1:8000` and exposes:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET`  | `/` | Health check |
 | `POST` | `/search` | Genomic range query — see [Search request](#search-request) |
-| `POST` | `/files` | Recursively list objects under a storage URI — JSON body is a bare string, e.g. `"s3://bucket/prefix/"` |
 | `POST` | `/files/list` | List one level of a cloud URI (folders and files) — JSON body `{"uri": "s3://bucket/prefix/"}`; local paths are rejected |
 | `GET`  | `/files/buckets/{backend}` | List the buckets/containers the configured credentials can see — `backend` is `s3`, `gcs` or `azure` |
 | `GET`  | `/files/formats` | Supported file formats, their extensions and index extensions |
-| `GET`  | `/genes/symbols/{genome}/{source}/` | List gene symbols for `hg19`/`hg38`/`grch37`/`grch38`; `source` is `refseq` or `gencode` |
+| `GET`  | `/genes/symbols/{genome}/{source}` | List gene symbols for `hg19`/`hg38`/`grch37`/`grch38`; `source` is `refseq` or `gencode` |
 | `GET`  | `/cytobands/{genome}/{chromosome}` | Cytobands for a chromosome |
+| `POST` | `/notes/read` | Read a note as base64 — JSON body `{"path": "s3://bucket/analysis/notes/today.txt"}`; local paths are rejected |
+| `POST` | `/notes/save` | Save a note from base64 — JSON body `{"path": "...", "data": "<base64>"}`; local paths are rejected |
+
+`seqa_lambda` serves the same endpoints; [seqa_lambda/README.md](seqa_lambda/README.md) documents every request, response and status code. A trailing `/` on a path is optional, and any other method and path returns 404. POST bodies must be JSON with content type `application/json`; anything else returns 400. Every error response is JSON:
+
+```json
+{ "error": "No coordinates" }
+```
 
 ### Search request
 
 ```json
 {
     "path": "s3://my-bucket/sample.vcf.gz",
-    "coordinates": "chr1:1000000-2000000",
+    "coordinates": ["chr1:1000000-2000000"],
     "with_header": false,
     "only_header": false
 }
 ```
 
-`with_header` and `only_header` are optional and default to `false`. The response is JSON:
+`with_header` and `only_header` are optional and default to `false`. `index_path` and `output_format` are optional and override the index path and format inferred from the file extension. The response is JSON:
 
 ```json
 {

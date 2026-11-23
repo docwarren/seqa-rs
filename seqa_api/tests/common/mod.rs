@@ -13,12 +13,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Deserialize;
-
-#[derive(Deserialize, Debug)]
-pub struct SearchRequest {
-    pub coordinates: Vec<String>,
-    pub path: String,
-    pub with_header: Option<bool>,
-    pub only_header: Option<bool>,
-}
+pub mod s3_cleanup;
