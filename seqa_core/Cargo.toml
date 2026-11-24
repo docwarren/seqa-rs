@@ -1,6 +1,6 @@
 [package]
 name = "seqa_core"
-version = "11.0.0"
+version = "11.0.1"
 edition = "2024"
 authors = ["Andrew Warren"]
 rust-version = "1.94.0"
@@ -15,7 +15,7 @@ url = "2.5.4"
 serde = { version = "1.0.219", features = ["derive"] }
 futures = "0.3.31"
 flate2 = "1.1.1"
-object_store = { version = "0.14.2", features = ["aws", "azure", "reqwest", "http", "gcp"] }
+object_store = { version = "=0.14.2", features = ["aws", "azure", "reqwest", "http", "gcp"] }
 thiserror = "2.0.16"
 log = "0.4.29"
 quick-xml = "0.38"

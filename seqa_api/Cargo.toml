@@ -14,7 +14,7 @@ seqa_core = { path = "../seqa_core", version = "11.0.0" }
 serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.16"
 url = "2.5.4"
-object_store = { version = "0.14.2", features = ["aws"] }
+object_store = { version = "=0.14.2", features = ["aws"] }
 base64 = "0.22.1"
 
 [dev-dependencies]
