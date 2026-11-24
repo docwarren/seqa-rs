@@ -126,6 +126,10 @@ fn build_get(url: &str) -> Result<HttpRequest, StoreError> {
         .map_err(|e| StoreError::ValidationError(format!("Invalid request URL {url}: {e}")))
 }
 
+fn signing_error(error: object_store::Error) -> StoreError {
+    StoreError::ListError(format!("Could not sign request: {error}"))
+}
+
 /// Collects the text of every `<Name>` element nested inside `container`.
 ///
 /// Both the S3 and Azure listing documents wrap their entries in a container
@@ -205,7 +209,9 @@ async fn list_s3_buckets() -> Result<Vec<String>, StoreError> {
     let url = format!("https://s3.{region}.amazonaws.com/");
     let mut request = build_get(&url)?;
 
-    AwsAuthorizer::new(&credential, "s3", &region).authorize(&mut request, None);
+    AwsAuthorizer::new(&credential, "s3", &region)
+        .try_authorize(&mut request, None)
+        .map_err(signing_error)?;
 
     let body = send(request).await?;
 
@@ -244,7 +250,9 @@ async fn list_azure_containers() -> Result<Vec<String>, StoreError> {
     let url = format!("https://{account}.blob.core.windows.net/?comp=list");
     let mut request = build_get(&url)?;
 
-    AzureAuthorizer::new(&credential, &account).authorize(&mut request);
+    AzureAuthorizer::new(&credential, &account)
+        .try_authorize(&mut request)
+        .map_err(signing_error)?;
 
     let body = send(request).await?;
 
