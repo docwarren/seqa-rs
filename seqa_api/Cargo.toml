@@ -10,11 +10,11 @@ repository = "https://github.com/docwarren/seqa-rs"
 homepage = "https://www.seqa23.com"
 
 [dependencies]
-seqa_core = { path = "../seqa_core", version = "10.0.0" }
+seqa_core = { path = "../seqa_core", version = "11.0.0" }
 serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.16"
 url = "2.5.4"
-object_store = { version = "0.12.4", features = ["aws"] }
+object_store = { version = "0.14.2", features = ["aws"] }
 base64 = "0.22.1"
 
 [dev-dependencies]

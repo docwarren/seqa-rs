@@ -5,7 +5,8 @@ members = [
     "seqa_cli",
     "seqa_axum",
     "seqa_lambda",
-    "seqa_api"
+    "seqa_api",
+    "seqa_obos"
 ]
 
 [profile.release]

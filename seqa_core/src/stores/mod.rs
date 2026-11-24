@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use futures::StreamExt;
 use log::info;
 use object_store::path::Path as ObjectStorePath;
-use object_store::{ObjectMeta, ObjectStore, ObjectStoreScheme, PutPayload};
+use object_store::{ObjectMeta, ObjectStore, ObjectStoreExt, ObjectStoreScheme, PutPayload};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -192,7 +192,7 @@ impl StoreService {
 
     /// Downloads a byte range from `path` and returns the raw bytes.
     ///
-    /// `range` is a half-open byte range `[start, end)`.
+    /// `range` is a half-open byte range `[begin, end)`.
     ///
     /// # Errors
     ///
@@ -237,6 +237,9 @@ impl StoreService {
         match ObjectStoreScheme::parse(&url) {
             Ok((scheme, path)) => {
                 match scheme {
+                    ObjectStoreScheme::MicrosoftAzure if url.scheme() == "az" => {
+                        Ok((scheme, Self::strip_azure_container(&path)))
+                    }
                     ObjectStoreScheme::MicrosoftAzure => { Ok((scheme, path)) }
                     ObjectStoreScheme::AmazonS3 => { Ok((scheme, path)) }
                     ObjectStoreScheme::GoogleCloudStorage => { Ok((scheme, path)) }
@@ -253,6 +256,12 @@ impl StoreService {
                 Err(StoreError::ObjectStoreUriParseError(e.to_string()))
             }
         }
+    }
+
+    /// `az://account/container/path` URLs parse to `container/path`, but the store is
+    /// already scoped to the container.
+    fn strip_azure_container(path: &ObjectStorePath) -> ObjectStorePath {
+        path.parts().skip(1).collect()
     }
 
     /// Returns the total size of the object at `path` in bytes.

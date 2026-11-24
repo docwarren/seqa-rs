@@ -16,6 +16,7 @@ Supports BAM, VCF, GFF/GTF, BED, BedGraph, BigWig, BigBed, and FASTA formats. In
 | [`seqa`](seqa_cli/) | CLI tool — query any supported file from the command line | [seqa_cli/README.md](seqa_cli/README.md) |
 | [`seqa_axum`](seqa_axum/) | REST API server — genomic search, file browsing, notes and reference data | |
 | [`seqa_lambda`](seqa_lambda/) | AWS Lambda function — the same endpoints as `seqa_axum`, behind API Gateway | [seqa_lambda/README.md](seqa_lambda/README.md) |
+| [`seqa_obos`](seqa_obos/) | Load an OBO ontology (HPO, MONDO, GO, ...) from local disk, HTTP or cloud storage and search its terms, plus the `obos` CLI | [seqa_obos/README.md](seqa_obos/README.md) |
 
 ## Storage Backends
 

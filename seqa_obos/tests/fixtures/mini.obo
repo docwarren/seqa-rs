@@ -1,0 +1,121 @@
+format-version: 1.2
+ontology: hp
+synonymtypedef: layperson "layperson term"
+subsetdef: hp_slim "HPO slim"
+
+[Term]
+id: HP:0000001
+name: All
+
+[Term]
+id: HP:000025
+name: Abnormal head shape
+is_a: HP:0000001 ! All
+
+[Term]
+id: HP:0000118
+is_anonymous: false
+name: Phenotypic abnormality
+namespace: human_phenotype
+comment: Root of all phenotypic abnormalities.
+subset: hp_slim
+property_value: IAO:0000589 "phenotypic abnormality" xsd:string
+property_value: RO:0002161 NCBITaxon:9606
+builtin: false
+intersection_of: HP:0000001
+intersection_of: part_of HP:0000002
+union_of: HP:0000003
+union_of: HP:0000004
+equivalent_to: HP:0000005
+disjoint_from: HP:0000006
+relationship: part_of HP:0000001
+created_by: peter
+creation_date: 2008-02-27T02:20:00Z
+replaced_by: HP:0000007
+consider: HP:0000008
+
+[Term]
+id: HP:0040195
+name: Decreased head circumference
+is_a: HP:0000118 ! Phenotypic abnormality
+
+[Term]
+id: HP:0040196
+name: Small head circumference
+is_a: HP:0040195 ! Decreased head circumference
+
+[Term]
+id: HP:0000252
+name: Microcephaly
+alt_id: HP:0001366
+def: "Head circumference below 2 standard deviations below the mean for age and gender." [HPO:probinson, PMID:19125436]
+synonym: "Small head" EXACT layperson [ORCID:0000-0001-5208-3432]
+synonym: "Microcephalus" EXACT []
+synonym: "Severe microcephaly" NARROW []
+synonym: "Reduced braincase" BROAD []
+synonym: "Braincase anomaly" RELATED []
+xref: UMLS:C0025958 {source="MONDO"} ! from MONDO
+xref: SNOMEDCT_US:1829003
+is_a: HP:0040195 ! Decreased head circumference
+
+[Term]
+id: HP:0000253
+name: Progressive microcephaly
+is_a: HP:0000252 ! Microcephaly
+
+[Term]
+id: HP:0000254
+name: Progressive congenital microcephaly
+is_a: HP:0000253 ! Progressive microcephaly
+
+[Term]
+id: HP:0000255
+name: Microcephaly, progressive
+is_a: HP:0000252 ! Microcephaly
+
+[Term]
+id: HP:0000256
+name: Microcephaly, congenital
+is_a: HP:0000252 ! Microcephaly
+
+[Term]
+id: HP:0000257
+name: obsolete Microcephalus
+is_obsolete: true
+replaced_by: HP:0000252
+
+[Term]
+id: HP:0000258
+is_a: HP:0000252 ! Microcephaly
+
+[Term]
+id: HP:0000259
+name: Micro-cephaly
+is_a: HP:0000252 ! Microcephaly
+
+[Term]
+id: HP:0000408
+name: Progressive hearing impairment
+is_a: HP:0000118 ! Phenotypic abnormality
+
+[Term]
+id: HP:0011451
+name: Congenital reduced head size
+synonym: "Congenital microcephaly" EXACT []
+is_a: HP:0040195 ! Decreased head circumference
+
+[Term]
+id: HP:0000261
+name: Reduced skull size
+synonym: "Tiny skull" EXACT []
+is_a: HP:0000118 ! Phenotypic abnormality
+
+[Term]
+id: HP:0000262
+name: Abnormal skull
+synonym: "Tiny skull" NARROW []
+is_a: HP:0000118 ! Phenotypic abnormality
+
+[Typedef]
+id: part_of
+name: part of

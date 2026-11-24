@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use object_store::aws::AmazonS3Builder;
-use object_store::{ObjectStore, ObjectStoreScheme};
+use object_store::{ObjectStoreExt, ObjectStoreScheme};
 use url::Url;
 
 /// Deletes the S3 object at a URI when dropped, so a test removes the object it
