@@ -192,18 +192,41 @@ impl StoreService {
 
     /// Downloads a byte range from `path` and returns the raw bytes.
     ///
-    /// `range` is a half-open byte range `[begin, end)`.
+    /// `range` is a half-open byte range `[begin, end)`, clamped to the size of the
+    /// object: a range ending past the end returns the bytes up to the end, and a
+    /// range beginning at or past the end returns no bytes.
     ///
     /// # Errors
     ///
     /// Returns [`StoreError`] on path normalisation failure or storage I/O errors.
     pub(crate) async fn get_range(&self, path: &str, range: Range<u64>) -> Result<Vec<u8>, StoreError> {
+        let size = self.get_file_size(path).await?;
+        let clamped = clamp_range_to_size(&range, size);
+        if clamped.is_empty() {
+            return Ok(Vec::new());
+        }
         let (_, url) = Self::get_obj_scheme_and_path(path)?;
         let store = self.get_or_create_store(path)?;
-        Ok(store.get_range(&url, range).await?.to_vec())
+        Ok(store.get_range(&url, clamped).await?.to_vec())
     }
 
+    /// Downloads several byte ranges from `path` and returns one buffer per range,
+    /// in the order of `ranges`.
+    ///
+    /// Each range is clamped to the size of the object as in [`Self::get_range`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] on path normalisation failure or storage I/O errors.
     pub(crate) async fn get_ranges(&self, path: &str, ranges: &[Range<u64>]) -> Result<Vec<Vec<u8>>, StoreError> {
+        let size = self.get_file_size(path).await?;
+        let clamped = clamp_ranges_to_size(ranges, size);
+        let non_empty = select_non_empty_ranges(&clamped);
+        let fetched = self.fetch_ranges(path, &non_empty).await?;
+        Ok(place_in_request_order(&clamped, fetched))
+    }
+
+    async fn fetch_ranges(&self, path: &str, ranges: &[Range<u64>]) -> Result<Vec<Vec<u8>>, StoreError> {
         let (_, url) = Self::get_obj_scheme_and_path(path)?;
         let store = self.get_or_create_store(path)?;
         Ok(store.get_ranges(&url, ranges).await?.iter().map(|r| r.to_vec()).collect())
@@ -446,6 +469,35 @@ impl StoreService {
     }
 }
 
+fn clamp_range_to_size(range: &Range<u64>, size: u64) -> Range<u64> {
+    let begin = range.start.min(size);
+    let end = range.end.min(size);
+    begin..end
+}
+
+fn clamp_ranges_to_size(ranges: &[Range<u64>], size: u64) -> Vec<Range<u64>> {
+    ranges.iter().map(|range| clamp_range_to_size(range, size)).collect()
+}
+
+fn select_non_empty_ranges(ranges: &[Range<u64>]) -> Vec<Range<u64>> {
+    ranges.iter().filter(|range| !range.is_empty()).cloned().collect()
+}
+
+/// Pairs `fetched` (one buffer per non-empty range) back up with `ranges`, giving
+/// each empty range an empty buffer.
+fn place_in_request_order(ranges: &[Range<u64>], fetched: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+    let mut fetched_buffers = fetched.into_iter();
+    let mut ordered = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        if range.is_empty() {
+            ordered.push(Vec::new());
+        } else {
+            ordered.push(fetched_buffers.next().unwrap_or_default());
+        }
+    }
+    ordered
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -611,5 +663,71 @@ mod tests {
         let path = "s3://com.gmail.docarw/test_data/density.bw";
         let (_, canonical) = StoreService::get_obj_scheme_and_path(path).expect("Failed to get canonical path");
         assert_eq!(canonical.as_ref(), "test_data/density.bw");
+    }
+
+    #[test]
+    fn clamp_range_to_size_cuts_ranges_at_size() {
+        assert_eq!(clamp_range_to_size(&(10..20), 100), 10..20);
+        assert_eq!(clamp_range_to_size(&(90..120), 100), 90..100);
+        assert_eq!(clamp_range_to_size(&(100..120), 100), 100..100);
+        assert_eq!(clamp_range_to_size(&(150..200), 100), 100..100);
+    }
+
+    #[test]
+    fn place_in_request_order_fills_empty_ranges() {
+        let ranges = vec![0..2, 5..5, 7..9];
+        let fetched = vec![vec![1, 2], vec![3, 4]];
+        let ordered = place_in_request_order(&ranges, fetched);
+        assert_eq!(ordered, vec![vec![1, 2], vec![], vec![3, 4]]);
+    }
+
+    fn mock_vcf_uri() -> String {
+        format!("{}/NA12878.gatk.cnv.vcf.gz", mock_data_uri())
+    }
+
+    fn read_mock_vcf_bytes() -> Vec<u8> {
+        let path = format!("{}/mock_data/NA12878.gatk.cnv.vcf.gz", env!("CARGO_MANIFEST_DIR"));
+        std::fs::read(path).unwrap()
+    }
+
+    #[tokio::test]
+    async fn get_range_within_file_returns_exact_bytes() {
+        let service = StoreService::new();
+        let expected = read_mock_vcf_bytes();
+        let data = service.get_range(&mock_vcf_uri(), 100..200).await.unwrap();
+        assert_eq!(data, expected[100..200]);
+    }
+
+    #[tokio::test]
+    async fn get_range_past_end_of_file_returns_bytes_to_end() {
+        let service = StoreService::new();
+        let expected = read_mock_vcf_bytes();
+        let size = expected.len() as u64;
+        let begin = size - 10;
+        let data = service.get_range(&mock_vcf_uri(), begin..size + 1000).await.unwrap();
+        assert_eq!(data, expected[begin as usize..]);
+    }
+
+    #[tokio::test]
+    async fn get_range_beginning_at_or_past_end_of_file_is_empty() {
+        let service = StoreService::new();
+        let size = read_mock_vcf_bytes().len() as u64;
+        let at_end = service.get_range(&mock_vcf_uri(), size..size + 10).await.unwrap();
+        let past_end = service.get_range(&mock_vcf_uri(), size + 5..size + 10).await.unwrap();
+        assert!(at_end.is_empty());
+        assert!(past_end.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_ranges_clamps_each_range_and_keeps_order() {
+        let service = StoreService::new();
+        let expected = read_mock_vcf_bytes();
+        let size = expected.len() as u64;
+        let begin = size - 10;
+        let ranges = vec![100..200, begin..size + 1000];
+        let data = service.get_ranges(&mock_vcf_uri(), &ranges).await.unwrap();
+        assert_eq!(data.len(), 2);
+        assert_eq!(data[0], expected[100..200]);
+        assert_eq!(data[1], expected[begin as usize..]);
     }
 }

@@ -21,7 +21,7 @@ required-features = ["cli"]
 [dependencies]
 clap = { version = "4", features = ["derive"], optional = true }
 fastobo = "0.15.5"
-object_store = { version = "0.14.2", features = ["aws", "azure", "gcp", "http"] }
+object_store = { version = "=0.14.2", features = ["aws", "azure", "gcp", "http"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

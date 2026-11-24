@@ -5,4 +5,4 @@
 !seqa_core/data/*.db
 .agents
 .claude
-openspec/changes/archive
+**/openspec

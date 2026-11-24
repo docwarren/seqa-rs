@@ -372,3 +372,21 @@ async fn vcf_header_only_returns_empty_lines() {
     assert!(result.lines[0].is_empty());
     assert!(result.lines[1].is_empty());
 }
+
+#[tokio::test]
+async fn vcf_local_last_chromosome_near_end_of_file() {
+    let local_vcf = format!("file://{}/mock_data/NA12878.gatk.cnv.vcf.gz", env!("CARGO_MANIFEST_DIR"));
+    let options = SearchOptions::new(&local_vcf, &vec!["chrY".to_string()])
+        .unwrap()
+        .set_output_format("vcf")
+        .set_include_header(false);
+
+    let store_service = StoreService::new();
+    let result = search_features(&store_service, &options)
+        .await
+        .expect("Failed to search local VCF for chrY");
+    let lines = &result.lines[0];
+    assert_eq!(lines.len(), 10);
+    assert!(lines[0].starts_with("chrY\t3390830\t"));
+    assert!(lines[9].starts_with("chrY\t56848641\t"));
+}
