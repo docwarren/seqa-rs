@@ -48,4 +48,4 @@
 
 ## 9. Retire the old repo
 
-- [ ] 9.1 Delete `/home/drew/dev/seqa-obos/.git` (leave the other files and the GitHub repo untouched)
+- [x] 9.1 Delete `/home/drew/dev/seqa-obos/.git` (leave the other files and the GitHub repo untouched)
