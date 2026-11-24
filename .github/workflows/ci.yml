@@ -37,3 +37,6 @@ jobs:
           cargo test -p seqa_axum test_search_missing_coordinates
           cargo test -p seqa_axum test_search_invalid_json
           cargo test -p seqa_axum test_404
+
+      - name: Obos tests
+        run: cargo test -p seqa_obos --features cli

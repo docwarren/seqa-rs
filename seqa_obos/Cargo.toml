@@ -1,0 +1,36 @@
+[package]
+name = "seqa_obos"
+version = "0.1.0"
+edition = "2024"
+authors = ["Andrew Warren"]
+rust-version = "1.94.0"
+description = "Load an OBO ontology from S3, Azure, GCS, HTTP(S) or local disk, keep it in memory, and search its terms"
+license = "Apache-2.0"
+repository = "https://github.com/docwarren/seqa-rs"
+homepage = "https://www.seqa23.com"
+
+[features]
+default = []
+cli = ["dep:clap"]
+
+[[bin]]
+name = "obos"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"], optional = true }
+fastobo = "0.15.5"
+object_store = { version = "0.14.2", features = ["aws", "azure", "gcp", "http"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+url = "2"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+async-trait = "0.1"
+futures-util = "0.3"
+tokio = { version = "1", features = ["net", "io-util", "sync"] }

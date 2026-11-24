@@ -1,0 +1,12 @@
+format-version: 1.2
+ontology: mondo
+
+[Term]
+id: MONDO:0001149
+name: microcephaly
+synonym: "small head" EXACT []
+is_a: MONDO:0000001 ! disease
+
+[Term]
+id: MONDO:0000001
+name: disease
