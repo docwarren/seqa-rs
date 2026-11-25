@@ -131,7 +131,6 @@ impl TabixIndex {
         tabix.l_nm = read_i32(&bytes, i)?;
         i += 4;
 
-        // Read names
         let name_bytes = read_slice(&bytes, i, tabix.l_nm as usize)?;
         tabix.names = name_bytes
             .iter()
@@ -141,16 +140,13 @@ impl TabixIndex {
             .map(|s| s.to_string())
             .collect();
 
-        // Remove the last empty string if it exists
         if let Some(last) = tabix.names.last() && last.is_empty() {
             tabix.names.pop();
         }
 
         i += tabix.l_nm as usize;
 
-        // Read indices
         for _ in 0..tabix.n_ref {
-            // Read TabixIndex
             let mut chr_index = ChrIdx {
                 bins: HashMap::new(),
                 intervals: Vec::new(),
@@ -160,7 +156,6 @@ impl TabixIndex {
             i += 4;
 
             for _ in 0..n_bin {
-                // Read TabixBin
                 let mut tabix_bin = bin::Bin {
                     bin: 0,
                     chunks: Vec::new(),
@@ -179,10 +174,9 @@ impl TabixIndex {
                         .map_err(|e| ParsingError::ChunkError {
                             source: e,
                         })?;
-                    i += 16; // Each chunk is 16 bytes (8 for begin, 8 for end)
+                    i += 16;
                     chunks.push(chunk);
 
-                    // Update first_feature_offset if this chunk's begin_vp is less than the current first_feature_offset
                     if chunk.begin_vp.virtual_pointer < tabix.first_feature_offset.virtual_pointer {
                         tabix.first_feature_offset = chunk.begin_vp;
                     }

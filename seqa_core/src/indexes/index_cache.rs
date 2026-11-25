@@ -71,19 +71,15 @@ pub(crate) async fn get_or_download_index(
 ) -> Result<Vec<u8>, StoreError> {
     let local_path = get_local_index_path(index_path);
 
-    // Check if index exists locally (skip when no_cache is set)
     if !no_cache && local_path.exists() {
-        // Read from local cache
         return fs::read(&local_path).await.map_err(|e| StoreError::CacheReadError {
             key: index_path.to_string(),
             source: e
         });
     }
 
-    // Index doesn't exist locally or failed to read - download from remote
     let bytes = store_service.get_object(index_path).await?;
 
-    // Try to cache the downloaded index locally (skip when no_cache is set)
     if !no_cache
         && let Err(e) = cache_index_locally(&local_path, &bytes).await {
             error!("Warning: Failed to cache index locally at {}: {}",
@@ -102,12 +98,10 @@ pub(crate) async fn get_or_download_index(
 /// # Returns
 /// * Result indicating success or failure
 async fn cache_index_locally(local_path: &Path, bytes: &[u8]) -> Result<(), std::io::Error> {
-    // Create parent directories if they don't exist
     if let Some(parent) = local_path.parent() {
         fs::create_dir_all(parent).await?;
     }
 
-    // Write the file
     let mut file = fs::File::create(local_path).await?;
     file.write_all(bytes).await?;
     file.flush().await?;
