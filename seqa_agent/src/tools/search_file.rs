@@ -39,6 +39,8 @@ pub(crate) enum SearchFileError {
         coordinate: String,
         source: ParsingError,
     },
+    #[error("Could not build the search options for {path}: {source}")]
+    Options { path: String, source: ParsingError },
     #[error("Search of {path} failed: {source}")]
     Search { path: String, source: SearchError },
 }
@@ -50,15 +52,7 @@ pub(crate) struct SearchFileArguments {
 }
 
 pub(crate) struct SearchFile {
-    context: Arc<ToolContext>,
-}
-
-impl SearchFile {
-    pub(crate) fn new(context: &Arc<ToolContext>) -> Self {
-        SearchFile {
-            context: Arc::clone(context),
-        }
-    }
+    pub(super) context: Arc<ToolContext>,
 }
 
 impl Tool for SearchFile {
@@ -120,22 +114,25 @@ impl Tool for SearchFile {
 }
 
 fn build_options(arguments: &SearchFileArguments) -> Result<SearchOptions, SearchFileError> {
+    check_coordinates(&arguments.coordinates)?;
     SearchOptions::new(&arguments.path, &arguments.coordinates).map_err(|source| {
-        let coordinate = first_invalid_coordinate(&arguments.coordinates);
-        SearchFileError::InvalidCoordinate { coordinate, source }
+        SearchFileError::Options {
+            path: arguments.path.clone(),
+            source,
+        }
     })
 }
 
-fn first_invalid_coordinate(coordinates: &[String]) -> String {
-    coordinates
-        .iter()
-        .find(|coordinate| is_invalid_coordinate(coordinate))
-        .cloned()
-        .unwrap_or_default()
-}
-
-fn is_invalid_coordinate(coordinate: &str) -> bool {
-    Coordinate::new(coordinate, CoordinateSystem::OneBasedClosed).is_err()
+fn check_coordinates(coordinates: &[String]) -> Result<(), SearchFileError> {
+    for coordinate in coordinates {
+        Coordinate::new(coordinate, CoordinateSystem::OneBasedClosed).map_err(|source| {
+            SearchFileError::InvalidCoordinate {
+                coordinate: coordinate.clone(),
+                source,
+            }
+        })?;
+    }
+    Ok(())
 }
 
 fn header_items(result: &SearchResult) -> Vec<Value> {
@@ -197,8 +194,7 @@ mod tests {
     #[tokio::test]
     async fn full_result_holds_header_lines_then_records() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = SearchFile::new(&shared_context);
+        let tool = SearchFile { context };
         let arguments = search_arguments(VCF_PATH, &["chr1:30000-50000"]);
         call_tool(&tool, arguments).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
@@ -226,8 +222,7 @@ mod tests {
     #[tokio::test]
     async fn model_receives_only_counts() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = SearchFile::new(&shared_context);
+        let tool = SearchFile { context };
         let arguments = search_arguments(VCF_PATH, &["chr1:30000-50000", "chr1:110000-130000"]);
         let summary = call_tool(&tool, arguments).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
@@ -246,8 +241,7 @@ mod tests {
     #[tokio::test]
     async fn bad_coordinate_error_names_it() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = SearchFile::new(&shared_context);
+        let tool = SearchFile { context };
         let arguments = search_arguments(VCF_PATH, &["chr1:1-100", "chr1:abc"]);
         let error = call_tool(&tool, arguments).await.unwrap_err();
         assert!(error.to_string().contains("chr1:abc"), "{error}");
@@ -258,8 +252,7 @@ mod tests {
     #[tokio::test]
     async fn unsupported_extension_gives_an_unsupported_format_error() {
         let (context, _event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = SearchFile::new(&shared_context);
+        let tool = SearchFile { context };
         let arguments = search_arguments(TEXT_PATH, &["chr1:1-100"]);
         let error = call_tool(&tool, arguments).await.unwrap_err();
         assert!(
@@ -271,8 +264,7 @@ mod tests {
     #[tokio::test]
     async fn local_path_is_rejected_when_disallowed() {
         let (context, mut event_receiver) = test_context(20, false);
-        let shared_context = Arc::new(context);
-        let tool = SearchFile::new(&shared_context);
+        let tool = SearchFile { context };
         let arguments = search_arguments(VCF_PATH, &["chr1:30000-50000"]);
         let error = call_tool(&tool, arguments).await.unwrap_err();
         assert!(

@@ -37,15 +37,7 @@ pub(crate) struct GeneCoordinatesArguments {
 }
 
 pub(crate) struct GeneCoordinates {
-    context: Arc<ToolContext>,
-}
-
-impl GeneCoordinates {
-    pub(crate) fn new(context: &Arc<ToolContext>) -> Self {
-        GeneCoordinates {
-            context: Arc::clone(context),
-        }
-    }
+    pub(super) context: Arc<ToolContext>,
 }
 
 impl Tool for GeneCoordinates {
@@ -99,8 +91,7 @@ mod tests {
     #[tokio::test]
     async fn full_result_contains_brca1_on_chr17() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = GeneCoordinates::new(&shared_context);
+        let tool = GeneCoordinates { context };
         call_tool(&tool, hg38_refseq()).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
         let brca1 = event
@@ -114,8 +105,7 @@ mod tests {
     #[tokio::test]
     async fn model_receives_only_the_record_count() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = GeneCoordinates::new(&shared_context);
+        let tool = GeneCoordinates { context };
         let summary = call_tool(&tool, hg38_refseq()).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
         assert_eq!(

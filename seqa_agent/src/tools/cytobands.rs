@@ -37,15 +37,7 @@ pub(crate) struct CytobandsArguments {
 }
 
 pub(crate) struct Cytobands {
-    context: Arc<ToolContext>,
-}
-
-impl Cytobands {
-    pub(crate) fn new(context: &Arc<ToolContext>) -> Self {
-        Cytobands {
-            context: Arc::clone(context),
-        }
-    }
+    pub(super) context: Arc<ToolContext>,
 }
 
 impl Tool for Cytobands {
@@ -99,8 +91,7 @@ mod tests {
     #[tokio::test]
     async fn full_result_holds_the_chr17_bands() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = Cytobands::new(&shared_context);
+        let tool = Cytobands { context };
         call_tool(&tool, hg38("chr17")).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
         assert!(!event.items.is_empty());
@@ -111,8 +102,7 @@ mod tests {
     #[tokio::test]
     async fn model_receives_only_the_record_count() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = Cytobands::new(&shared_context);
+        let tool = Cytobands { context };
         let summary = call_tool(&tool, hg38("chr17")).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
         assert_eq!(
@@ -125,8 +115,7 @@ mod tests {
     #[tokio::test]
     async fn chromosome_without_prefix_gives_zero_records() {
         let (context, _event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = Cytobands::new(&shared_context);
+        let tool = Cytobands { context };
         let summary = call_tool(&tool, hg38("17")).await.unwrap();
         assert_eq!(summary["record_count"], 0);
     }

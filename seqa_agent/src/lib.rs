@@ -52,6 +52,10 @@ mod tools;
 /// ([`rig_agent::tool::DynamicTool`]) for [`AgentConfig::extra_tools`] with a matching version.
 pub use rig_agent;
 
+/// The rig core crate this crate is built on. [`AgentError::Client`] wraps its
+/// [`rig_core::http_client::Error`].
+pub use rig_core;
+
 pub use config::AgentConfig;
 pub use events::ToolResultEvent;
 pub use session::{AgentError, AgentSession};

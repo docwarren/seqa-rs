@@ -33,6 +33,7 @@ use serde::Serialize;
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedSender;
+use url::Url;
 
 use crate::events::ToolResultEvent;
 use cytobands::Cytobands;
@@ -76,7 +77,8 @@ impl ToolContext {
     }
 
     pub(crate) fn check_local_path(&self, uri: &str) -> Result<(), LocalPathNotAllowed> {
-        if !self.allow_local_paths && is_local_uri(uri) {
+        let is_local = is_local_uri(uri) || is_windows_drive_path(uri);
+        if !self.allow_local_paths && is_local {
             return Err(LocalPathNotAllowed(uri.to_string()));
         }
         Ok(())
@@ -87,13 +89,27 @@ pub(crate) fn add_built_in_tools(
     builder: AgentBuilder,
     context: &Arc<ToolContext>,
 ) -> AgentBuilder<WithBuilderTools> {
-    let search_file = SearchFile::new(context);
-    let list_directory = ListDirectory::new(context);
-    let list_buckets = ListBuckets::new(context);
-    let supported_formats = SupportedFormats::new(context);
-    let gene_coordinates = GeneCoordinates::new(context);
-    let cytobands = Cytobands::new(context);
-    let search_ontology = SearchOntology::new(context);
+    let search_file = SearchFile {
+        context: Arc::clone(context),
+    };
+    let list_directory = ListDirectory {
+        context: Arc::clone(context),
+    };
+    let list_buckets = ListBuckets {
+        context: Arc::clone(context),
+    };
+    let supported_formats = SupportedFormats {
+        context: Arc::clone(context),
+    };
+    let gene_coordinates = GeneCoordinates {
+        context: Arc::clone(context),
+    };
+    let cytobands = Cytobands {
+        context: Arc::clone(context),
+    };
+    let search_ontology = SearchOntology {
+        context: Arc::clone(context),
+    };
     builder
         .tool(search_file)
         .tool(list_directory)
@@ -102,6 +118,13 @@ pub(crate) fn add_built_in_tools(
         .tool(gene_coordinates)
         .tool(cytobands)
         .tool(search_ontology)
+}
+
+pub(crate) fn is_windows_drive_path(uri: &str) -> bool {
+    match Url::parse(uri) {
+        Ok(url) => url.scheme().len() == 1,
+        Err(_) => false,
+    }
 }
 
 fn model_visible_error<E>(error: E) -> ToolExecutionError
@@ -142,10 +165,11 @@ pub(crate) mod tests {
     pub(crate) fn test_context(
         summary_limit: usize,
         allow_local_paths: bool,
-    ) -> (ToolContext, UnboundedReceiver<ToolResultEvent>) {
+    ) -> (Arc<ToolContext>, UnboundedReceiver<ToolResultEvent>) {
         let (event_sender, event_receiver) = unbounded_channel();
         let context = ToolContext::new(summary_limit, allow_local_paths, event_sender);
-        (context, event_receiver)
+        let shared_context = Arc::new(context);
+        (shared_context, event_receiver)
     }
 
     #[test]
@@ -172,6 +196,21 @@ pub(crate) mod tests {
             file_uri.to_string(),
             "Local paths are not allowed: file:///x"
         );
+    }
+
+    #[test]
+    fn windows_drive_paths_are_recognised() {
+        assert!(is_windows_drive_path("C:\\data"));
+        assert!(is_windows_drive_path("d:/data/x.vcf.gz"));
+        assert!(!is_windows_drive_path("s3://b/x"));
+        assert!(!is_windows_drive_path("/data/x"));
+    }
+
+    #[test]
+    fn windows_drive_paths_are_rejected_when_disallowed() {
+        let (context, _event_receiver) = test_context(20, false);
+        let error = context.check_local_path("C:\\data").unwrap_err();
+        assert_eq!(error.to_string(), "Local paths are not allowed: C:\\data");
     }
 
     #[test]

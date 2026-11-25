@@ -42,15 +42,7 @@ pub(crate) struct ListBucketsArguments {
 }
 
 pub(crate) struct ListBuckets {
-    context: Arc<ToolContext>,
-}
-
-impl ListBuckets {
-    pub(crate) fn new(context: &Arc<ToolContext>) -> Self {
-        ListBuckets {
-            context: Arc::clone(context),
-        }
-    }
+    pub(super) context: Arc<ToolContext>,
 }
 
 impl Tool for ListBuckets {
@@ -110,8 +102,7 @@ mod tests {
     #[tokio::test]
     async fn unknown_backend_error_names_it() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = ListBuckets::new(&shared_context);
+        let tool = ListBuckets { context };
         let arguments = ListBucketsArguments {
             backend: "ftp".to_string(),
         };

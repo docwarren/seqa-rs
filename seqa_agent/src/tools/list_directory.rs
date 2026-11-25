@@ -22,7 +22,9 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use url::Url;
 
-use super::{LocalPathNotAllowed, ToolContext, model_visible_error, serialize_items};
+use super::{
+    LocalPathNotAllowed, ToolContext, is_windows_drive_path, model_visible_error, serialize_items,
+};
 use crate::summary::item_summary;
 
 #[derive(Debug, Error)]
@@ -44,15 +46,7 @@ pub(crate) struct ListDirectoryArguments {
 }
 
 pub(crate) struct ListDirectory {
-    context: Arc<ToolContext>,
-}
-
-impl ListDirectory {
-    pub(crate) fn new(context: &Arc<ToolContext>) -> Self {
-        ListDirectory {
-            context: Arc::clone(context),
-        }
-    }
+    pub(super) context: Arc<ToolContext>,
 }
 
 impl Tool for ListDirectory {
@@ -104,10 +98,14 @@ impl Tool for ListDirectory {
 }
 
 fn to_store_uri(uri: &str) -> String {
-    if Url::parse(uri).is_ok() {
+    if is_store_url(uri) {
         return uri.to_string();
     }
     local_path_uri(uri).unwrap_or_else(|| uri.to_string())
+}
+
+fn is_store_url(uri: &str) -> bool {
+    Url::parse(uri).is_ok() && !is_windows_drive_path(uri)
 }
 
 fn local_path_uri(path: &str) -> Option<String> {
@@ -142,8 +140,7 @@ mod tests {
     #[tokio::test]
     async fn plain_local_path_lists_the_vcf() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = ListDirectory::new(&shared_context);
+        let tool = ListDirectory { context };
         let directory = mock_data_directory();
         let summary = call_tool(&tool, list_arguments(&directory)).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
@@ -152,10 +149,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn path_with_parent_segments_lists_the_vcf() {
+        let (context, mut event_receiver) = test_context(20, true);
+        let tool = ListDirectory { context };
+        let directory = concat!(env!("CARGO_MANIFEST_DIR"), "/../seqa_core/mock_data/");
+        call_tool(&tool, list_arguments(directory)).await.unwrap();
+        let event = event_receiver.try_recv().unwrap();
+        assert!(has_vcf(&event.items));
+    }
+
+    #[test]
+    fn windows_drive_path_becomes_a_file_uri() {
+        let store_uri = to_store_uri("C:\\data");
+        assert!(store_uri.starts_with("file://"), "{store_uri}");
+    }
+
+    #[tokio::test]
     async fn file_uri_lists_the_vcf() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = ListDirectory::new(&shared_context);
+        let tool = ListDirectory { context };
         let directory = format!("file://{}", mock_data_directory());
         call_tool(&tool, list_arguments(&directory)).await.unwrap();
         let event = event_receiver.try_recv().unwrap();
@@ -165,8 +177,7 @@ mod tests {
     #[tokio::test]
     async fn store_error_includes_the_uri() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = ListDirectory::new(&shared_context);
+        let tool = ListDirectory { context };
         let error = call_tool(&tool, list_arguments("ftp://example.com/data/"))
             .await
             .unwrap_err();
@@ -180,8 +191,7 @@ mod tests {
     #[tokio::test]
     async fn local_path_is_rejected_when_disallowed() {
         let (context, mut event_receiver) = test_context(20, false);
-        let shared_context = Arc::new(context);
-        let tool = ListDirectory::new(&shared_context);
+        let tool = ListDirectory { context };
         let directory = mock_data_directory();
         let error = call_tool(&tool, list_arguments(&directory))
             .await

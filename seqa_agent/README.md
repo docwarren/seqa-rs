@@ -120,13 +120,13 @@ Example arguments:
 ```
 
 - `search_file` works like the rest of seqa: the index path and file format come from the file's extension, and the index sits next to the file. A remote index is cached in the working directory (see the `seqa_core` README). `record_count` is the total across all coordinates. The model sees no header or record text.
-- `list_directory` lists one level, folders first. A plain local path such as `/data/project/` is turned into a `file://` URI.
+- `list_directory` lists one level, folders first. A plain local path such as `/data/project/`, or a Windows drive path such as `C:\data`, is turned into a `file://` URI.
 - `items` holds at most `summary_limit` entries (default 20). `omitted` is the number left out.
 - Credentials come from the same environment variables as the rest of seqa (`AWS_*`, `AZURE_*`, `GOOGLE_*`).
 
 ### Local paths
 
-`allow_local_paths` is a host setting on `AgentConfig`, not a tool argument, so the model cannot change it. It defaults to `true`. When it is `false`, `search_file` and `list_directory` reject local paths and `file:` URIs before touching storage, using the same check as `seqa_axum` (`seqa_api::local_uri::is_local_uri`). Cloud and HTTP URIs are unaffected. A server host should set it to `false`.
+`allow_local_paths` is a host setting on `AgentConfig`, not a tool argument, so the model cannot change it. It defaults to `true`. When it is `false`, `search_file` and `list_directory` reject local paths, Windows drive paths and `file:` URIs before touching storage, using the same check as `seqa_axum` (`seqa_api::local_uri::is_local_uri`) plus a check for single-letter (drive) schemes. Cloud and HTTP URIs are unaffected. A server host should set it to `false`.
 
 ### Ontology
 

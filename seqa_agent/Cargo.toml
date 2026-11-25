@@ -18,6 +18,10 @@ name = "seqa-agent"
 path = "src/main.rs"
 required-features = ["cli"]
 
+[[test]]
+name = "cli"
+required-features = ["cli"]
+
 [dependencies]
 clap = { version = "4", features = ["derive"], optional = true }
 rig-core = { version = "=0.42.0", default-features = false, features = ["reqwest", "rustls"] }

@@ -45,15 +45,7 @@ pub(crate) struct SearchOntologyArguments {
 }
 
 pub(crate) struct SearchOntology {
-    context: Arc<ToolContext>,
-}
-
-impl SearchOntology {
-    pub(crate) fn new(context: &Arc<ToolContext>) -> Self {
-        SearchOntology {
-            context: Arc::clone(context),
-        }
-    }
+    pub(super) context: Arc<ToolContext>,
 }
 
 impl Tool for SearchOntology {
@@ -129,11 +121,12 @@ mod tests {
         }
     }
 
+    // One ordered test, because seqa_obos holds one ontology per process and the
+    // not-loaded check must run before any load.
     #[tokio::test]
     async fn search_before_and_after_loading_the_ontology() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = SearchOntology::new(&shared_context);
+        let tool = SearchOntology { context };
 
         let not_loaded = call_tool(&tool, ontology_arguments("microceph", None))
             .await

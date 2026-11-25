@@ -57,9 +57,8 @@ async fn main() -> ExitCode {
 async fn run(arguments: Arguments) -> Result<(), Box<dyn Error>> {
     load_ontology(arguments.ontology.as_deref()).await?;
     let config = build_config(arguments);
-    let (mut session, event_receiver) = AgentSession::new(config)?;
-    tokio::spawn(print_events(event_receiver));
-    chat_loop(&mut session).await?;
+    let (mut session, mut event_receiver) = AgentSession::new(config)?;
+    chat_loop(&mut session, &mut event_receiver).await?;
     Ok(())
 }
 
@@ -77,8 +76,8 @@ fn build_config(arguments: Arguments) -> AgentConfig {
     config
 }
 
-async fn print_events(mut event_receiver: UnboundedReceiver<ToolResultEvent>) {
-    while let Some(event) = event_receiver.recv().await {
+fn print_events(event_receiver: &mut UnboundedReceiver<ToolResultEvent>) {
+    while let Ok(event) = event_receiver.try_recv() {
         println!("{}", event_line(&event));
     }
 }
@@ -92,7 +91,10 @@ fn event_line(event: &ToolResultEvent) -> String {
     )
 }
 
-async fn chat_loop(session: &mut AgentSession) -> io::Result<()> {
+async fn chat_loop(
+    session: &mut AgentSession,
+    event_receiver: &mut UnboundedReceiver<ToolResultEvent>,
+) -> io::Result<()> {
     let mut lines = BufReader::new(stdin()).lines();
     loop {
         print_prompt()?;
@@ -103,7 +105,7 @@ async fn chat_loop(session: &mut AgentSession) -> io::Result<()> {
             "/quit" => return Ok(()),
             "/reset" => reset(session),
             "" => {}
-            message => respond(session, message).await,
+            message => respond(session, event_receiver, message).await,
         }
     }
 }
@@ -118,8 +120,14 @@ fn reset(session: &mut AgentSession) {
     println!("History cleared.");
 }
 
-async fn respond(session: &mut AgentSession, message: &str) {
-    match session.chat(message).await {
+async fn respond(
+    session: &mut AgentSession,
+    event_receiver: &mut UnboundedReceiver<ToolResultEvent>,
+    message: &str,
+) {
+    let result = session.chat(message).await;
+    print_events(event_receiver);
+    match result {
         Ok(reply) => println!("{reply}"),
         Err(error) => eprintln!("error: {error}"),
     }

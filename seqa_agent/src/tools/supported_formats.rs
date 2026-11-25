@@ -34,15 +34,7 @@ pub(crate) enum SupportedFormatsError {
 pub(crate) struct SupportedFormatsArguments {}
 
 pub(crate) struct SupportedFormats {
-    context: Arc<ToolContext>,
-}
-
-impl SupportedFormats {
-    pub(crate) fn new(context: &Arc<ToolContext>) -> Self {
-        SupportedFormats {
-            context: Arc::clone(context),
-        }
-    }
+    pub(super) context: Arc<ToolContext>,
 }
 
 impl Tool for SupportedFormats {
@@ -86,8 +78,7 @@ mod tests {
     #[tokio::test]
     async fn full_result_lists_bam_with_an_index_and_bigwig_without() {
         let (context, mut event_receiver) = test_context(20, true);
-        let shared_context = Arc::new(context);
-        let tool = SupportedFormats::new(&shared_context);
+        let tool = SupportedFormats { context };
         let summary = call_tool(&tool, SupportedFormatsArguments {})
             .await
             .unwrap();
