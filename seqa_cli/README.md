@@ -159,4 +159,4 @@ Results are written to stdout in each format's native representation. When more 
 
 ## Index Files
 
-Index files must be in the same location as the data file with the standard extension appended (e.g. `sample.bam` → `sample.bam.bai`). For remote BAM and tabix files the index is downloaded once and cached in the current directory under its file name (e.g. `./sample.bam.bai`), then reused by later searches. Pass `--no-cache` to always download it and never write the cache file.
+Index files must be in the same location as the data file with the standard extension appended (e.g. `sample.bam` → `sample.bam.bai`). For remote BAM and tabix files the index is downloaded once and cached in the current directory, then reused by later searches. The cache file name is the whole remote index path with every character outside `[A-Za-z0-9]` replaced by `_` (e.g. `s3://bucket/path/sample.bam.bai` is cached at `./s3___bucket_path_sample_bam_bai`). Pass `--no-cache` to always download it and never write the cache file.

@@ -80,7 +80,7 @@ Text formats must be bgzipped and tabix-indexed; plain `.vcf`, `.bed`, etc. are 
 
 ## Index Caching
 
-`.bai` and `.tbi` indexes for remote files are cached in the current working directory under the index's file name (e.g. `./sample.bam.bai`) and reused on later searches. Local indexes are read in place. Set `SearchOptions::set_no_cache(true)` to always download and never write the cache, or remove a cached file with `indexes::index_cache::delete_local_index`.
+`.bai` and `.tbi` indexes for remote files are cached in the current working directory and reused on later searches. The cache file name is the whole remote index path with every character outside `[A-Za-z0-9]` replaced by `_` (e.g. `s3://bucket/path/sample.bam.bai` is cached at `./s3___bucket_path_sample_bam_bai`), so indexes with the same file name in different locations do not collide. Local indexes are read in place. Set `SearchOptions::set_no_cache(true)` to always download and never write the cache, or hold an `indexes::index_cache::IndexGuard` to remove the cached file when it is dropped.
 
 ## Environment Variables
 
