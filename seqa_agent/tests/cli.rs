@@ -13,12 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::thread;
+mod common;
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use serde_json::json;
+
+use common::{FakeOllama, mini_obo_path, reply, tool_calls};
 
 const UNREACHABLE_OLLAMA: &str = "http://127.0.0.1:9";
 
@@ -33,62 +34,15 @@ fn repl(stdin: &str) -> assert_cmd::assert::Assert {
         .assert()
 }
 
-fn mini_obo_path() -> String {
-    let relative = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../seqa_obos/tests/fixtures/mini.obo"
-    );
-    let canonical = std::fs::canonicalize(relative).unwrap();
-    canonical.display().to_string()
-}
-
-const CYTOBANDS_TOOL_CALL: &str = r#"{"model":"fake","created_at":"2026-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"cytobands","arguments":{"genome":"hg38","chromosome":"chr17"}}}]},"done":true,"done_reason":"stop"}"#;
-const FINAL_REPLY: &str = r#"{"model":"fake","created_at":"2026-01-01T00:00:00Z","message":{"role":"assistant","content":"chr17 has 24 bands."},"done":true,"done_reason":"stop"}"#;
-
-fn fake_ollama(responses: Vec<&'static str>) -> String {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    thread::spawn(move || {
-        for response in responses {
-            let (stream, _) = listener.accept().unwrap();
-            answer_request(stream, response);
-        }
-    });
-    format!("http://{address}")
-}
-
-fn answer_request(mut stream: TcpStream, response: &str) {
-    let mut reader = BufReader::new(stream.try_clone().unwrap());
-    let content_length = read_content_length(&mut reader);
-    let mut body = vec![0; content_length];
-    reader.read_exact(&mut body).unwrap();
-    let reply = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}",
-        response.len()
-    );
-    stream.write_all(reply.as_bytes()).unwrap();
-}
-
-fn read_content_length(reader: &mut BufReader<TcpStream>) -> usize {
-    let mut content_length = 0;
-    loop {
-        let mut line = String::new();
-        reader.read_line(&mut line).unwrap();
-        let header = line.trim_end().to_ascii_lowercase();
-        if header.is_empty() {
-            return content_length;
-        }
-        if let Some(value) = header.strip_prefix("content-length:") {
-            content_length = value.trim().parse().unwrap();
-        }
-    }
-}
-
 #[test]
 fn tool_events_print_before_the_reply() {
-    let url = fake_ollama(vec![CYTOBANDS_TOOL_CALL, FINAL_REPLY]);
+    let cytobands_call = tool_calls(&[(
+        "cytobands",
+        json!({ "genome": "hg38", "chromosome": "chr17" }),
+    )]);
+    let fake_ollama = FakeOllama::start(vec![cytobands_call, reply("chr17 has 24 bands.")]);
     let assert = seqa_agent()
-        .args(["--model", "fake", "--ollama-url", &url])
+        .args(["--model", "fake", "--ollama-url", &fake_ollama.url])
         .write_stdin("what cytobands are on chr17?\n/quit\n")
         .assert()
         .success();
