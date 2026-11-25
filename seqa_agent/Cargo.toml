@@ -1,0 +1,36 @@
+[package]
+name = "seqa_agent"
+version = "0.1.0"
+edition = "2024"
+authors = ["Andrew Warren"]
+rust-version = "1.94.0"
+description = "A local Ollama-backed agent that answers genomics questions with seqa tools"
+license = "Apache-2.0"
+repository = "https://github.com/docwarren/seqa-rs"
+homepage = "https://www.seqa23.com"
+
+[features]
+default = []
+cli = ["dep:clap", "tokio/io-std", "tokio/io-util"]
+
+[[bin]]
+name = "seqa-agent"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"], optional = true }
+rig-core = { version = "=0.42.0", default-features = false, features = ["reqwest", "rustls"] }
+rig-agent = { version = "=0.42.0", default-features = false }
+seqa_core = { path = "../seqa_core" }
+seqa_obos = { path = "../seqa_obos" }
+seqa_api = { path = "../seqa_api" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+url = "2"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
