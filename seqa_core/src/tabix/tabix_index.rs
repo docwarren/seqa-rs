@@ -106,31 +106,33 @@ impl TabixIndex {
         Ok(TabixIndex::from_bytes(decompressed)?)
     }
 
+    /// Parses a decompressed tabix index, returning an error when the bytes are truncated.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ParsingError> {
         let mut i = 0;
         let mut tabix = TabixIndex::new();
 
-        tabix.magic = String::from_utf8(bytes[i..i + 4].to_vec())?;
+        let magic_bytes = read_slice(&bytes, i, 4)?;
+        tabix.magic = String::from_utf8(magic_bytes.to_vec())?;
         i += 4;
-        tabix.n_ref = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.n_ref = read_i32(&bytes, i)?;
         i += 4;
-        tabix.format = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.format = read_i32(&bytes, i)?;
         i += 4;
-        tabix.col_seq = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.col_seq = read_i32(&bytes, i)?;
         i += 4;
-        tabix.col_beg = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.col_beg = read_i32(&bytes, i)?;
         i += 4;
-        tabix.col_end = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.col_end = read_i32(&bytes, i)?;
         i += 4;
-        tabix.meta = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.meta = read_i32(&bytes, i)?;
         i += 4;
-        tabix.skip = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.skip = read_i32(&bytes, i)?;
         i += 4;
-        tabix.l_nm = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+        tabix.l_nm = read_i32(&bytes, i)?;
         i += 4;
 
-        // Read names
-        tabix.names = bytes[i..(i + tabix.l_nm as usize)]
+        let name_bytes = read_slice(&bytes, i, tabix.l_nm as usize)?;
+        tabix.names = name_bytes
             .iter()
             .map(|&b| b as char)
             .collect::<String>()
@@ -138,47 +140,43 @@ impl TabixIndex {
             .map(|s| s.to_string())
             .collect();
 
-        // Remove the last empty string if it exists
         if let Some(last) = tabix.names.last() && last.is_empty() {
             tabix.names.pop();
         }
 
         i += tabix.l_nm as usize;
 
-        // Read indices
         for _ in 0..tabix.n_ref {
-            // Read TabixIndex
             let mut chr_index = ChrIdx {
                 bins: HashMap::new(),
                 intervals: Vec::new(),
             };
 
-            let n_bin = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+            let n_bin = read_i32(&bytes, i)?;
             i += 4;
 
             for _ in 0..n_bin {
-                // Read TabixBin
                 let mut tabix_bin = bin::Bin {
                     bin: 0,
                     chunks: Vec::new(),
                 };
 
-                tabix_bin.bin = u32::from_le_bytes(bytes[i..i + 4].try_into()?);
+                tabix_bin.bin = read_u32(&bytes, i)?;
                 i += 4;
-                let n_chunk = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+                let n_chunk = read_i32(&bytes, i)?;
                 i += 4;
 
                 let mut chunks = Vec::with_capacity(n_chunk as usize);
 
                 for _ in 0..n_chunk {
-                    let chunk = Chunk::from_bytes(&bytes[i..i + 16], tabix_bin.bin)
+                    let chunk_bytes = read_slice(&bytes, i, 16)?;
+                    let chunk = Chunk::from_bytes(chunk_bytes, tabix_bin.bin)
                         .map_err(|e| ParsingError::ChunkError {
                             source: e,
                         })?;
-                    i += 16; // Each chunk is 16 bytes (8 for begin, 8 for end)
+                    i += 16;
                     chunks.push(chunk);
 
-                    // Update first_feature_offset if this chunk's begin_vp is less than the current first_feature_offset
                     if chunk.begin_vp.virtual_pointer < tabix.first_feature_offset.virtual_pointer {
                         tabix.first_feature_offset = chunk.begin_vp;
                     }
@@ -188,13 +186,13 @@ impl TabixIndex {
                 chr_index.bins.insert(tabix_bin.bin, tabix_bin);
             }
 
-            let n_intv = i32::from_le_bytes(bytes[i..i + 4].try_into()?);
+            let n_intv = read_i32(&bytes, i)?;
             i += 4;
 
             let mut intervals = Vec::with_capacity(n_intv as usize);
 
             for _ in 0..n_intv {
-                let interval = u64::from_le_bytes(bytes[i..i + 8].try_into()?);
+                let interval = read_u64(&bytes, i)?;
                 i += 8;
                 intervals.push(interval);
             }
@@ -215,3 +213,115 @@ impl TabixIndex {
 }
 
 impl SamIndex for TabixIndex {}
+
+fn read_slice(bytes: &[u8], begin: usize, length: usize) -> Result<&[u8], ParsingError> {
+    let end = begin.checked_add(length).ok_or(ParsingError::InsufficientBytes)?;
+    bytes.get(begin..end).ok_or(ParsingError::InsufficientBytes)
+}
+
+fn read_i32(bytes: &[u8], offset: usize) -> Result<i32, ParsingError> {
+    let slice = read_slice(bytes, offset, 4)?;
+    Ok(i32::from_le_bytes(slice.try_into()?))
+}
+
+fn read_u32(bytes: &[u8], offset: usize) -> Result<u32, ParsingError> {
+    let slice = read_slice(bytes, offset, 4)?;
+    Ok(u32::from_le_bytes(slice.try_into()?))
+}
+
+fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, ParsingError> {
+    let slice = read_slice(bytes, offset, 8)?;
+    Ok(u64::from_le_bytes(slice.try_into()?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn le_i32(value: i32) -> Vec<u8> {
+        value.to_le_bytes().to_vec()
+    }
+
+    fn header_bytes() -> Vec<u8> {
+        let names = b"chr1\0".to_vec();
+        let name_length = names.len() as i32;
+        [
+            b"TBI\x01".to_vec(),
+            le_i32(1),
+            le_i32(2),
+            le_i32(1),
+            le_i32(2),
+            le_i32(0),
+            le_i32(35),
+            le_i32(0),
+            le_i32(name_length),
+            names,
+        ]
+        .concat()
+    }
+
+    fn reference_bytes() -> Vec<u8> {
+        [
+            le_i32(1),
+            4681u32.to_le_bytes().to_vec(),
+            le_i32(1),
+            0u64.to_le_bytes().to_vec(),
+            65536u64.to_le_bytes().to_vec(),
+            le_i32(1),
+            0u64.to_le_bytes().to_vec(),
+        ]
+        .concat()
+    }
+
+    fn index_bytes() -> Vec<u8> {
+        [header_bytes(), reference_bytes()].concat()
+    }
+
+    fn truncated(bytes: Vec<u8>, length: usize) -> Vec<u8> {
+        bytes.into_iter().take(length).collect()
+    }
+
+    #[test]
+    fn complete_index_parses() {
+        let tabix = TabixIndex::from_bytes(index_bytes()).unwrap();
+        assert_eq!(tabix.names, ["chr1"]);
+        assert_eq!(tabix.references.len(), 1);
+    }
+
+    #[test]
+    fn empty_bytes_return_an_error() {
+        let result = TabixIndex::from_bytes(Vec::new());
+        assert!(matches!(result, Err(ParsingError::InsufficientBytes)));
+    }
+
+    #[test]
+    fn truncated_header_returns_an_error() {
+        let bytes = truncated(index_bytes(), 10);
+        let result = TabixIndex::from_bytes(bytes);
+        assert!(matches!(result, Err(ParsingError::InsufficientBytes)));
+    }
+
+    #[test]
+    fn truncated_names_return_an_error() {
+        let header_length = header_bytes().len();
+        let bytes = truncated(index_bytes(), header_length - 2);
+        let result = TabixIndex::from_bytes(bytes);
+        assert!(matches!(result, Err(ParsingError::InsufficientBytes)));
+    }
+
+    #[test]
+    fn truncated_body_returns_an_error() {
+        let full_length = index_bytes().len();
+        let bytes = truncated(index_bytes(), full_length - 4);
+        let result = TabixIndex::from_bytes(bytes);
+        assert!(matches!(result, Err(ParsingError::InsufficientBytes)));
+    }
+
+    #[test]
+    fn truncated_chunk_returns_an_error() {
+        let header_length = header_bytes().len();
+        let bytes = truncated(index_bytes(), header_length + 16);
+        let result = TabixIndex::from_bytes(bytes);
+        assert!(matches!(result, Err(ParsingError::InsufficientBytes)));
+    }
+}

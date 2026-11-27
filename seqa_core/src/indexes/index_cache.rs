@@ -21,8 +21,9 @@ use crate::stores::{StoreService, error::StoreError};
 
 /// Determines the local cache path for an index file.
 ///
-/// For remote files (s3://, az://, gs://, https://), extracts the filename and
-/// uses it as the local cache name in the current working directory.
+/// For remote files (s3://, az://, gs://, http://, https://), returns `./<key>` in the
+/// current working directory, where the key is the whole remote path with every character
+/// outside `[A-Za-z0-9]` replaced by `_`.
 /// For local files, returns the path as-is (stripping the `file://` scheme if present).
 ///
 /// # Arguments
@@ -38,16 +39,21 @@ fn get_local_index_path(index_path: &str) -> PathBuf {
         || index_path.starts_with("https://");
 
     if is_remote {
-        let filename = index_path
-            .split('/')
-            .next_back()
-            .unwrap_or("index");
-
-        PathBuf::from(format!("./{}", filename))
+        let key = index_cache_key(index_path);
+        PathBuf::from(format!("./{}", key))
     } else {
         let fs_path = index_path.strip_prefix("file://").unwrap_or(index_path);
         PathBuf::from(fs_path)
     }
+}
+
+/// Builds a cache file name from a remote index path by replacing every character
+/// outside `[A-Za-z0-9]` with `_`.
+fn index_cache_key(index_path: &str) -> String {
+    index_path
+        .chars()
+        .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
+        .collect()
 }
 
 /// Checks if an index file exists locally, and if not, downloads it from the remote location.
@@ -65,19 +71,15 @@ pub(crate) async fn get_or_download_index(
 ) -> Result<Vec<u8>, StoreError> {
     let local_path = get_local_index_path(index_path);
 
-    // Check if index exists locally (skip when no_cache is set)
     if !no_cache && local_path.exists() {
-        // Read from local cache
         return fs::read(&local_path).await.map_err(|e| StoreError::CacheReadError {
             key: index_path.to_string(),
             source: e
         });
     }
 
-    // Index doesn't exist locally or failed to read - download from remote
     let bytes = store_service.get_object(index_path).await?;
 
-    // Try to cache the downloaded index locally (skip when no_cache is set)
     if !no_cache
         && let Err(e) = cache_index_locally(&local_path, &bytes).await {
             error!("Warning: Failed to cache index locally at {}: {}",
@@ -96,12 +98,10 @@ pub(crate) async fn get_or_download_index(
 /// # Returns
 /// * Result indicating success or failure
 async fn cache_index_locally(local_path: &Path, bytes: &[u8]) -> Result<(), std::io::Error> {
-    // Create parent directories if they don't exist
     if let Some(parent) = local_path.parent() {
         fs::create_dir_all(parent).await?;
     }
 
-    // Write the file
     let mut file = fs::File::create(local_path).await?;
     file.write_all(bytes).await?;
     file.flush().await?;
@@ -156,25 +156,25 @@ mod tests {
     #[test]
     fn test_get_local_index_path_remote_s3() {
         let path = get_local_index_path("s3://bucket/path/to/file.bam.bai");
-        assert_eq!(path, PathBuf::from("./file.bam.bai"));
+        assert_eq!(path, PathBuf::from("./s3___bucket_path_to_file_bam_bai"));
     }
 
     #[test]
     fn test_get_local_index_path_remote_https() {
         let path = get_local_index_path("https://example.com/data/sample.vcf.gz.tbi");
-        assert_eq!(path, PathBuf::from("./sample.vcf.gz.tbi"));
+        assert_eq!(path, PathBuf::from("./https___example_com_data_sample_vcf_gz_tbi"));
     }
 
     #[test]
     fn test_get_local_index_path_remote_azure() {
         let path = get_local_index_path("az://container/folder/file.bam.bai");
-        assert_eq!(path, PathBuf::from("./file.bam.bai"));
+        assert_eq!(path, PathBuf::from("./az___container_folder_file_bam_bai"));
     }
 
     #[test]
     fn test_get_local_index_path_remote_gcs() {
         let path = get_local_index_path("gs://bucket/data/file.bam.bai");
-        assert_eq!(path, PathBuf::from("./file.bam.bai"));
+        assert_eq!(path, PathBuf::from("./gs___bucket_data_file_bam_bai"));
     }
 
     #[test]
@@ -193,6 +193,43 @@ mod tests {
     fn test_get_local_index_path_file_scheme() {
         let path = get_local_index_path("file:///media/user/data/file.bam.bai");
         assert_eq!(path, PathBuf::from("/media/user/data/file.bam.bai"));
+    }
+
+    #[test]
+    fn test_get_local_index_path_preserves_case() {
+        let sample = get_local_index_path("s3://b/Sample.bai");
+        let xample = get_local_index_path("s3://b/Xample.bai");
+        assert_eq!(sample, PathBuf::from("./s3___b_Sample_bai"));
+        assert_eq!(xample, PathBuf::from("./s3___b_Xample_bai"));
+    }
+
+    #[test]
+    fn test_get_local_index_path_same_name_different_buckets() {
+        let first = get_local_index_path("s3://bucket-a/data/sample.bam.bai");
+        let second = get_local_index_path("s3://bucket-b/data/sample.bam.bai");
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn test_get_local_index_path_same_path_different_schemes() {
+        let s3 = get_local_index_path("s3://data/sample.bam.bai");
+        let gcs = get_local_index_path("gs://data/sample.bam.bai");
+        assert_ne!(s3, gcs);
+    }
+
+    #[test]
+    fn test_get_local_index_path_host_with_port() {
+        let path = get_local_index_path("https://example.com:8080/data/x.tbi");
+        assert_eq!(path, PathBuf::from("./https___example_com_8080_data_x_tbi"));
+    }
+
+    #[test]
+    fn test_get_local_index_path_parent_segments_stay_in_working_directory() {
+        let path = get_local_index_path("s3://bucket/../../etc/x.bai");
+        let key = path.strip_prefix("./").unwrap().to_str().unwrap();
+        assert!(!key.contains('/'));
+        assert!(!key.contains('.'));
+        assert_eq!(key, "s3___bucket_______etc_x_bai");
     }
 
     #[tokio::test]
